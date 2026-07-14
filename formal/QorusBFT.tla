@@ -214,4 +214,50 @@ Fairness ==
 SafeSpec == Init /\ [][Next]_vars
 Spec == Init /\ [][Next]_vars /\ Fairness
 
+-----------------------------------------------------------------------------
+(* Invariants.                                                               *)
+
+TypeOK ==
+    /\ msgs \subseteq ( [ kind : {"propose"}, from : Validators, height : Heights, view : 0 .. MaxView, block : AllBlocks ]
+                        \cup [ kind : {"vote"}, from : Validators, height : Heights, block : AllBlocks ] )
+    /\ certs \subseteq [ height : Heights, block : AllBlocks ]
+    /\ view \in [ Heights -> 0 .. MaxView ]
+    /\ stable \in BOOLEAN
+
+(* Safety, no two conflicting blocks are ever finalized at one height.       *)
+Agreement == \A c1, c2 \in certs : (c1.height = c2.height) => (c1.block = c2.block)
+
+(* Safety, a finalized block is valid, meaning well shaped, within budget,   *)
+(* and descending from the previous finalized value.                        *)
+ValidFinalized == \A c \in certs : ValidBlock(c.block, c.height)
+
+(* Safety, a finalized block descends from the previous finalized block, or  *)
+(* from Genesis at the first height.                                         *)
+ChainDescends ==
+    \A c \in certs :
+        IF c.height = MinHeight
+          THEN c.block.parent = Genesis
+          ELSE /\ Decided(c.height - 1)
+               /\ c.block.parent = FinalBlockOf(c.height - 1).val
+
+(* The set of validators that attested two different blocks at one height,   *)
+(* which is the only slashable fault.                                        *)
+Equivocators ==
+    { x \in Validators :
+        \E m1, m2 \in msgs :
+            /\ m1.kind = "vote" /\ m2.kind = "vote"
+            /\ m1.from = x /\ m2.from = x
+            /\ m1.height = m2.height
+            /\ m1.block # m2.block }
+
+(* Only byzantine validators are ever slashable, honest ones never          *)
+(* equivocate.                                                               *)
+OnlyByzantineSlashed == Equivocators \subseteq Byzantine
+
+(* An absent validator is never slashable, it casts no attestation.         *)
+OfflineNeverSlashed == Offline \cap Equivocators = {}
+
+(* Provers hold no vote, no attestation ever originates from a prover.       *)
+ProversHaveNoVote == \A m \in msgs : m.from \in Validators
+
 =============================================================================
