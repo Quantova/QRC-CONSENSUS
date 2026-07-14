@@ -2,6 +2,7 @@
 
 pub mod attest;
 pub mod block;
+pub mod certificate;
 pub mod committee;
 pub mod hash;
 pub mod message;
