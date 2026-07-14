@@ -1,6 +1,6 @@
 [workspace]
 resolver = "2"
-members = ["crates/qtv-sim", "crates/qtv-bft", "crates/qtv-sampler"]
+members = ["crates/qtv-sim", "crates/qtv-bft", "crates/qtv-sampler", "crates/qtv-attest"]
 
 # The hash based verifiable random function in qtv-crypto is heavy under an
 # unoptimized build. Optimize the crypto dependency in dev and test builds so the
