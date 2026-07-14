@@ -21,4 +21,5 @@
 //! lowers the count without penalty.
 
 pub mod attestation;
+pub mod attester;
 pub mod params;
