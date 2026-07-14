@@ -12,6 +12,7 @@
 //! Each state machine action in `machine` corresponds to an action of the
 //! `Next` relation in the formal model, so a reviewer can line the two up.
 
+pub mod attest;
 pub mod block;
 pub mod committee;
 pub mod hash;
