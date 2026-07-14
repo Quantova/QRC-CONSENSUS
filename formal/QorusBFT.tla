@@ -177,4 +177,41 @@ Finalize(h, b) ==
        /\ certs' = certs \cup {c}
        /\ UNCHANGED << msgs, view, stable >>
 
+(* A timeout advances the view of an undecided height, rotating the leader.  *)
+(* Before stabilization the network may time out at any point. After         *)
+(* stabilization it only rotates past a leader that is offline or byzantine. *)
+Timeout(h) ==
+    /\ Working(h)
+    /\ view[h] < MaxView
+    /\ \/ ~ stable
+       \/ /\ stable
+          /\ \/ Leader(h, view[h]) \in Offline
+             \/ Leader(h, view[h]) \in Byzantine
+    /\ view' = [ view EXCEPT ![h] = view[h] + 1 ]
+    /\ UNCHANGED << msgs, certs, stable >>
+
+Stabilize ==
+    /\ ~ stable
+    /\ stable' = TRUE
+    /\ UNCHANGED << msgs, certs, view >>
+
+Next ==
+    \/ \E h \in Heights : HonestPropose(h)
+    \/ \E h \in Heights, b \in AllBlocks : ByzPropose(h, b)
+    \/ \E x \in Validators, h \in Heights, b \in AllBlocks : Vote(x, h, b)
+    \/ \E x \in Validators, h \in Heights, b \in AllBlocks : ByzVote(x, h, b)
+    \/ \E h \in Heights, b \in AllBlocks : Finalize(h, b)
+    \/ \E h \in Heights : Timeout(h)
+    \/ Stabilize
+
+Fairness ==
+    /\ WF_vars(Stabilize)
+    /\ \A h \in Heights : WF_vars(HonestPropose(h))
+    /\ \A h \in Heights : WF_vars(Timeout(h))
+    /\ \A x \in Validators : \A h \in Heights : \A b \in BlocksAt(h) : WF_vars(Vote(x, h, b))
+    /\ \A h \in Heights : \A b \in BlocksAt(h) : WF_vars(Finalize(h, b))
+
+SafeSpec == Init /\ [][Next]_vars
+Spec == Init /\ [][Next]_vars /\ Fairness
+
 =============================================================================
