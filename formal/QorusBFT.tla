@@ -260,4 +260,10 @@ OfflineNeverSlashed == Offline \cap Equivocators = {}
 (* Provers hold no vote, no attestation ever originates from a prover.       *)
 ProversHaveNoVote == \A m \in msgs : m.from \in Validators
 
+-----------------------------------------------------------------------------
+(* Liveness. After the network stabilizes, with an honest online            *)
+(* supermajority, every pending height eventually finalizes.                *)
+AllFinalized == \A h \in Heights : Decided(h)
+Liveness == stable ~> AllFinalized
+
 =============================================================================
