@@ -13,3 +13,4 @@
 //! by the resource budget, a consensus parameter.
 
 pub mod params;
+pub mod stake;
