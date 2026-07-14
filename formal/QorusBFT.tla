@@ -60,4 +60,50 @@ WithinBudget(b) == Cost(b) <= ResourceBound
 (* view. Every validator appears as leader as the view advances.            *)
 Leader(h, v) == ((h + v) % N) + 1
 
+-----------------------------------------------------------------------------
+VARIABLES
+    msgs,   \* the growing set of authenticated proposals and attestations
+    certs,  \* the set of finality certificates, one intended per height
+    view,   \* the current view per height, advanced by a timeout
+    stable  \* partial synchrony, TRUE once the network has stabilized
+
+vars == << msgs, certs, view, stable >>
+
+Decided(h) == \E c \in certs : c.height = h
+FinalBlockOf(h) == (CHOOSE c \in certs : c.height = h).block
+ParentVal(h) == IF h = MinHeight THEN Genesis ELSE FinalBlockOf(h - 1).val
+
+(* A height is being worked when it is undecided and every earlier height   *)
+(* is already decided, so the chain grows in order.                         *)
+Working(h) == /\ ~ Decided(h)
+              /\ \A g \in Heights : (g < h) => Decided(g)
+
+(* A block is valid at a height when it is shaped for that height, carries  *)
+(* a known value, descends from the previous finalized value, and respects  *)
+(* the resource budget.                                                     *)
+ValidBlock(b, h) == /\ b.height = h
+                    /\ b.val \in Vals
+                    /\ b.parent = ParentVal(h)
+                    /\ WithinBudget(b)
+
+HonestProposal(h) == [ height |-> h,
+                       val |-> CHOOSE x \in Vals : TRUE,
+                       parent |-> ParentVal(h) ]
+
+VotedFor(x, h, b) == \E m \in msgs : /\ m.kind = "vote"
+                                     /\ m.from = x
+                                     /\ m.height = h
+                                     /\ m.block = b
+
+VotedOther(x, h, b) == \E m \in msgs : /\ m.kind = "vote"
+                                       /\ m.from = x
+                                       /\ m.height = h
+                                       /\ m.block # b
+
+SawProposal(h, b) == \E m \in msgs : /\ m.kind = "propose"
+                                     /\ m.height = h
+                                     /\ m.block = b
+                                     /\ m.view <= view[h]
+                                     /\ m.from = Leader(h, m.view)
+
 =============================================================================
