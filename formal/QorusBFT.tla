@@ -106,4 +106,35 @@ SawProposal(h, b) == \E m \in msgs : /\ m.kind = "propose"
                                      /\ m.view <= view[h]
                                      /\ m.from = Leader(h, m.view)
 
+-----------------------------------------------------------------------------
+Init == /\ msgs = {}
+        /\ certs = {}
+        /\ view = [ h \in Heights |-> 0 ]
+        /\ stable = FALSE
+
+(* The honest leader of the current view proposes its single valid block.   *)
+HonestPropose(h) ==
+    LET l == Leader(h, view[h])
+        b == HonestProposal(h)
+        m == [ kind |-> "propose", from |-> l, height |-> h, view |-> view[h], block |-> b ]
+    IN /\ Working(h)
+       /\ l \in Honest
+       /\ l \notin Offline
+       /\ m \notin msgs
+       /\ msgs' = msgs \cup {m}
+       /\ UNCHANGED << certs, view, stable >>
+
+(* A byzantine leader may propose any block, including an invalid one or a   *)
+(* second block in the same view, which is an equivocating proposal.         *)
+ByzPropose(h, b) ==
+    LET l == Leader(h, view[h])
+        m == [ kind |-> "propose", from |-> l, height |-> h, view |-> view[h], block |-> b ]
+    IN /\ Working(h)
+       /\ l \in Byzantine
+       /\ l \notin Offline
+       /\ b \in BlocksAt(h)
+       /\ m \notin msgs
+       /\ msgs' = msgs \cup {m}
+       /\ UNCHANGED << certs, view, stable >>
+
 =============================================================================
