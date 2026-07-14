@@ -1,0 +1,12 @@
+[package]
+name = "qtv-sampler"
+version = "0.1.0"
+edition = "2021"
+license = "Apache-2.0 OR MIT"
+publish = false
+
+[lib]
+name = "qtv_sampler"
+
+[dependencies]
+qtv-crypto = { git = "https://github.com/Quantova/Q-Crypto.git", tag = "v0.1.0" }
