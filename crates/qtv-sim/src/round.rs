@@ -3,9 +3,12 @@
 //! blocks at the same height is flagged for slashing. Offline validators are
 //! skipped and never slashed.
 
+use crate::certificate::{aggregate, Certificate};
 use crate::committee::{rotation_order, sample_committee};
 use crate::hash::combine;
 use crate::validator::{Fault, ValidatorId, ValidatorSet};
+
+const STALL_TAG: u64 = 0x5354414c4c;
 
 pub type BlockId = u64;
 
@@ -70,7 +73,19 @@ pub struct RoundOutcome {
     pub committee: Vec<ValidatorId>,
     pub proposer: Option<ValidatorId>,
     pub proposal: Option<BlockId>,
+    pub certificate: Option<Certificate>,
     pub slashed: Vec<ValidatorId>,
+    pub next_seed: u64,
+}
+
+impl RoundOutcome {
+    pub fn finalized(&self) -> bool {
+        self.certificate.is_some()
+    }
+
+    pub fn final_block(&self) -> Option<BlockId> {
+        self.certificate.map(|c| c.block)
+    }
 }
 
 pub fn run_round(
@@ -83,13 +98,19 @@ pub fn run_round(
     let proposer = select_proposer(set, &committee, seed, height);
     let proposal = proposer.map(|_| canonical_block(height, seed));
 
-    let slashed = match proposal {
+    let (certificate, slashed) = match proposal {
         Some(block) => {
             let conflict = conflicting_block(height, seed);
             let votes = collect_votes(set, &committee, block, conflict);
-            detect_equivocation(&votes)
+            let certificate = aggregate(height, seed, &committee, &votes, committee_size);
+            (certificate, detect_equivocation(&votes))
         }
-        None => Vec::new(),
+        None => (None, Vec::new()),
+    };
+
+    let next_seed = match &certificate {
+        Some(c) => combine(seed, c.block),
+        None => combine(seed, height ^ STALL_TAG),
     };
 
     RoundOutcome {
@@ -98,6 +119,8 @@ pub fn run_round(
         committee,
         proposer,
         proposal,
+        certificate,
         slashed,
+        next_seed,
     }
 }
