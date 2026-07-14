@@ -22,4 +22,5 @@
 
 pub mod attestation;
 pub mod attester;
+pub mod committee;
 pub mod params;
