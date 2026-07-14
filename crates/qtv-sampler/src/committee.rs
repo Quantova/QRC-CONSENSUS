@@ -1,5 +1,7 @@
 //! Committee and leader selection by verifiable random sortition. A registry
 
+use qtv_crypto::vrf::{verify, PUBLIC_KEY_BYTES};
+
 use crate::beacon::Beacon;
 use crate::params::{COMMITTEE_BUDGET, DOMAIN_COMMITTEE, DOMAIN_LEADER};
 use crate::sortition::{draw, is_selected, Draw};
@@ -39,6 +41,17 @@ impl Committee {
 pub struct Leader {
     pub id: ValidatorId,
     pub draw: Draw,
+}
+
+/// Verify a proposer eligibility proof: the leader draw checks against the
+pub fn verify_leader(
+    public_key: &[u8; PUBLIC_KEY_BYTES],
+    beacon: &Beacon,
+    slot: u64,
+    draw: &Draw,
+) -> bool {
+    let input = beacon.sortition_input(DOMAIN_LEADER, slot);
+    verify(public_key, &input, &draw.output, &draw.proof)
 }
 
 /// A registry of validators and the committee budget that bounds the target
