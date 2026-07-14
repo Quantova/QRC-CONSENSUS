@@ -6,6 +6,7 @@ pub mod certificate;
 pub mod committee;
 pub mod equivocation;
 pub mod hash;
+pub mod machine;
 pub mod message;
 pub mod params;
 pub mod validator;
