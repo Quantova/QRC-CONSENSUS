@@ -13,6 +13,7 @@
 //! by the resource budget, a consensus parameter.
 
 pub mod beacon;
+pub mod committee;
 pub mod params;
 pub mod sortition;
 pub mod stake;
