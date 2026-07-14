@@ -12,5 +12,6 @@
 //! selected is simply skipped and is never slashed. The committee size is bounded
 //! by the resource budget, a consensus parameter.
 
+pub mod beacon;
 pub mod params;
 pub mod stake;
