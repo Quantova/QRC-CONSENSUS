@@ -16,5 +16,6 @@ pub mod attest;
 pub mod block;
 pub mod committee;
 pub mod hash;
+pub mod message;
 pub mod params;
 pub mod validator;
