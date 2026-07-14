@@ -137,4 +137,44 @@ ByzPropose(h, b) ==
        /\ msgs' = msgs \cup {m}
        /\ UNCHANGED << certs, view, stable >>
 
+(* An honest validator attests a validly proposed block from the legitimate  *)
+(* leader of a view it has reached, and only when it has not already         *)
+(* attested a different block at this height, so an honest validator never   *)
+(* equivocates.                                                              *)
+Vote(x, h, b) ==
+    LET m == [ kind |-> "vote", from |-> x, height |-> h, block |-> b ]
+    IN /\ Working(h)
+       /\ x \in Honest
+       /\ x \notin Offline
+       /\ ValidBlock(b, h)
+       /\ SawProposal(h, b)
+       /\ ~ VotedOther(x, h, b)
+       /\ m \notin msgs
+       /\ msgs' = msgs \cup {m}
+       /\ UNCHANGED << certs, view, stable >>
+
+(* A byzantine validator may attest any block and may attest two different   *)
+(* blocks at one height, which is equivocation.                              *)
+ByzVote(x, h, b) ==
+    LET m == [ kind |-> "vote", from |-> x, height |-> h, block |-> b ]
+    IN /\ Working(h)
+       /\ x \in Byzantine
+       /\ b \in BlocksAt(h)
+       /\ m \notin msgs
+       /\ msgs' = msgs \cup {m}
+       /\ UNCHANGED << certs, view, stable >>
+
+(* When a quorum has attested one block, the attestations aggregate into a   *)
+(* single certificate and the block is finalized. The rule does not forbid   *)
+(* a second certificate at the same height, so the model would expose a      *)
+(* conflicting finalization if the quorum arithmetic allowed one.            *)
+Finalize(h, b) ==
+    LET c == [ height |-> h, block |-> b ]
+    IN /\ h \in Heights
+       /\ \A g \in Heights : (g < h) => Decided(g)
+       /\ \E Q \in Quorums : \A x \in Q : VotedFor(x, h, b)
+       /\ c \notin certs
+       /\ certs' = certs \cup {c}
+       /\ UNCHANGED << msgs, view, stable >>
+
 =============================================================================
