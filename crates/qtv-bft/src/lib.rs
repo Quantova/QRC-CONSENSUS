@@ -15,3 +15,4 @@
 pub mod block;
 pub mod hash;
 pub mod params;
+pub mod validator;
