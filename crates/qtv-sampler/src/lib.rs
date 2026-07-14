@@ -11,3 +11,5 @@
 //! prover holds zero votes and is never selected. An offline validator that is
 //! selected is simply skipped and is never slashed. The committee size is bounded
 //! by the resource budget, a consensus parameter.
+
+pub mod params;
