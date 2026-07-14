@@ -19,3 +19,5 @@
 //! The certificate is module lattice only, per the frozen consensus decision. A
 //! prover holds no vote and contributes nothing, and an offline absentee simply
 //! lowers the count without penalty.
+
+pub mod params;
