@@ -2,5 +2,6 @@
 
 pub mod beacon;
 pub mod params;
+pub mod sortition;
 pub mod stake;
 pub mod validator;
