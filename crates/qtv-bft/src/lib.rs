@@ -13,6 +13,7 @@
 //! `Next` relation in the formal model, so a reviewer can line the two up.
 
 pub mod block;
+pub mod committee;
 pub mod hash;
 pub mod params;
 pub mod validator;
