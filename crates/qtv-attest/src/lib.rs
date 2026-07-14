@@ -20,4 +20,5 @@
 //! prover holds no vote and contributes nothing, and an offline absentee simply
 //! lowers the count without penalty.
 
+pub mod attestation;
 pub mod params;
