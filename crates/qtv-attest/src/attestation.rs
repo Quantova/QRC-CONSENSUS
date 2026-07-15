@@ -3,9 +3,9 @@
 use qtv_bft::block::{Block, Height};
 use qtv_bft::validator::{Validator, ValidatorId};
 use qtv_crypto::ml_dsa::{verify, PublicKey, Signature};
-use qtv_crypto::vrf_mldsa::PUBLIC_KEY_BYTES;
 use qtv_sampler::beacon::Beacon;
-use qtv_sampler::sortition::{verify_selection, Draw};
+use qtv_sampler::onetime::Root;
+use qtv_sampler::sortition::{verify_selection, Credential};
 
 use crate::params::{ATTEST_CONTEXT, DOMAIN_COMMITTEE};
 
@@ -25,7 +25,7 @@ pub struct Attestation {
     pub height: Height,
     pub slot: u64,
     pub block: Block,
-    pub membership: Draw,
+    pub membership: Credential,
     pub sig: Signature,
 }
 
@@ -36,7 +36,7 @@ impl Attestation {
         height: Height,
         slot: u64,
         block: Block,
-        membership: Draw,
+        membership: Credential,
     ) -> Self {
         let msg = attestation_message(height, slot, &block);
         let sig = signer.sign(&msg, ATTEST_CONTEXT);
@@ -56,17 +56,17 @@ impl Attestation {
         verify(attest_pk, &msg, &self.sig, ATTEST_CONTEXT)
     }
 
-    /// True when the membership draw proves the signer was an entitled committee
+    /// True when the membership credential proves the signer was an entitled
     pub fn is_entitled(
         &self,
-        vrf_pk: &[u8; PUBLIC_KEY_BYTES],
+        root: &Root,
         beacon: &Beacon,
         weight: u64,
         total: u64,
         budget: u64,
     ) -> bool {
         verify_selection(
-            vrf_pk,
+            root,
             beacon,
             DOMAIN_COMMITTEE,
             self.slot,
@@ -82,7 +82,6 @@ impl Attestation {
 mod tests {
     use super::*;
     use qtv_bft::block::Parent;
-    use qtv_sampler::sortition::draw;
     use qtv_sampler::validator::SamplerValidator;
 
     // A budget that saturates a single validator's whole stake share, so a valid
@@ -98,20 +97,19 @@ mod tests {
         let (signer, sampler) = parts(1, 100);
         let beacon = Beacon::genesis();
         let block = Block::new(1, 5, Parent::Genesis);
-        let membership = draw(&sampler, &beacon, DOMAIN_COMMITTEE, 0);
+        let membership = sampler.reveal(0);
         let att = Attestation::create(&signer, 1, 0, block, membership);
 
         assert!(att.signature_verifies(signer.public_key()));
-        assert!(att.is_entitled(sampler.public_key(), &beacon, 100, 100, SATURATING_BUDGET));
+        assert!(att.is_entitled(&sampler.root(), &beacon, 100, 100, SATURATING_BUDGET));
     }
 
     #[test]
     fn a_signature_under_the_wrong_key_is_rejected() {
         let (signer, sampler) = parts(1, 100);
         let other = Validator::new(2);
-        let beacon = Beacon::genesis();
         let block = Block::new(1, 5, Parent::Genesis);
-        let membership = draw(&sampler, &beacon, DOMAIN_COMMITTEE, 0);
+        let membership = sampler.reveal(0);
         let att = Attestation::create(&signer, 1, 0, block, membership);
         assert!(!att.signature_verifies(other.public_key()));
     }
@@ -119,24 +117,23 @@ mod tests {
     #[test]
     fn a_tampered_block_breaks_the_signature() {
         let (signer, sampler) = parts(1, 100);
-        let beacon = Beacon::genesis();
         let block = Block::new(1, 5, Parent::Genesis);
-        let membership = draw(&sampler, &beacon, DOMAIN_COMMITTEE, 0);
+        let membership = sampler.reveal(0);
         let mut att = Attestation::create(&signer, 1, 0, block, membership);
         att.block = Block::new(1, 6, Parent::Genesis);
         assert!(!att.signature_verifies(signer.public_key()));
     }
 
     #[test]
-    fn a_membership_draw_from_another_key_is_not_entitled() {
+    fn a_membership_credential_from_another_account_is_not_entitled() {
         let (signer, sampler) = parts(1, 100);
         let impostor = SamplerValidator::new(9, 100);
         let beacon = Beacon::genesis();
         let block = Block::new(1, 5, Parent::Genesis);
-        // Draw with the impostor key but sign with the real signer key.
-        let membership = draw(&impostor, &beacon, DOMAIN_COMMITTEE, 0);
+        // Reveal with the impostor's tree but sign with the real signer key.
+        let membership = impostor.reveal(0);
         let att = Attestation::create(&signer, 1, 0, block, membership);
-        // The draw does not verify under the signer's own verifiable random key.
-        assert!(!att.is_entitled(sampler.public_key(), &beacon, 100, 100, SATURATING_BUDGET));
+        // The credential does not authenticate to the signer's own registered root.
+        assert!(!att.is_entitled(&sampler.root(), &beacon, 100, 100, SATURATING_BUDGET));
     }
 }

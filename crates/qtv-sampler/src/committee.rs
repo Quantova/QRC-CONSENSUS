@@ -1,16 +1,16 @@
-//! Committee and leader selection by verifiable random sortition. A registry
-
-use qtv_crypto::vrf_mldsa::{verify, PUBLIC_KEY_BYTES};
+//! Committee and leader selection on the one time key sortition. A registry holds
 
 use crate::beacon::Beacon;
+use crate::onetime::Root;
 use crate::params::{COMMITTEE_BUDGET, DOMAIN_COMMITTEE, DOMAIN_LEADER};
-use crate::sortition::{draw, is_selected, Draw};
-use crate::validator::{SamplerValidator, ValidatorId};
+use crate::sortition::{is_selected, leader_score, verify_membership, Credential};
+use crate::validator::{Registration, SamplerValidator, ValidatorId};
 
-/// A committee member: its id and the committee draw that admitted it.
+/// A committee member: its id, its native weight, and the one time credential
 pub struct Member {
     pub id: ValidatorId,
-    pub draw: Draw,
+    pub weight: u64,
+    pub credential: Credential,
 }
 
 /// The committee sampled for a slot, in ascending id order.
@@ -37,31 +37,25 @@ impl Committee {
     }
 }
 
-/// The leader of a slot: its id and the leader draw that proves eligibility.
+/// The leader of a slot: its id and the credential that proves eligibility.
 pub struct Leader {
     pub id: ValidatorId,
-    pub draw: Draw,
+    pub credential: Credential,
 }
 
-/// Verify a proposer eligibility proof: the leader draw checks against the
-pub fn verify_leader(
-    public_key: &[u8; PUBLIC_KEY_BYTES],
-    beacon: &Beacon,
-    slot: u64,
-    draw: &Draw,
-) -> bool {
-    let input = beacon.sortition_input(DOMAIN_LEADER, slot);
-    verify(public_key, &input, &draw.output, &draw.proof)
+/// Verify a proposer eligibility proof: the leader credential authenticates to
+pub fn verify_leader(root: &Root, slot: u64, credential: &Credential) -> bool {
+    verify_membership(root, slot, credential)
 }
 
-/// A registry of validators and the committee budget that bounds the target
+/// A registry of staking accounts and the committee budget that bounds the target
 pub struct Registry {
     validators: Vec<SamplerValidator>,
     budget: u64,
 }
 
 impl Registry {
-    /// A registry over the given validators with the protocol committee budget.
+    /// A registry over the given accounts with the protocol committee budget.
     pub fn new(validators: Vec<SamplerValidator>) -> Self {
         Registry {
             validators,
@@ -83,12 +77,17 @@ impl Registry {
         self.validators.iter().find(|v| v.id == id)
     }
 
-    /// Total native weight of the voting validators. Provers and bridged
+    /// The public registration of an account, the root and weight a verifier reads
+    pub fn registration(&self, id: ValidatorId) -> Option<Registration> {
+        self.get(id).map(Registration::of)
+    }
+
+    /// Total native weight of the voting accounts. Provers and bridged holdings
     pub fn total_weight(&self) -> u64 {
         self.validators.iter().map(SamplerValidator::weight).sum()
     }
 
-    /// Native weights of the voting validators, for reasoning about the expected
+    /// Native weights of the voting accounts, for reasoning about the expected
     pub fn weights(&self) -> Vec<u64> {
         self.validators
             .iter()
@@ -97,7 +96,7 @@ impl Registry {
             .collect()
     }
 
-    /// Sample the committee for a slot. Every voting validator draws over the
+    /// Sample the committee for a slot. Every voting account reveals its one time
     pub fn sample_committee(&self, beacon: &Beacon, slot: u64) -> Committee {
         let total = self.total_weight();
         let mut members: Vec<Member> = Vec::new();
@@ -105,35 +104,40 @@ impl Registry {
             if v.is_prover() {
                 continue;
             }
-            let d = draw(v, beacon, DOMAIN_COMMITTEE, slot);
-            if is_selected(d.value(), v.weight(), total, self.budget) {
-                members.push(Member { id: v.id, draw: d });
+            let credential = v.reveal(slot);
+            let value = credential.value(beacon, DOMAIN_COMMITTEE, slot);
+            if is_selected(value, v.weight(), total, self.budget) {
+                members.push(Member {
+                    id: v.id,
+                    weight: v.weight(),
+                    credential,
+                });
             }
         }
         members.sort_by_key(|m| m.id);
         Committee { members }
     }
 
-    /// Elect the leader of a slot from a committee: the member with the lowest
+    /// Elect the leader of a slot from a committee: the member that wins the stake
     pub fn elect_leader(
         &self,
         committee: &Committee,
         beacon: &Beacon,
         slot: u64,
     ) -> Option<Leader> {
-        let mut best: Option<Leader> = None;
+        let mut best: Option<(f64, ValidatorId, Credential)> = None;
         for m in &committee.members {
-            let Some(v) = self.get(m.id) else { continue };
-            let d = draw(v, beacon, DOMAIN_LEADER, slot);
+            let output = m.credential.output(beacon, DOMAIN_LEADER, slot);
+            let score = leader_score(&output, m.weight);
             let take = match &best {
                 None => true,
-                Some(b) => d.output < b.draw.output || (d.output == b.draw.output && m.id < b.id),
+                Some((bs, bid, _)) => score < *bs || (score == *bs && m.id < *bid),
             };
             if take {
-                best = Some(Leader { id: m.id, draw: d });
+                best = Some((score, m.id, m.credential.clone()));
             }
         }
-        best
+        best.map(|(_, id, credential)| Leader { id, credential })
     }
 }
 
@@ -150,12 +154,15 @@ mod tests {
     }
 
     #[test]
-    fn a_generous_budget_admits_every_validator_and_elects_one_leader() {
+    fn a_generous_budget_admits_every_account_and_elects_one_leader() {
         let reg = Registry::new(validators(&[100, 100, 100])).with_budget(10);
         let beacon = Beacon::genesis();
         let committee = reg.sample_committee(&beacon, 0);
         assert_eq!(committee.ids(), vec![1, 2, 3]);
         let leader = reg.elect_leader(&committee, &beacon, 0).unwrap();
         assert!(committee.contains(leader.id));
+        // The leader credential rechecks against the leader's registered root.
+        let root = reg.registration(leader.id).unwrap().root;
+        assert!(verify_leader(&root, 0, &leader.credential));
     }
 }

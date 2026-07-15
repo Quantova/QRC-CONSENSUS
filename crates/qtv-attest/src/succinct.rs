@@ -29,8 +29,7 @@ pub fn attestation_set_digest(attestations: &[Attestation]) -> [u8; 32] {
     buf.extend_from_slice(&(ordered.len() as u64).to_le_bytes());
     for att in ordered {
         buf.extend_from_slice(&att.from.to_le_bytes());
-        buf.extend_from_slice(&att.membership.output);
-        buf.extend_from_slice(&att.membership.proof);
+        buf.extend_from_slice(&att.membership.to_bytes());
         buf.extend_from_slice(&att.sig);
     }
     let mut out = [0u8; 32];
