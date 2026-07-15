@@ -10,5 +10,10 @@ name = "qtv_attest"
 
 [dependencies]
 qtv-crypto = { git = "https://github.com/Quantova/Q-Crypto.git", tag = "v0.1.0" }
+qtv-stark = { git = "https://github.com/Quantova/q-prover.git", tag = "v0.6.0" }
 qtv-bft = { path = "../qtv-bft" }
 qtv-sampler = { path = "../qtv-sampler" }
+
+[[bench]]
+name = "stage_two"
+harness = false
