@@ -1,6 +1,6 @@
 //! Committee and leader selection by verifiable random sortition. A registry
 
-use qtv_crypto::vrf::{verify, PUBLIC_KEY_BYTES};
+use qtv_crypto::vrf_mldsa::{verify, PUBLIC_KEY_BYTES};
 
 use crate::beacon::Beacon;
 use crate::params::{COMMITTEE_BUDGET, DOMAIN_COMMITTEE, DOMAIN_LEADER};
