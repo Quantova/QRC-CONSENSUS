@@ -43,7 +43,7 @@ pub fn aggregate(
             continue;
         }
         if !att.is_entitled(
-            &member.vrf_pk,
+            &member.root,
             beacon,
             member.weight,
             commitment.total_weight,

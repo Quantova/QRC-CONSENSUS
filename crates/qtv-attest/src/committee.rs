@@ -11,7 +11,7 @@
 
 use qtv_crypto::ml_dsa::PublicKey;
 use qtv_crypto::sha3::shake256;
-use qtv_crypto::vrf_mldsa::PUBLIC_KEY_BYTES;
+use qtv_sampler::onetime::Root;
 
 use crate::attester::{Attester, ValidatorId};
 use crate::params::COMMITTEE_BUDGET;
@@ -19,12 +19,14 @@ use crate::params::COMMITTEE_BUDGET;
 /// A 32 byte commitment to the committee for a slot.
 pub type CommitteeDigest = [u8; 32];
 
-/// The public keys and weight of one committee member.
+/// The committed root, module lattice key, and weight of one committee member.
+/// The root is the account's one time sortition identity, the value its committee
+/// entitlement is rechecked against.
 #[derive(Clone)]
 pub struct MemberKey {
     pub id: ValidatorId,
     pub weight: u64,
-    pub vrf_pk: [u8; PUBLIC_KEY_BYTES],
+    pub root: Root,
     pub attest_pk: PublicKey,
 }
 
@@ -54,7 +56,7 @@ impl CommitteeCommitment {
             .map(|a| MemberKey {
                 id: a.id(),
                 weight: a.weight(),
-                vrf_pk: *a.vrf_public_key(),
+                root: a.root(),
                 attest_pk: *a.attest_public_key(),
             })
             .collect();
@@ -99,7 +101,8 @@ impl CommitteeCommitment {
         for m in &self.members {
             buf.extend_from_slice(&m.id.to_le_bytes());
             buf.extend_from_slice(&m.weight.to_le_bytes());
-            buf.extend_from_slice(&m.vrf_pk);
+            buf.extend_from_slice(&m.root.digest);
+            buf.extend_from_slice(&m.root.slots.to_le_bytes());
             buf.extend_from_slice(&m.attest_pk);
         }
         let mut out = [0u8; 32];

@@ -53,11 +53,12 @@ fn a_swapped_block_is_rejected_as_wrong_subject() {
 }
 
 #[test]
-fn a_mangled_membership_proof_is_rejected_as_not_entitled() {
+fn a_mangled_membership_credential_is_rejected_as_not_entitled() {
     let (members, beacon, block, commitment) = setup();
     let mut atts = quorum_attestations(&members, &beacon, block);
-    // The signature stays valid, but the entitlement proof no longer verifies.
-    atts[0].membership.proof[0] ^= 1;
+    // The signature stays valid, but the mangled preimage no longer authenticates
+    // to the member's registered root, so entitlement no longer verifies.
+    atts[0].membership.preimage[0] ^= 1;
     let cert = Certificate::stage_one(Envelope::new(1, 0, block, &commitment), atts);
     assert_eq!(
         cert.verify(&commitment, &beacon),

@@ -8,13 +8,11 @@
 use qtv_bft::block::{Block, Height};
 use qtv_bft::validator::Validator;
 use qtv_crypto::ml_dsa::PublicKey;
-use qtv_crypto::vrf_mldsa::PUBLIC_KEY_BYTES;
 use qtv_sampler::beacon::Beacon;
-use qtv_sampler::sortition::draw;
+use qtv_sampler::onetime::Root;
 use qtv_sampler::validator::SamplerValidator;
 
 use crate::attestation::Attestation;
-use crate::params::DOMAIN_COMMITTEE;
 
 pub use qtv_bft::validator::ValidatorId;
 
@@ -58,17 +56,20 @@ impl Attester {
         self.signer.public_key()
     }
 
-    /// The verifiable random public key its committee entitlement is checked
-    /// under.
-    pub fn vrf_public_key(&self) -> &[u8; PUBLIC_KEY_BYTES] {
-        self.sampler.public_key()
+    /// The committed one time root its committee entitlement is checked against.
+    pub fn root(&self) -> Root {
+        self.sampler.root()
     }
 
     /// Attest a block at a height and slot. The attestation carries the committee
-    /// membership draw over the beacon and the module lattice signature over the
-    /// canonical message, tying entitlement to the signature under one key.
+    /// membership credential, the account's one time reveal for the slot, and the
+    /// module lattice signature over the canonical message, tying entitlement to
+    /// the signature under one identity. The reveal is a fixed function of the
+    /// slot, so the beacon is not needed to produce it; the beacon binds the output
+    /// at verification, where entitlement is checked.
     pub fn attest(&self, height: Height, slot: u64, block: Block, beacon: &Beacon) -> Attestation {
-        let membership = draw(&self.sampler, beacon, DOMAIN_COMMITTEE, slot);
+        let _ = beacon;
+        let membership = self.sampler.reveal(slot);
         Attestation::create(&self.signer, height, slot, block, membership)
     }
 }
@@ -86,7 +87,7 @@ mod tests {
         let att = a.attest(1, 0, block, &beacon);
         assert_eq!(att.from, a.id());
         assert!(att.signature_verifies(a.attest_public_key()));
-        assert!(att.is_entitled(a.vrf_public_key(), &beacon, a.weight(), a.weight(), 100));
+        assert!(att.is_entitled(&a.root(), &beacon, a.weight(), a.weight(), 100));
     }
 
     #[test]
@@ -98,6 +99,6 @@ mod tests {
         assert_eq!(p.weight(), 0);
         // The signature is genuine, yet zero weight means no passing entitlement.
         assert!(att.signature_verifies(p.attest_public_key()));
-        assert!(!att.is_entitled(p.vrf_public_key(), &beacon, 0, 100, 100));
+        assert!(!att.is_entitled(&p.root(), &beacon, 0, 100, 100));
     }
 }

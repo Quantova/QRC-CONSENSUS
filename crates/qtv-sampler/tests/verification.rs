@@ -1,119 +1,123 @@
-//! A selected validator produces a proof that verifies, and a validator that is
-//! not entitled cannot produce a passing proof. Verification uses only the public
-//! key, the public stake, and the beacon, never the secret key.
+//! A selected account produces a credential that verifies against its registered
+//! root, and an account that is not entitled cannot produce a passing credential.
+//! Verification uses only the registered root, the public stake, and the beacon,
+//! never a secret.
 
 use qtv_sampler::beacon::Beacon;
 use qtv_sampler::params::DOMAIN_COMMITTEE;
-use qtv_sampler::sortition::{draw, verify_selection};
+use qtv_sampler::sortition::verify_selection;
 use qtv_sampler::validator::SamplerValidator;
 
-// A budget that saturates the single validator's stake share, so a valid draw is
+// A budget that saturates the single account's stake share, so a valid draw is
 // always admitted.
 const SATURATING_BUDGET: u64 = 4;
 
 #[test]
-fn selected_validator_proof_verifies() {
+fn selected_account_credential_verifies() {
     let v = SamplerValidator::new(1, 100);
     let beacon = Beacon::genesis();
-    let d = draw(&v, &beacon, DOMAIN_COMMITTEE, 0);
+    let cred = v.reveal(0);
     assert!(verify_selection(
-        v.public_key(),
+        &v.root(),
         &beacon,
         DOMAIN_COMMITTEE,
         0,
         100,
         100,
         SATURATING_BUDGET,
-        &d,
+        &cred,
     ));
 }
 
 #[test]
 fn a_prover_is_never_entitled() {
-    // A prover holds zero weight, so no draw is ever below its threshold and no
-    // membership proof passes, whatever the total and budget.
+    // A prover holds zero weight, so no output is ever below its threshold and no
+    // membership credential passes, whatever the total and budget.
     let p = SamplerValidator::prover(9);
     let beacon = Beacon::genesis();
-    let d = draw(&p, &beacon, DOMAIN_COMMITTEE, 0);
+    let cred = p.reveal(0);
     assert!(!verify_selection(
-        p.public_key(),
+        &p.root(),
         &beacon,
         DOMAIN_COMMITTEE,
         0,
         0,
         100,
         SATURATING_BUDGET,
-        &d,
+        &cred,
     ));
 }
 
 #[test]
-fn an_unentitled_validator_has_a_genuine_but_failing_proof() {
-    // One tiny stake among a large total. The draw is a genuine verifiable
-    // random output, shown by its passing under a budget that saturates the
-    // share, yet it fails the real stake weighted membership check. Because the
-    // function is deterministic the validator cannot grind a lower output.
+fn an_unentitled_account_has_a_genuine_but_failing_credential() {
+    // One tiny stake among a large total. The credential is a genuine one time
+    // reveal, shown by its passing under a budget that saturates the share, yet it
+    // fails the real stake weighted membership check. Because the output is a fixed
+    // hash the account cannot grind a lower one.
     let v = SamplerValidator::new(1, 1);
     let total = 1_000_000;
     let beacon = Beacon::genesis();
-    let d = draw(&v, &beacon, DOMAIN_COMMITTEE, 0);
+    let cred = v.reveal(0);
 
     let genuine = verify_selection(
-        v.public_key(),
+        &v.root(),
         &beacon,
         DOMAIN_COMMITTEE,
         0,
         1,
         total,
         total, // budget == total saturates the share, so a valid draw passes
-        &d,
+        &cred,
     );
     let entitled = verify_selection(
-        v.public_key(),
+        &v.root(),
         &beacon,
         DOMAIN_COMMITTEE,
         0,
         1,
         total,
         1, // the real budget: the sliver threshold is not met
-        &d,
+        &cred,
     );
-    assert!(genuine, "the proof is a valid verifiable random output");
-    assert!(!entitled, "the validator is not entitled at its true stake");
+    assert!(genuine, "the credential is a valid one time reveal");
+    assert!(!entitled, "the account is not entitled at its true stake");
 }
 
 #[test]
-fn a_tampered_proof_does_not_verify() {
+fn a_tampered_preimage_does_not_verify() {
     let v = SamplerValidator::new(1, 100);
     let beacon = Beacon::genesis();
-    let mut d = draw(&v, &beacon, DOMAIN_COMMITTEE, 0);
-    d.proof[0] ^= 1;
+    let mut cred = v.reveal(0);
+    cred.preimage[0] ^= 1;
+    // A preimage that is not the committed leaf fails the Merkle check against the
+    // registered root, so the credential no longer authenticates.
     assert!(!verify_selection(
-        v.public_key(),
+        &v.root(),
         &beacon,
         DOMAIN_COMMITTEE,
         0,
         100,
         100,
         SATURATING_BUDGET,
-        &d,
+        &cred,
     ));
 }
 
 #[test]
-fn another_key_does_not_verify_the_draw() {
+fn another_root_does_not_verify_the_credential() {
     let v = SamplerValidator::new(1, 100);
     let other = SamplerValidator::new(2, 100);
     let beacon = Beacon::genesis();
-    let d = draw(&v, &beacon, DOMAIN_COMMITTEE, 0);
+    let cred = v.reveal(0);
+    // The credential authenticates to its own account's root, not another's.
     assert!(!verify_selection(
-        other.public_key(),
+        &other.root(),
         &beacon,
         DOMAIN_COMMITTEE,
         0,
         100,
         100,
         SATURATING_BUDGET,
-        &d,
+        &cred,
     ));
 }

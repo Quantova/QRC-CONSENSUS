@@ -113,7 +113,7 @@ fn verify_stage_one(
             return Verdict::Rejected(RejectReason::BadSignature);
         }
         if !att.is_entitled(
-            &member.vrf_pk,
+            &member.root,
             beacon,
             member.weight,
             commitment.total_weight,

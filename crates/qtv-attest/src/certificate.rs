@@ -162,8 +162,7 @@ impl Certificate {
                 buf.extend_from_slice(&(b.attestations.len() as u64).to_le_bytes());
                 for a in &b.attestations {
                     buf.extend_from_slice(&a.from.to_le_bytes());
-                    buf.extend_from_slice(&a.membership.output);
-                    buf.extend_from_slice(&a.membership.proof);
+                    buf.extend_from_slice(&a.membership.to_bytes());
                     buf.extend_from_slice(&a.sig);
                 }
             }
