@@ -10,3 +10,13 @@ opt-level = 3
 
 [profile.test.package.qtv-crypto]
 opt-level = 3
+
+# The prover backing the stage two certificate proves a STARK, which is heavy
+# under an unoptimized build. Optimize it in dev and test builds the same way, so
+# the stage two tests prove in reasonable time while our own crates stay
+# debuggable.
+[profile.dev.package.qtv-stark]
+opt-level = 3
+
+[profile.test.package.qtv-stark]
+opt-level = 3
