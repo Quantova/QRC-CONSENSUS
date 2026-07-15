@@ -10,7 +10,7 @@
 //! by the core, never removed here and never slashed. Only native stake counts,
 //! so a bridged holding never lifts a validator into the committee.
 
-use qtv_crypto::vrf::{verify, PUBLIC_KEY_BYTES};
+use qtv_crypto::vrf_mldsa::{verify, PUBLIC_KEY_BYTES};
 
 use crate::beacon::Beacon;
 use crate::params::{COMMITTEE_BUDGET, DOMAIN_COMMITTEE, DOMAIN_LEADER};

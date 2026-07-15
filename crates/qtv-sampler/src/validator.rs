@@ -8,7 +8,7 @@
 //! on liveness; if selected it is simply skipped in the round and is never
 //! slashed. Only equivocation is slashable, which the core handles, not here.
 
-use qtv_crypto::vrf::{
+use qtv_crypto::vrf_mldsa::{
     keygen, prove, OUTPUT_BYTES, PROOF_BYTES, PUBLIC_KEY_BYTES, SECRET_KEY_BYTES,
 };
 
@@ -110,8 +110,12 @@ impl SamplerValidator {
     }
 
     /// Evaluate the verifiable random function over the input with the secret
-    /// key, returning the output and its proof. Deterministic signing makes the
-    /// output a fixed function of the key and the input.
+    /// key, returning the output and its proof. The construction is the ML-DSA
+    /// VRF, and its proving path signs only with the derandomized function, the
+    /// all zero randomizer of FIPS 204, so the output is a fixed function of the
+    /// key and the input. There is no path here that signs with a caller chosen
+    /// randomizer, so a validator cannot hedge the draw to search for a lower
+    /// output.
     pub fn evaluate(&self, input: &[u8]) -> ([u8; OUTPUT_BYTES], [u8; PROOF_BYTES]) {
         prove(&self.sk, input)
     }

@@ -13,7 +13,7 @@
 //! lower output. A prover and a bridged holding both weigh zero, so their
 //! threshold is zero and they are never selected.
 
-use qtv_crypto::vrf::{verify, OUTPUT_BYTES, PROOF_BYTES, PUBLIC_KEY_BYTES};
+use qtv_crypto::vrf_mldsa::{verify, OUTPUT_BYTES, PROOF_BYTES, PUBLIC_KEY_BYTES};
 
 use crate::beacon::Beacon;
 use crate::validator::SamplerValidator;

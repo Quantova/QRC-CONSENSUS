@@ -8,7 +8,7 @@
 use qtv_bft::block::{Block, Height};
 use qtv_bft::validator::Validator;
 use qtv_crypto::ml_dsa::PublicKey;
-use qtv_crypto::vrf::PUBLIC_KEY_BYTES;
+use qtv_crypto::vrf_mldsa::PUBLIC_KEY_BYTES;
 use qtv_sampler::beacon::Beacon;
 use qtv_sampler::sortition::draw;
 use qtv_sampler::validator::SamplerValidator;
