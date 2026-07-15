@@ -9,16 +9,21 @@
 //! binds the decision: the height, the slot, the block digest, the committee
 //! commitment digest, the supermajority count, and a digest of the committee
 //! attestation set. The prover proves in circuit that SHAKE256 of that preimage
-//! is the genuine permutation and that the per coefficient module lattice
-//! arithmetic, the canonical reduction, the commitment decomposition, and the
-//! hint recovery, is carried out over the coefficients the hash produces, fused
-//! so the hashing and the arithmetic cannot be split.
+//! is the genuine permutation and that the per coefficient module lattice verify
+//! arithmetic, the canonical reduction, the transform domain matrix vector
+//! product, the response infinity norm, the commitment decomposition, and the hint
+//! recovery, is carried out over the coefficients the hash produces, fused so the
+//! hashing and the arithmetic cannot be split. The response coefficients the norm
+//! and the matrix vector product bands consume are decoded from the real committee
+//! signatures, so the fused relation runs over genuine signature witness.
 //!
 //! What this binds and what it does not is stated exactly in NOTES-stage-two.md.
 //! The certificate binds the decision subject, the committee, and the count into
 //! a real constant size proof and carries the attestation set digest; it does not
-//! yet re-derive the full multi block attestation hash or each signature verify
-//! equation in circuit, which is the remaining stage two work.
+//! yet reconstruct the hash derived coefficients to each member's expanded matrix,
+//! decoded response, and public key, close the full verify equation, or re-derive
+//! the multi block attestation hash in circuit, which is the remaining stage two
+//! work.
 
 use qtv_crypto::sha3::shake256;
 
@@ -67,6 +72,75 @@ fn distinct_count(attestations: &[Attestation]) -> usize {
     ids.sort_unstable();
     ids.dedup();
     ids.len()
+}
+
+// The ML DSA 65 encoding constants the response decode needs, from FIPS 204,
+// Table 1 and section 7.2. They are public standard parameters.
+const MLDSA_Q: u64 = 8_380_417; // 2^23 - 2^13 + 1
+const MLDSA_GAMMA1: i64 = 1 << 19; // response coefficient range
+const MLDSA_N: usize = 256; // ring degree
+const MLDSA_L: usize = 5; // response polynomials
+const CTILDE_BYTES: usize = 48; // challenge encoding length, lambda over four
+const POLYZ_BITS: usize = 20; // packed bits per response coefficient
+const POLYZ_PACKED: usize = MLDSA_N * POLYZ_BITS / 8; // 640 bytes per response poly
+
+// The centered response coefficient mapped into the range zero to the modulus,
+// so its centered representative is the signed response value the norm bounds.
+fn to_field(signed: i64) -> u64 {
+    if signed < 0 {
+        (signed + MLDSA_Q as i64) as u64
+    } else {
+        signed as u64
+    }
+}
+
+// Decode the response polynomials z from one signature, the L times N coefficients
+// the norm band and the matrix vector product consume, each mapped into the field.
+// The response is packed twenty bits per coefficient after the challenge encoding,
+// least significant bit first, and each raw value v decodes to gamma1 minus v, the
+// signed response whose infinity norm verification checks (FIPS 204, section 7.2).
+fn decode_response(sig: &[u8]) -> Vec<u64> {
+    let mut out = Vec::with_capacity(MLDSA_L * MLDSA_N);
+    for poly in 0..MLDSA_L {
+        let base = CTILDE_BYTES + poly * POLYZ_PACKED;
+        let mut acc: u64 = 0;
+        let mut acc_bits = 0usize;
+        let mut byte = base;
+        for _ in 0..MLDSA_N {
+            while acc_bits < POLYZ_BITS {
+                acc |= (sig[byte] as u64) << acc_bits;
+                byte += 1;
+                acc_bits += 8;
+            }
+            let raw = (acc & ((1 << POLYZ_BITS) - 1)) as i64;
+            acc >>= POLYZ_BITS;
+            acc_bits -= POLYZ_BITS;
+            out.push(to_field(MLDSA_GAMMA1 - raw));
+        }
+    }
+    out
+}
+
+/// Collect the member response coefficients the fused certificate proves over,
+/// decoded from the real committee signatures in ascending signer order, up to the
+/// requested count. Each is a genuine ML DSA 65 response coefficient inside the
+/// response bound, so the norm and matrix vector product bands run over real
+/// signature witness rather than a stand in.
+pub fn member_responses(attestations: &[Attestation], want: usize) -> Vec<u64> {
+    let mut ordered: Vec<&Attestation> = attestations.iter().collect();
+    ordered.sort_by_key(|a| a.from);
+    ordered.dedup_by_key(|a| a.from);
+
+    let mut out = Vec::with_capacity(want);
+    'outer: for att in ordered {
+        for z in decode_response(&att.sig) {
+            out.push(z);
+            if out.len() == want {
+                break 'outer;
+            }
+        }
+    }
+    out
 }
 
 /// The single block preimage the fused certificate hashes for a decision. It
@@ -133,7 +207,10 @@ pub fn prove_stage_two_with_segments(
     let set_digest = attestation_set_digest(attestations);
     let count = distinct_count(attestations);
     let preimage = stage_two_preimage(&envelope, &envelope.committee, count, &set_digest);
-    let batch = prove_batch(&preimage, segments);
+    // The response coefficients the fused certificate's norm and matrix vector
+    // product bands consume, decoded from the real committee signatures.
+    let responses = member_responses(attestations, segments);
+    let batch = prove_batch(&preimage, segments, &responses);
     let bytes = encode_body(&set_digest, &batch);
     Certificate::stage_two(envelope, count, SuccinctProof { bytes })
 }
@@ -291,7 +368,8 @@ mod tests {
         let set_digest = attestation_set_digest(&attestations);
         let preimage =
             stage_two_preimage(&stage_one.envelope, &commitment.digest(), 1, &set_digest);
-        let batch = prove_batch(&preimage, TEST_SEGMENTS);
+        let responses = member_responses(&attestations, TEST_SEGMENTS);
+        let batch = prove_batch(&preimage, TEST_SEGMENTS, &responses);
         let bytes = encode_body(&set_digest, &batch);
         let cert = Certificate::stage_two(stage_one.envelope.clone(), 1, SuccinctProof { bytes });
         assert_eq!(
@@ -317,5 +395,24 @@ mod tests {
     fn a_malformed_body_is_rejected() {
         assert!(decode_body(&[0u8; 4]).is_none());
         assert!(BatchProof::from_bytes(&[0u8; 2]).is_none());
+    }
+
+    #[test]
+    fn member_responses_decode_inside_the_response_bound() {
+        // The responses the fused certificate proves over are decoded from the real
+        // committee signatures, and every one is a genuine ML DSA 65 response
+        // coefficient inside the norm bound the certificate enforces.
+        let (members, _commitment, block, beacon) = small_decision();
+        let atts: Vec<_> = members
+            .iter()
+            .map(|a| a.attest(1, 0, block, &beacon))
+            .collect();
+        let responses = member_responses(&atts, STAGE2_SEGMENTS);
+        assert_eq!(responses.len(), STAGE2_SEGMENTS);
+        const BOUND: u64 = (1 << 19) - 196; // gamma1 - beta
+        for z in responses {
+            let centered = if z > MLDSA_Q / 2 { MLDSA_Q - z } else { z };
+            assert!(centered < BOUND, "response {z} out of the norm bound");
+        }
     }
 }
