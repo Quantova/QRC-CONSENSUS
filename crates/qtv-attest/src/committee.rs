@@ -2,7 +2,7 @@
 
 use qtv_crypto::ml_dsa::PublicKey;
 use qtv_crypto::sha3::shake256;
-use qtv_crypto::vrf::PUBLIC_KEY_BYTES;
+use qtv_crypto::vrf_mldsa::PUBLIC_KEY_BYTES;
 
 use crate::attester::{Attester, ValidatorId};
 use crate::params::COMMITTEE_BUDGET;

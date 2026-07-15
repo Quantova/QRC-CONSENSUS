@@ -16,7 +16,7 @@ certificate over it, then returns a self contained BatchProof. verify_batch
 checks that BatchProof against the same message. The codec module serializes a
 proof to bytes and reads it back, so the proof travels as the opaque body of a
 certificate. A caller wires neither the arithmetization nor the proof protocol by
-hand. The prover is pinned by tag v0.6.0.
+hand. The prover is pinned by tag v0.7.0.
 
 ## The seam wiring
 

@@ -1,6 +1,6 @@
 //! Stake weighted verifiable random sortition. A validator draws a verifiable
 
-use qtv_crypto::vrf::{verify, OUTPUT_BYTES, PROOF_BYTES, PUBLIC_KEY_BYTES};
+use qtv_crypto::vrf_mldsa::{verify, OUTPUT_BYTES, PROOF_BYTES, PUBLIC_KEY_BYTES};
 
 use crate::beacon::Beacon;
 use crate::validator::SamplerValidator;

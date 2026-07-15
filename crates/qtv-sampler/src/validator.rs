@@ -1,6 +1,6 @@
 //! A sampler validator holds a verifiable random function key pair from the
 
-use qtv_crypto::vrf::{
+use qtv_crypto::vrf_mldsa::{
     keygen, prove, OUTPUT_BYTES, PROOF_BYTES, PUBLIC_KEY_BYTES, SECRET_KEY_BYTES,
 };
 
