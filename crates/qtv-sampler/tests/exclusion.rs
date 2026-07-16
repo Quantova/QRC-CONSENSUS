@@ -13,7 +13,8 @@ fn a_prover_is_never_in_the_committee() {
         SamplerValidator::new(2, 100),
         SamplerValidator::prover(3),
     ])
-    .with_budget(50);
+    .with_budget(50)
+    .with_floor(0);
     let beacon = Beacon::genesis();
     for slot in 0..3 {
         let committee = reg.sample_committee(&beacon, slot);
@@ -28,7 +29,8 @@ fn a_prover_is_not_counted_in_the_weights() {
     let reg = Registry::new(vec![
         SamplerValidator::new(1, 100),
         SamplerValidator::prover(2),
-    ]);
+    ])
+    .with_floor(0);
     assert_eq!(reg.total_weight(), 100);
     assert_eq!(reg.weights(), vec![100]);
 }

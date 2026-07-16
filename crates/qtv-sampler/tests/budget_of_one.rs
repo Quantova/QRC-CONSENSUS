@@ -161,7 +161,8 @@ fn a_draw_against_a_root_not_in_the_registry_is_rejected() {
         SamplerValidator::new(1, 100),
         SamplerValidator::new(2, 100),
     ])
-    .with_budget(SATURATING_BUDGET);
+    .with_budget(SATURATING_BUDGET)
+    .with_floor(0);
     let beacon = Beacon::genesis();
 
     let outsider = SamplerValidator::new(3, 100);
