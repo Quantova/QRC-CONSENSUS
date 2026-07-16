@@ -123,3 +123,48 @@ fn finer_splitting_is_still_neutral_by_the_model() {
         "fine split {fine_attacker}"
     );
 }
+
+#[test]
+fn the_minimum_stake_winning_window_sits_above_the_float_cliff() {
+    // The error concentrates near u equal to one, the dust winning region, and this
+    // vector checks the extreme rather than the average. A minimum stake account of
+    // 2000 against the whole staked supply has stake fraction about two to the minus
+    // eleven, and it leads only when its u lands in a window of that width just below
+    // one. Near one the float spacing is about two to the minus fifty three, so a u
+    // within that of one collapses to exactly one and its score to zero, an auto win.
+    // The window here is about two to the forty two wider than that cliff, so it is
+    // finely resolved and no dust artifact inflates the account's leadership. Without
+    // the floor a fraction below two to the minus fifty three would collapse and auto
+    // win, which is why the floor is load bearing.
+    let supply = 4_571_429u64; // full supply staked, the worst case for the fraction
+    let min_stake = 2_000u64;
+    let f = min_stake as f64 / supply as f64;
+    let cliff = 2f64.powi(-53);
+    assert!(
+        f > cliff * 1e6,
+        "min stake window is not far above the float cliff"
+    );
+
+    // The near edge of the winning window, u = 1 - f, must be strictly below one and
+    // give a finite positive score, so the window is not collapsed onto the cliff.
+    let u_edge = 1.0 - f;
+    assert!(u_edge < 1.0, "winning window edge collapsed to one");
+    let score_edge = -u_edge.ln() / min_stake as f64;
+    assert!(
+        score_edge.is_finite() && score_edge > 0.0,
+        "edge score collapsed to zero, the cliff triggered"
+    );
+
+    // Halving the window still gives a distinct larger u and a distinct smaller
+    // score, so the window resolves into many float points and is not a single one.
+    let u_half = 1.0 - f / 2.0;
+    assert!(
+        u_half > u_edge && u_half < 1.0,
+        "half window did not resolve"
+    );
+    let score_half = -u_half.ln() / min_stake as f64;
+    assert!(
+        score_half < score_edge,
+        "window is not resolved into distinct scores"
+    );
+}
