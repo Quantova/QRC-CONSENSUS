@@ -18,11 +18,19 @@ pub struct Attester {
 }
 
 impl Attester {
-    /// An attester for `id` with `stake` native weight.
+    /// An attester for `id` with `stake` native weight, over the default slot count.
     pub fn new(id: ValidatorId, stake: u64) -> Self {
         Attester {
             signer: Validator::new(id),
             sampler: SamplerValidator::new(id, stake),
+        }
+    }
+
+    /// An attester over an explicit one time slot count. The default constructor
+    pub fn with_slots(id: ValidatorId, stake: u64, slots: u64) -> Self {
+        Attester {
+            signer: Validator::new(id),
+            sampler: SamplerValidator::with_slots(id, stake, slots),
         }
     }
 
@@ -73,6 +81,24 @@ mod tests {
         let block = Block::new(1, 7, Parent::Genesis);
         let att = a.attest(1, 0, block, &beacon);
         assert_eq!(att.from, a.id());
+        assert!(att.signature_verifies(a.attest_public_key()));
+        assert!(att.is_entitled(&a.root(), &beacon, a.weight(), a.weight(), 100));
+    }
+
+    #[test]
+    fn with_slots_attests_at_a_slot_beyond_the_default() {
+        // A tree sized well above the default serves a slot past the default count.
+        // The whole path holds: the tree builds to the requested count, the reveal
+        // authenticates through a deeper Merkle path, and entitlement checks below
+        // the stake weighted threshold.
+        let slots = 4096;
+        let a = Attester::with_slots(1, 100, slots);
+        let beacon = Beacon::genesis();
+        let block = Block::new(1, 7, Parent::Genesis);
+        let slot = 4000;
+        let att = a.attest(1, slot, block, &beacon);
+        // The authentication path is the log of the padded leaf count, twelve here.
+        assert_eq!(att.membership.path.siblings.len(), 12);
         assert!(att.signature_verifies(a.attest_public_key()));
         assert!(att.is_entitled(&a.root(), &beacon, a.weight(), a.weight(), 100));
     }
