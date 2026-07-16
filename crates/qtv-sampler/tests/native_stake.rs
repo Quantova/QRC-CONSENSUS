@@ -38,7 +38,8 @@ fn a_bridged_validator_stays_out_of_the_committee() {
         SamplerValidator::new(1, 100),
         SamplerValidator::with_stake(2, Stake::bridged(1_000_000, TAG)),
     ])
-    .with_budget(50);
+    .with_budget(50)
+    .with_floor(0);
     // The bridged holding does not count toward the total weight.
     assert_eq!(reg.total_weight(), 100);
     let committee = reg.sample_committee(&Beacon::genesis(), 0);

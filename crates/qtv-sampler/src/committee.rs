@@ -2,7 +2,7 @@
 
 use crate::beacon::Beacon;
 use crate::onetime::Root;
-use crate::params::{COMMITTEE_BUDGET, DOMAIN_COMMITTEE, DOMAIN_LEADER};
+use crate::params::{COMMITTEE_BUDGET, DOMAIN_COMMITTEE, DOMAIN_LEADER, MIN_SELF_STAKE};
 use crate::sortition::{is_selected, leader_score, verify_membership, Credential};
 use crate::validator::{Registration, SamplerValidator, ValidatorId};
 
@@ -52,14 +52,16 @@ pub fn verify_leader(root: &Root, slot: u64, credential: &Credential) -> bool {
 pub struct Registry {
     validators: Vec<SamplerValidator>,
     budget: u64,
+    floor: u64,
 }
 
 impl Registry {
-    /// A registry over the given accounts with the protocol committee budget.
+    /// A registry over the given accounts with the protocol committee budget and the
     pub fn new(validators: Vec<SamplerValidator>) -> Self {
         Registry {
             validators,
             budget: COMMITTEE_BUDGET,
+            floor: MIN_SELF_STAKE,
         }
     }
 
@@ -67,6 +69,17 @@ impl Registry {
     pub fn with_budget(mut self, budget: u64) -> Self {
         self.budget = budget;
         self
+    }
+
+    /// Override the minimum self stake floor. Production keeps the default floor;
+    pub fn with_floor(mut self, floor: u64) -> Self {
+        self.floor = floor;
+        self
+    }
+
+    /// The minimum self stake an account needs to be eligible in this registry.
+    pub fn floor(&self) -> u64 {
+        self.floor
     }
 
     pub fn budget(&self) -> u64 {
@@ -82,16 +95,20 @@ impl Registry {
         self.get(id).map(Registration::of)
     }
 
-    /// Total native weight of the voting accounts. Provers and bridged holdings
+    /// Total native weight of the eligible voting accounts. Provers and bridged
     pub fn total_weight(&self) -> u64 {
-        self.validators.iter().map(SamplerValidator::weight).sum()
+        self.validators
+            .iter()
+            .map(SamplerValidator::weight)
+            .filter(|&w| w >= self.floor)
+            .sum()
     }
 
-    /// Native weights of the voting accounts, for reasoning about the expected
+    /// Native weights of the eligible voting accounts, for reasoning about the
     pub fn weights(&self) -> Vec<u64> {
         self.validators
             .iter()
-            .filter(|v| !v.is_prover())
+            .filter(|v| !v.is_prover() && v.weight() >= self.floor)
             .map(SamplerValidator::weight)
             .collect()
     }
@@ -101,7 +118,9 @@ impl Registry {
         let total = self.total_weight();
         let mut members: Vec<Member> = Vec::new();
         for v in &self.validators {
-            if v.is_prover() {
+            // A prover holds no vote, and an account below the stake floor is not
+            // eligible, so neither is drawn into the committee.
+            if v.is_prover() || v.weight() < self.floor {
                 continue;
             }
             let credential = v.reveal(slot);
@@ -155,7 +174,11 @@ mod tests {
 
     #[test]
     fn a_generous_budget_admits_every_account_and_elects_one_leader() {
-        let reg = Registry::new(validators(&[100, 100, 100])).with_budget(10);
+        // Small illustrative weights below the real self stake floor, so the floor
+        // is turned off for this mechanics test.
+        let reg = Registry::new(validators(&[100, 100, 100]))
+            .with_budget(10)
+            .with_floor(0);
         let beacon = Beacon::genesis();
         let committee = reg.sample_committee(&beacon, 0);
         assert_eq!(committee.ids(), vec![1, 2, 3]);

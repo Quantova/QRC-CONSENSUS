@@ -60,7 +60,8 @@ fn a_real_committee_never_exceeds_the_validator_set() {
         SamplerValidator::new(2, 100),
         SamplerValidator::new(3, 100),
     ])
-    .with_budget(2);
+    .with_budget(2)
+    .with_floor(0);
     let committee = reg.sample_committee(&Beacon::genesis(), 0);
     assert!(committee.len() <= 3);
 }
@@ -71,7 +72,8 @@ fn a_generous_real_budget_selects_the_whole_set() {
         SamplerValidator::new(1, 100),
         SamplerValidator::new(2, 100),
     ])
-    .with_budget(50);
+    .with_budget(50)
+    .with_floor(0);
     let committee = reg.sample_committee(&Beacon::genesis(), 0);
     assert_eq!(committee.len(), 2);
 }

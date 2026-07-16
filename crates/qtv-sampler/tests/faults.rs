@@ -151,7 +151,8 @@ fn honest_committee_participation_raises_no_fault() {
         SamplerValidator::new(2, 100),
         SamplerValidator::new(3, 100),
     ])
-    .with_budget(SATURATING_BUDGET);
+    .with_budget(SATURATING_BUDGET)
+    .with_floor(0);
     let beacon = Beacon::genesis();
 
     // Each member's honest reveal for a slot is its committed leaf at that slot, so

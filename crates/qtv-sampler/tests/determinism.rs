@@ -11,6 +11,7 @@ fn registry() -> Registry {
         SamplerValidator::new(2, 100),
     ])
     .with_budget(10)
+    .with_floor(0)
 }
 
 // The ids paired with their committee outputs over the beacon, the full
