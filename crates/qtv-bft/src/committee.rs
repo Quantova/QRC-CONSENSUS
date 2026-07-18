@@ -42,7 +42,7 @@ mod tests {
     #[test]
     fn full_committee_is_all_voting_validators_in_order() {
         let set = ValidatorSet::new(4).with_prover();
-        let committee = sample_committee(&set, &[0xBEu8; 32], 4);
+        let committee = sample_committee(&set, &[190u8; 32], 4);
         assert_eq!(committee, vec![1, 2, 3, 4]);
     }
 

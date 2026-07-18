@@ -62,7 +62,7 @@ fn drive_equivocation(seed: [u8; 32], honest_for_a: [bool; 3]) -> Machine {
 
 #[test]
 fn agreement_holds_across_every_honest_split() {
-    for seed in [[0xC0u8; 32], [1u8; 32], [2u8; 32], [0xDEu8; 32], [0x99u8; 32]] {
+    for seed in [[192u8; 32], [1u8; 32], [2u8; 32], [222u8; 32], [153u8; 32]] {
         for mask in 0..8u8 {
             let split = [mask & 1 != 0, mask & 2 != 0, mask & 4 != 0];
             let machine = drive_equivocation(seed, split);
@@ -83,7 +83,7 @@ fn agreement_holds_across_every_honest_split() {
 fn a_two_thirds_honest_split_still_finalizes() {
     // Two honest for A plus the equivocating byzantine reach the quorum of
     // three, so finalization is not vacuous, while B stays short.
-    let machine = drive_equivocation([0xC0u8; 32], [true, true, false]);
+    let machine = drive_equivocation([192u8; 32], [true, true, false]);
     let certs = machine.certificates();
     assert_eq!(certs.len(), 1);
     assert_eq!(certs[0].block.val, [100u8; 32]);
@@ -92,7 +92,7 @@ fn a_two_thirds_honest_split_still_finalizes() {
 
 #[test]
 fn the_equivocator_is_the_only_slashed_validator() {
-    let machine = drive_equivocation([0xC0u8; 32], [true, false, false]);
+    let machine = drive_equivocation([192u8; 32], [true, false, false]);
     let slashed = machine.slashed();
     assert_eq!(slashed, vec![2]);
     // Only a byzantine validator is ever slashed, honest ones never equivocate.

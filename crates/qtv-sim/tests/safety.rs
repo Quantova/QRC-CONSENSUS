@@ -2,7 +2,7 @@ use qtv_sim::fault::FaultConfig;
 use qtv_sim::sim::Simulation;
 
 const ROUNDS: u64 = 8;
-const SEED: u64 = 0xC0FFEE;
+const SEED: u64 = 12648430;
 
 #[test]
 fn beyond_tolerance_stalls_without_conflicting_finality() {
@@ -28,7 +28,7 @@ fn equivocator_is_flagged_for_slashing() {
 #[test]
 fn same_seed_and_faults_give_identical_results() {
     let config = FaultConfig::new().offline(0).equivocating(2);
-    let first = Simulation::new(config.build(4), 4, 0x1234).run(16);
-    let second = Simulation::new(config.build(4), 4, 0x1234).run(16);
+    let first = Simulation::new(config.build(4), 4, 4660).run(16);
+    let second = Simulation::new(config.build(4), 4, 4660).run(16);
     assert_eq!(first, second);
 }

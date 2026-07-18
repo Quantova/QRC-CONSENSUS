@@ -43,9 +43,9 @@ fn old_style_draw(slot: u64) -> Credential {
     let depth = SamplerValidator::new(999, STAKE).reveal(slot).path.siblings.len();
     Credential {
         position: slot,
-        preimage: [0xAB; 32],
+        preimage: [171; 32],
         path: MerklePath {
-            siblings: vec![[0xCD; 32]; depth],
+            siblings: vec![[205; 32]; depth],
         },
     }
 }
@@ -54,7 +54,7 @@ fn old_style_draw(slot: u64) -> Credential {
 fn the_consensus_verification_rejects_an_old_mechanism_membership_draw() {
     let members: Vec<Attester> = (1..=4).map(|id| Attester::new(id, STAKE)).collect();
     let beacon = Beacon::genesis();
-    let block = Block::new(1, 9, Parent::Genesis);
+    let block = Block::new(1, [9u8; 32], Parent::Genesis);
     let commitment = committee(&members);
 
     // Positive control: a quorum carrying genuine one time credentials verifies.
@@ -81,7 +81,7 @@ fn the_consensus_verification_rejects_an_old_mechanism_membership_draw() {
 fn aggregation_drops_an_old_mechanism_membership_draw() {
     let members: Vec<Attester> = (1..=4).map(|id| Attester::new(id, STAKE)).collect();
     let beacon = Beacon::genesis();
-    let block = Block::new(1, 9, Parent::Genesis);
+    let block = Block::new(1, [9u8; 32], Parent::Genesis);
     let commitment = committee(&members);
 
     // Three genuine one time draws are an entitled supermajority and aggregate.

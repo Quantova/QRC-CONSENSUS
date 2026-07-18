@@ -268,7 +268,7 @@ mod tests {
         let members: Vec<Attester> = (1..=4).map(|id| Attester::new(id, 100)).collect();
         let refs: Vec<&Attester> = members.iter().collect();
         let commitment = CommitteeCommitment::from_attesters_with_budget(0, &refs, 4);
-        let block = Block::new(1, 9, Parent::Genesis);
+        let block = Block::new(1, [9u8; 32], Parent::Genesis);
         (members, commitment, block, Beacon::genesis())
     }
 

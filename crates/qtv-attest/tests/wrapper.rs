@@ -31,7 +31,7 @@ fn the_wrapper_round_trips_both_bodies_through_one_envelope() {
     let members: Vec<Attester> = (1..=4).map(|id| Attester::new(id, 100)).collect();
     let refs: Vec<&Attester> = members.iter().collect();
     let beacon = Beacon::genesis();
-    let block = Block::new(1, 9, Parent::Genesis);
+    let block = Block::new(1, [9u8; 32], Parent::Genesis);
     let commitment = CommitteeCommitment::from_attesters(0, &refs);
 
     let atts: Vec<_> = members[..3]

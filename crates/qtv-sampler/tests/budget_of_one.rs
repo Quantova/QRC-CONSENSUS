@@ -63,7 +63,7 @@ fn the_committed_leaf_is_the_only_valid_draw_for_a_slot() {
     for k in 0u64..256 {
         let forged = Credential {
             position: slot,
-            preimage: derive_preimage(&[0xAB; 32], k),
+            preimage: derive_preimage(&[171; 32], k),
             path: honest.path.clone(),
         };
         if forged.preimage == honest.preimage {
@@ -177,7 +177,7 @@ fn a_draw_against_a_root_not_in_the_registry_is_rejected() {
     // Against a fabricated root that is not in the registry the draw fails the
     // Merkle recomputation.
     let fake_root = Root {
-        digest: [0x11; 32],
+        digest: [17; 32],
         slots: outsider.slots(),
     };
     assert!(!verify_selection(

@@ -93,7 +93,7 @@ fn a_fabricated_out_of_position_over_a_foreign_leaf_is_not_proven() {
 
     let junk = Credential {
         position: 3,
-        preimage: [0x55; 32],
+        preimage: [85; 32],
         path: v.reveal(3).path,
     };
     let fault = OutOfPosition {

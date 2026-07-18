@@ -17,7 +17,7 @@ fn an_entitled_supermajority_certificate_verifies() {
     let members = committee_of_four();
     let refs: Vec<&Attester> = members.iter().collect();
     let beacon = Beacon::genesis();
-    let block = Block::new(1, 9, Parent::Genesis);
+    let block = Block::new(1, [9u8; 32], Parent::Genesis);
     let commitment = CommitteeCommitment::from_attesters(0, &refs);
 
     // Three of four entitled members attest, a supermajority.
@@ -37,7 +37,7 @@ fn a_certificate_missing_the_supermajority_does_not_verify() {
     let members = committee_of_four();
     let refs: Vec<&Attester> = members.iter().collect();
     let beacon = Beacon::genesis();
-    let block = Block::new(1, 9, Parent::Genesis);
+    let block = Block::new(1, [9u8; 32], Parent::Genesis);
     let commitment = CommitteeCommitment::from_attesters(0, &refs);
 
     // Only two of four attest, one short of the quorum of three.

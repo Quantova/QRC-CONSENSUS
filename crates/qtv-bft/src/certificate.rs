@@ -127,7 +127,7 @@ mod tests {
         // Two honest attestations plus one attestation with a corrupted signature.
         let mut atts = attest_all(&set, &[1, 2], block);
         let mut forged = Attestation::create(set.get(3).unwrap(), 1, block);
-        forged.sig[10] ^= 0xff;
+        forged.sig[10] ^= 255;
         atts.push(forged);
         // Only two verified attesters remain, below the quorum of three.
         assert!(aggregate(1, block, &committee, &atts, &set).is_none());

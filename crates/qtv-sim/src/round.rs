@@ -8,16 +8,16 @@ use crate::committee::{rotation_order, sample_committee};
 use crate::hash::combine;
 use crate::validator::{Fault, ValidatorId, ValidatorSet};
 
-const STALL_TAG: u64 = 0x5354414c4c;
+const STALL_TAG: u64 = 357895851084;
 
 pub type BlockId = u64;
 
 pub fn canonical_block(height: u64, seed: u64) -> BlockId {
-    combine(seed, combine(height, 0x1))
+    combine(seed, combine(height, 1))
 }
 
 pub fn conflicting_block(height: u64, seed: u64) -> BlockId {
-    combine(seed, combine(height, 0x2))
+    combine(seed, combine(height, 2))
 }
 
 pub type Vote = (ValidatorId, BlockId);
