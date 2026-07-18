@@ -28,14 +28,14 @@ mod tests {
     use crate::block::{Block, Parent};
     use crate::validator::Validator;
 
-    fn att(v: &Validator, height: u64, val: u64) -> Attestation {
+    fn att(v: &Validator, height: u64, val: [u8; 32]) -> Attestation {
         Attestation::create(v, height, Block::new(height, val, Parent::Genesis))
     }
 
     #[test]
     fn double_signing_at_one_height_is_flagged() {
         let v = Validator::new(2);
-        let atts = vec![att(&v, 1, 1), att(&v, 1, 2)];
+        let atts = vec![att(&v, 1, [1u8; 32]), att(&v, 1, [2u8; 32])];
         assert_eq!(equivocators(&atts), vec![2]);
     }
 
@@ -43,14 +43,14 @@ mod tests {
     fn a_single_vote_per_height_is_never_flagged() {
         let a = Validator::new(1);
         let b = Validator::new(2);
-        let atts = vec![att(&a, 1, 1), att(&b, 1, 1), att(&a, 2, 5)];
+        let atts = vec![att(&a, 1, [1u8; 32]), att(&b, 1, [1u8; 32]), att(&a, 2, [5u8; 32])];
         assert!(equivocators(&atts).is_empty());
     }
 
     #[test]
     fn different_heights_are_not_equivocation() {
         let v = Validator::new(3);
-        let atts = vec![att(&v, 1, 1), att(&v, 2, 2)];
+        let atts = vec![att(&v, 1, [1u8; 32]), att(&v, 2, [2u8; 32])];
         assert!(equivocators(&atts).is_empty());
     }
 
