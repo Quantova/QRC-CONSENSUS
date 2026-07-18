@@ -6,7 +6,7 @@ use qtv_bft::certificate::aggregate;
 use qtv_bft::machine::Machine;
 use qtv_bft::validator::{Validator, ValidatorSet};
 
-const SEED: [u8; 32] = [0xC0u8; 32];
+const SEED: [u8; 32] = [192u8; 32];
 
 #[test]
 fn genuine_attestation_verifies() {
@@ -21,7 +21,7 @@ fn forged_signature_is_rejected() {
     let v = Validator::new(1);
     let block = Block::new(1, [42u8; 32], Parent::Genesis);
     let mut att = Attestation::create(&v, 1, block);
-    att.sig[100] ^= 0x01;
+    att.sig[100] ^= 1;
     assert!(!att.verify(v.public_key()));
 }
 
@@ -46,7 +46,7 @@ fn a_forged_attestation_cannot_complete_a_quorum() {
         .collect();
     // A forged third attestation must not close the gap.
     let mut forged = Attestation::create(set.get(3).unwrap(), 1, block);
-    forged.sig[0] ^= 0xff;
+    forged.sig[0] ^= 255;
     atts.push(forged);
     assert!(aggregate(1, block, &committee, &atts, &set).is_none());
 }

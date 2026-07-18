@@ -74,7 +74,7 @@ mod tests {
         let c = Attester::new(3, 100);
         let d = Attester::new(4, 100);
         let beacon = Beacon::genesis();
-        let block = Block::new(1, 9, Parent::Genesis);
+        let block = Block::new(1, [9u8; 32], Parent::Genesis);
         let commitment = committee(&[&a, &b, &c, &d]);
         let atts = vec![
             a.attest(1, 0, block, &beacon),
@@ -92,7 +92,7 @@ mod tests {
         let c = Attester::new(3, 100);
         let d = Attester::new(4, 100);
         let beacon = Beacon::genesis();
-        let block = Block::new(1, 9, Parent::Genesis);
+        let block = Block::new(1, [9u8; 32], Parent::Genesis);
         let commitment = committee(&[&a, &b, &c, &d]);
         let atts = vec![
             a.attest(1, 0, block, &beacon),
@@ -108,7 +108,7 @@ mod tests {
         let c = Attester::new(3, 100);
         let d = Attester::new(4, 100);
         let beacon = Beacon::genesis();
-        let block = Block::new(1, 9, Parent::Genesis);
+        let block = Block::new(1, [9u8; 32], Parent::Genesis);
         let commitment = committee(&[&a, &b, &c, &d]);
         // a attests twice; only two distinct signers, below the quorum of three.
         let atts = vec![

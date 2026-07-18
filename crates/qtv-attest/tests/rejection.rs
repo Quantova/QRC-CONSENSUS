@@ -9,7 +9,7 @@ fn setup() -> (Vec<Attester>, Beacon, Block, CommitteeCommitment) {
     let members: Vec<Attester> = (1..=4).map(|id| Attester::new(id, 100)).collect();
     let refs: Vec<&Attester> = members.iter().collect();
     let beacon = Beacon::genesis();
-    let block = Block::new(1, 9, Parent::Genesis);
+    let block = Block::new(1, [9u8; 32], Parent::Genesis);
     let commitment = CommitteeCommitment::from_attesters(0, &refs);
     (members, beacon, block, commitment)
 }
@@ -29,7 +29,7 @@ fn quorum_attestations(
 fn a_forged_signature_is_rejected() {
     let (members, beacon, block, commitment) = setup();
     let mut atts = quorum_attestations(&members, &beacon, block);
-    atts[0].sig[0] ^= 0xff;
+    atts[0].sig[0] ^= 255;
     let cert = Certificate::stage_one(Envelope::new(1, 0, block, &commitment), atts);
     assert_eq!(
         cert.verify(&commitment, &beacon),
@@ -42,7 +42,7 @@ fn a_swapped_block_is_rejected_as_wrong_subject() {
     let (members, beacon, block, commitment) = setup();
     let mut atts = quorum_attestations(&members, &beacon, block);
     // The envelope commits to `block`; this attestation now names another block.
-    atts[0].block = Block::new(1, 10, Parent::Genesis);
+    atts[0].block = Block::new(1, [10u8; 32], Parent::Genesis);
     let cert = Certificate::stage_one(Envelope::new(1, 0, block, &commitment), atts);
     assert_eq!(
         cert.verify(&commitment, &beacon),

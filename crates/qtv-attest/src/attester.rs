@@ -78,7 +78,7 @@ mod tests {
     fn an_attester_attests_under_one_identity() {
         let a = Attester::new(1, 100);
         let beacon = Beacon::genesis();
-        let block = Block::new(1, 7, Parent::Genesis);
+        let block = Block::new(1, [7u8; 32], Parent::Genesis);
         let att = a.attest(1, 0, block, &beacon);
         assert_eq!(att.from, a.id());
         assert!(att.signature_verifies(a.attest_public_key()));
@@ -94,7 +94,7 @@ mod tests {
         let slots = 4096;
         let a = Attester::with_slots(1, 100, slots);
         let beacon = Beacon::genesis();
-        let block = Block::new(1, 7, Parent::Genesis);
+        let block = Block::new(1, [7u8; 32], Parent::Genesis);
         let slot = 4000;
         let att = a.attest(1, slot, block, &beacon);
         // The authentication path is the log of the padded leaf count, twelve here.
@@ -107,7 +107,7 @@ mod tests {
     fn a_prover_weighs_zero_and_is_never_entitled() {
         let p = Attester::prover(9);
         let beacon = Beacon::genesis();
-        let block = Block::new(1, 7, Parent::Genesis);
+        let block = Block::new(1, [7u8; 32], Parent::Genesis);
         let att = p.attest(1, 0, block, &beacon);
         assert_eq!(p.weight(), 0);
         // The signature is genuine, yet zero weight means no passing entitlement.

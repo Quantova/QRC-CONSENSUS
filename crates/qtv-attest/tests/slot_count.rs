@@ -13,7 +13,7 @@ fn a_certificate_verifies_at_a_slot_beyond_the_default() {
         .collect();
     let refs: Vec<&Attester> = members.iter().collect();
     let beacon = Beacon::genesis();
-    let block = Block::new(1, 9, Parent::Genesis);
+    let block = Block::new(1, [9u8; 32], Parent::Genesis);
     let slot = 4000;
 
     // A budget that saturates every member share, so each member draw is below its

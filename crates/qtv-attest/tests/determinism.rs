@@ -10,7 +10,7 @@ fn committee_of_four() -> Vec<Attester> {
 #[test]
 fn the_same_attestations_produce_the_same_certificate() {
     let beacon = Beacon::genesis();
-    let block = Block::new(1, 9, Parent::Genesis);
+    let block = Block::new(1, [9u8; 32], Parent::Genesis);
 
     let first = committee_of_four();
     let first_refs: Vec<&Attester> = first.iter().collect();
@@ -38,7 +38,7 @@ fn the_same_attestations_produce_the_same_certificate() {
 #[test]
 fn the_certificate_is_independent_of_attestation_order() {
     let beacon = Beacon::genesis();
-    let block = Block::new(1, 9, Parent::Genesis);
+    let block = Block::new(1, [9u8; 32], Parent::Genesis);
     let members = committee_of_four();
     let refs: Vec<&Attester> = members.iter().collect();
     let commitment = CommitteeCommitment::from_attesters(0, &refs);

@@ -96,7 +96,7 @@ mod tests {
     fn a_signed_entitled_attestation_checks_on_both_facts() {
         let (signer, sampler) = parts(1, 100);
         let beacon = Beacon::genesis();
-        let block = Block::new(1, 5, Parent::Genesis);
+        let block = Block::new(1, [5u8; 32], Parent::Genesis);
         let membership = sampler.reveal(0);
         let att = Attestation::create(&signer, 1, 0, block, membership);
 
@@ -108,7 +108,7 @@ mod tests {
     fn a_signature_under_the_wrong_key_is_rejected() {
         let (signer, sampler) = parts(1, 100);
         let other = Validator::new(2);
-        let block = Block::new(1, 5, Parent::Genesis);
+        let block = Block::new(1, [5u8; 32], Parent::Genesis);
         let membership = sampler.reveal(0);
         let att = Attestation::create(&signer, 1, 0, block, membership);
         assert!(!att.signature_verifies(other.public_key()));
@@ -117,10 +117,10 @@ mod tests {
     #[test]
     fn a_tampered_block_breaks_the_signature() {
         let (signer, sampler) = parts(1, 100);
-        let block = Block::new(1, 5, Parent::Genesis);
+        let block = Block::new(1, [5u8; 32], Parent::Genesis);
         let membership = sampler.reveal(0);
         let mut att = Attestation::create(&signer, 1, 0, block, membership);
-        att.block = Block::new(1, 6, Parent::Genesis);
+        att.block = Block::new(1, [6u8; 32], Parent::Genesis);
         assert!(!att.signature_verifies(signer.public_key()));
     }
 
@@ -129,7 +129,7 @@ mod tests {
         let (signer, sampler) = parts(1, 100);
         let impostor = SamplerValidator::new(9, 100);
         let beacon = Beacon::genesis();
-        let block = Block::new(1, 5, Parent::Genesis);
+        let block = Block::new(1, [5u8; 32], Parent::Genesis);
         // Reveal with the impostor's tree but sign with the real signer key.
         let membership = impostor.reveal(0);
         let att = Attestation::create(&signer, 1, 0, block, membership);
