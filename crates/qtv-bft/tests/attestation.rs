@@ -6,12 +6,12 @@ use qtv_bft::certificate::aggregate;
 use qtv_bft::machine::Machine;
 use qtv_bft::validator::{Validator, ValidatorSet};
 
-const SEED: u64 = 0xC0FFEE;
+const SEED: [u8; 32] = [0xC0u8; 32];
 
 #[test]
 fn genuine_attestation_verifies() {
     let v = Validator::new(1);
-    let block = Block::new(1, 42, Parent::Genesis);
+    let block = Block::new(1, [42u8; 32], Parent::Genesis);
     let att = Attestation::create(&v, 1, block);
     assert!(att.verify(v.public_key()));
 }
@@ -19,7 +19,7 @@ fn genuine_attestation_verifies() {
 #[test]
 fn forged_signature_is_rejected() {
     let v = Validator::new(1);
-    let block = Block::new(1, 42, Parent::Genesis);
+    let block = Block::new(1, [42u8; 32], Parent::Genesis);
     let mut att = Attestation::create(&v, 1, block);
     att.sig[100] ^= 0x01;
     assert!(!att.verify(v.public_key()));
@@ -29,7 +29,7 @@ fn forged_signature_is_rejected() {
 fn attestation_does_not_verify_under_another_validator_key() {
     let signer = Validator::new(1);
     let other = Validator::new(2);
-    let block = Block::new(1, 42, Parent::Genesis);
+    let block = Block::new(1, [42u8; 32], Parent::Genesis);
     let att = Attestation::create(&signer, 1, block);
     assert!(!att.verify(other.public_key()));
 }
@@ -38,7 +38,7 @@ fn attestation_does_not_verify_under_another_validator_key() {
 fn a_forged_attestation_cannot_complete_a_quorum() {
     let set = ValidatorSet::new(4);
     let committee = vec![1, 2, 3, 4];
-    let block = Block::new(1, 42, Parent::Genesis);
+    let block = Block::new(1, [42u8; 32], Parent::Genesis);
     // Two genuine attestations, one short of the quorum of three.
     let mut atts: Vec<Attestation> = [1u64, 2]
         .iter()

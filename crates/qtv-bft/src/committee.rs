@@ -7,8 +7,8 @@ use crate::validator::{ValidatorId, ValidatorSet};
 pub type View = u64;
 
 /// Sample a committee of at most `size` voting validators, preferring the
-pub fn sample_committee(set: &ValidatorSet, seed: u64, size: usize) -> Vec<ValidatorId> {
-    let mut scored: Vec<(u64, ValidatorId)> = set
+pub fn sample_committee(set: &ValidatorSet, seed: &[u8; 32], size: usize) -> Vec<ValidatorId> {
+    let mut scored: Vec<([u8; 32], ValidatorId)> = set
         .voting_ids()
         .into_iter()
         .map(|id| (score(seed, id), id))
@@ -36,15 +36,15 @@ mod tests {
     #[test]
     fn full_committee_is_all_voting_validators_in_order() {
         let set = ValidatorSet::new(4).with_prover();
-        let committee = sample_committee(&set, 0xBEEF, 4);
+        let committee = sample_committee(&set, &[0xBEu8; 32], 4);
         assert_eq!(committee, vec![1, 2, 3, 4]);
     }
 
     #[test]
     fn sampling_is_deterministic() {
         let set = ValidatorSet::new(10);
-        let a = sample_committee(&set, 99, 5);
-        let b = sample_committee(&set, 99, 5);
+        let a = sample_committee(&set, &[99u8; 32], 5);
+        let b = sample_committee(&set, &[99u8; 32], 5);
         assert_eq!(a, b);
         assert_eq!(a.len(), 5);
     }
