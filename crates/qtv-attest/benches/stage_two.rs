@@ -21,7 +21,7 @@ fn main() {
     let members: Vec<Attester> = (1..=4).map(|id| Attester::new(id, 100)).collect();
     let refs: Vec<&Attester> = members.iter().collect();
     let beacon = Beacon::genesis();
-    let block = Block::new(1, 7, Parent::Genesis);
+    let block = Block::new(1, [7u8; 32], Parent::Genesis);
     let commitment = CommitteeCommitment::from_attesters_with_budget(0, &refs, 4);
 
     // A supermajority of the committee attests, aggregated into a stage one

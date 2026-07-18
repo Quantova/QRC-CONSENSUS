@@ -406,7 +406,7 @@ mod tests {
 
     #[test]
     fn init_matches_the_model() {
-        let m = Machine::new(ValidatorSet::new(4), 4, [0xC0u8; 32], 2, 3);
+        let m = Machine::new(ValidatorSet::new(4), 4, [192u8; 32], 2, 3);
         assert!(m.messages().is_empty());
         assert!(m.certificates().is_empty());
         assert!(!m.is_stable());
@@ -416,7 +416,7 @@ mod tests {
 
     #[test]
     fn honest_run_finalizes_every_height_in_order() {
-        let mut m = Machine::new(ValidatorSet::new(4), 4, [0xC0u8; 32], 3, 3);
+        let mut m = Machine::new(ValidatorSet::new(4), 4, [192u8; 32], 3, 3);
         let certs = m.run();
         assert_eq!(certs.len(), 3);
         assert_eq!(certs[0].height, 1);
@@ -428,7 +428,7 @@ mod tests {
 
     #[test]
     fn each_finalized_block_descends_from_the_one_below() {
-        let mut m = Machine::new(ValidatorSet::new(4), 4, [0x12u8; 32], 3, 3);
+        let mut m = Machine::new(ValidatorSet::new(4), 4, [18u8; 32], 3, 3);
         let certs = m.run();
         assert_eq!(certs[0].block.parent, Parent::Genesis);
         for pair in certs.windows(2) {
@@ -441,7 +441,7 @@ mod tests {
         // Leader of height 1 view 0 is ((1+0) % 4) + 1 = 2. Make 2 byzantine.
         let mut set = ValidatorSet::new(4);
         set.set_fault(2, Fault::Byzantine);
-        let mut m = Machine::new(set, 4, [0xC0u8; 32], 1, 3);
+        let mut m = Machine::new(set, 4, [192u8; 32], 1, 3);
         assert_eq!(m.leader_of(1, 0), Some(2));
         let certs = m.run();
         assert_eq!(certs.len(), 1);

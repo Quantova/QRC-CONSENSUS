@@ -6,10 +6,10 @@ use qtv_sampler::sortition::{expected_committee_size, is_selected};
 use qtv_sampler::validator::SamplerValidator;
 
 fn next(state: &mut u64) -> u64 {
-    *state = state.wrapping_add(0x9E37_79B9_7F4A_7C15);
+    *state = state.wrapping_add(11400714819323198485);
     let mut z = *state;
-    z = (z ^ (z >> 30)).wrapping_mul(0xBF58_476D_1CE4_E5B9);
-    z = (z ^ (z >> 27)).wrapping_mul(0x94D0_49BB_1331_11EB);
+    z = (z ^ (z >> 30)).wrapping_mul(13787848793156543929);
+    z = (z ^ (z >> 27)).wrapping_mul(10723151780598845931);
     z ^ (z >> 31)
 }
 
@@ -36,7 +36,7 @@ fn mean_committee_size_stays_near_the_budget() {
     let total = weight * n as u64;
     let budget = 30u64;
     let rounds = 400u32;
-    let mut state = 0xDEAD_BEEF;
+    let mut state = 3735928559;
     let mut sum = 0u64;
     for _ in 0..rounds {
         let mut size = 0u64;

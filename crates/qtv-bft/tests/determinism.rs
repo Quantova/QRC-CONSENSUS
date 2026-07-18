@@ -15,24 +15,24 @@ fn run(seed: [u8; 32], faults: &[(u64, Fault)]) -> Machine {
 
 #[test]
 fn identical_inputs_give_identical_certificates() {
-    let first = run([0x12u8; 32], &[]);
-    let second = run([0x12u8; 32], &[]);
+    let first = run([18u8; 32], &[]);
+    let second = run([18u8; 32], &[]);
     assert_eq!(first.certificates(), second.certificates());
 }
 
 #[test]
 fn identical_inputs_give_identical_message_logs() {
     // Signing uses a zero randomizer, so even the attestation bytes match.
-    let first = run([0xABu8; 32], &[]);
-    let second = run([0xABu8; 32], &[]);
+    let first = run([171u8; 32], &[]);
+    let second = run([171u8; 32], &[]);
     assert_eq!(first.messages(), second.messages());
 }
 
 #[test]
 fn determinism_holds_with_faults_present() {
     let faults = [(2u64, Fault::Byzantine), (4u64, Fault::Offline)];
-    let first = run([0xC0u8; 32], &faults);
-    let second = run([0xC0u8; 32], &faults);
+    let first = run([192u8; 32], &faults);
+    let second = run([192u8; 32], &faults);
     assert_eq!(first.certificates(), second.certificates());
     assert_eq!(first.slashed(), second.slashed());
 }

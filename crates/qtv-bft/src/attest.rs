@@ -93,7 +93,7 @@ mod tests {
         let v = Validator::new(1);
         let block = Block::new(1, [5u8; 32], Parent::Genesis);
         let mut att = Attestation::create(&v, 1, block);
-        att.sig[0] ^= 0xff;
+        att.sig[0] ^= 255;
         assert!(!att.verify(v.public_key()));
     }
 }

@@ -15,7 +15,7 @@ fn an_off_committee_signer_is_rejected_even_with_a_valid_signature() {
     let members = committee_of_four();
     let refs: Vec<&Attester> = members.iter().collect();
     let beacon = Beacon::genesis();
-    let block = Block::new(1, 9, Parent::Genesis);
+    let block = Block::new(1, [9u8; 32], Parent::Genesis);
     let commitment = CommitteeCommitment::from_attesters(0, &refs);
 
     // An outsider with a genuine key that is not listed in the commitment.

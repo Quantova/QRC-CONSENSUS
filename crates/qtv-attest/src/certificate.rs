@@ -161,7 +161,7 @@ mod tests {
         let a = Attester::new(2, 100);
         let b = Attester::new(1, 100);
         let beacon = Beacon::genesis();
-        let block = Block::new(1, 5, Parent::Genesis);
+        let block = Block::new(1, [5u8; 32], Parent::Genesis);
         let commitment = CommitteeCommitment::from_attesters(0, &[&a, &b]);
         let envelope = Envelope::new(1, 0, block, &commitment);
         let atts = vec![
@@ -176,7 +176,7 @@ mod tests {
     #[test]
     fn a_stage_two_body_shares_the_envelope_and_hides_signers() {
         let a = Attester::new(1, 100);
-        let block = Block::new(1, 5, Parent::Genesis);
+        let block = Block::new(1, [5u8; 32], Parent::Genesis);
         let commitment = CommitteeCommitment::from_attesters(0, &[&a]);
         let envelope = Envelope::new(1, 0, block, &commitment);
         let cert = Certificate::stage_two(

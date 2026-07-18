@@ -4,7 +4,7 @@ use qtv_sim::sim::Simulation;
 use qtv_sim::validator::ValidatorSet;
 
 const ROUNDS: u64 = 8;
-const SEED: u64 = 0xC0FFEE;
+const SEED: u64 = 12648430;
 
 #[test]
 fn honest_supermajority_finalizes_each_round() {

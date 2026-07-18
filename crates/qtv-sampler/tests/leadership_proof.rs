@@ -8,9 +8,9 @@ use qtv_sampler::sortition::leader_score;
 fn output(prefix: u64) -> [u8; 32] {
     let mut o = [0u8; 32];
     o[..8].copy_from_slice(&prefix.to_be_bytes());
-    o[8] = 0x9a;
-    o[16] = 0x3c;
-    o[24] = 0xf1;
+    o[8] = 154;
+    o[16] = 60;
+    o[24] = 241;
     o
 }
 
