@@ -6,7 +6,7 @@ use qtv_bft::machine::Machine;
 use qtv_bft::params::supermajority;
 use qtv_bft::validator::{Fault, ValidatorSet};
 
-const SEED: u64 = 0xC0FFEE;
+const SEED: [u8; 32] = [0xC0u8; 32];
 
 #[test]
 fn honest_supermajority_finalizes_every_height() {

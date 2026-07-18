@@ -33,7 +33,7 @@ use crate::validator::{Fault, ValidatorId, ValidatorSet};
 pub struct Machine {
     set: ValidatorSet,
     committee_size: usize,
-    genesis_seed: u64,
+    genesis_seed: [u8; 32],
     max_height: Height,
     max_view: View,
     msgs: Vec<Message>,
@@ -48,7 +48,7 @@ impl Machine {
     pub fn new(
         set: ValidatorSet,
         committee_size: usize,
-        genesis_seed: u64,
+        genesis_seed: [u8; 32],
         max_height: Height,
         max_view: View,
     ) -> Self {
@@ -128,12 +128,12 @@ impl Machine {
 
     /// The seed that samples the committee for a height, folded forward from the
     /// genesis seed through the certificates of the heights below.
-    fn seed_for_height(&self, height: Height) -> u64 {
+    fn seed_for_height(&self, height: Height) -> [u8; 32] {
         let mut seed = self.genesis_seed;
         let mut h = MIN_HEIGHT;
         while h < height {
             match self.certs.iter().find(|c| c.height == h) {
-                Some(cert) => seed = cert.beacon(seed),
+                Some(cert) => seed = cert.beacon(&seed),
                 None => break,
             }
             h += 1;
@@ -143,7 +143,7 @@ impl Machine {
 
     /// The committee sampled for a slot.
     pub fn committee_for(&self, height: Height) -> Vec<ValidatorId> {
-        sample_committee(&self.set, self.seed_for_height(height), self.committee_size)
+        sample_committee(&self.set, &self.seed_for_height(height), self.committee_size)
     }
 
     /// Leader(h, v): the leader drawn from the committee at a view.
@@ -157,7 +157,7 @@ impl Machine {
 
     /// The canonical honest value for a height, derived from the committee seed.
     fn honest_val(&self, height: Height) -> Value {
-        fold(self.seed_for_height(height), b"HONEST-VAL")
+        fold(&self.seed_for_height(height), b"HONEST-VAL")
     }
 
     /// HonestProposal(h): the single valid block an honest leader offers.
@@ -442,7 +442,7 @@ mod tests {
 
     #[test]
     fn init_matches_the_model() {
-        let m = Machine::new(ValidatorSet::new(4), 4, 0xC0FFEE, 2, 3);
+        let m = Machine::new(ValidatorSet::new(4), 4, [0xC0u8; 32], 2, 3);
         assert!(m.messages().is_empty());
         assert!(m.certificates().is_empty());
         assert!(!m.is_stable());
@@ -452,7 +452,7 @@ mod tests {
 
     #[test]
     fn honest_run_finalizes_every_height_in_order() {
-        let mut m = Machine::new(ValidatorSet::new(4), 4, 0xC0FFEE, 3, 3);
+        let mut m = Machine::new(ValidatorSet::new(4), 4, [0xC0u8; 32], 3, 3);
         let certs = m.run();
         assert_eq!(certs.len(), 3);
         assert_eq!(certs[0].height, 1);
@@ -464,7 +464,7 @@ mod tests {
 
     #[test]
     fn each_finalized_block_descends_from_the_one_below() {
-        let mut m = Machine::new(ValidatorSet::new(4), 4, 0x1234, 3, 3);
+        let mut m = Machine::new(ValidatorSet::new(4), 4, [0x12u8; 32], 3, 3);
         let certs = m.run();
         assert_eq!(certs[0].block.parent, Parent::Genesis);
         for pair in certs.windows(2) {
@@ -477,7 +477,7 @@ mod tests {
         // Leader of height 1 view 0 is ((1+0) % 4) + 1 = 2. Make 2 byzantine.
         let mut set = ValidatorSet::new(4);
         set.set_fault(2, Fault::Byzantine);
-        let mut m = Machine::new(set, 4, 0xC0FFEE, 1, 3);
+        let mut m = Machine::new(set, 4, [0xC0u8; 32], 1, 3);
         assert_eq!(m.leader_of(1, 0), Some(2));
         let certs = m.run();
         assert_eq!(certs.len(), 1);

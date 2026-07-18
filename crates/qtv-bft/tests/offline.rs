@@ -5,7 +5,7 @@
 use qtv_bft::machine::Machine;
 use qtv_bft::validator::{Fault, ValidatorSet};
 
-const SEED: u64 = 0xC0FFEE;
+const SEED: [u8; 32] = [0xC0u8; 32];
 
 fn set_with_offline(count: usize, offline: &[u64]) -> ValidatorSet {
     let mut set = ValidatorSet::new(count);

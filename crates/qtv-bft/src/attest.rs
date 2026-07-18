@@ -74,7 +74,7 @@ mod tests {
     #[test]
     fn real_attestation_verifies() {
         let v = Validator::new(1);
-        let block = Block::new(1, 5, Parent::Genesis);
+        let block = Block::new(1, [5u8; 32], Parent::Genesis);
         let att = Attestation::create(&v, 1, block);
         assert!(att.verify(v.public_key()));
     }
@@ -83,7 +83,7 @@ mod tests {
     fn attestation_under_wrong_key_is_rejected() {
         let signer = Validator::new(1);
         let other = Validator::new(2);
-        let block = Block::new(1, 5, Parent::Genesis);
+        let block = Block::new(1, [5u8; 32], Parent::Genesis);
         let att = Attestation::create(&signer, 1, block);
         assert!(!att.verify(other.public_key()));
     }
@@ -91,16 +91,16 @@ mod tests {
     #[test]
     fn tampered_block_breaks_the_attestation() {
         let v = Validator::new(1);
-        let block = Block::new(1, 5, Parent::Genesis);
+        let block = Block::new(1, [5u8; 32], Parent::Genesis);
         let mut att = Attestation::create(&v, 1, block);
-        att.block = Block::new(1, 6, Parent::Genesis);
+        att.block = Block::new(1, [6u8; 32], Parent::Genesis);
         assert!(!att.verify(v.public_key()));
     }
 
     #[test]
     fn forged_signature_bytes_are_rejected() {
         let v = Validator::new(1);
-        let block = Block::new(1, 5, Parent::Genesis);
+        let block = Block::new(1, [5u8; 32], Parent::Genesis);
         let mut att = Attestation::create(&v, 1, block);
         att.sig[0] ^= 0xff;
         assert!(!att.verify(v.public_key()));

@@ -80,7 +80,7 @@ mod tests {
 
     #[test]
     fn proposal_message_reports_origin_and_height() {
-        let block = Block::new(1, 3, Parent::Genesis);
+        let block = Block::new(1, [3u8; 32], Parent::Genesis);
         let m = Message::Propose(Proposal {
             from: 2,
             height: 1,
@@ -96,7 +96,7 @@ mod tests {
     #[test]
     fn vote_message_wraps_an_attestation() {
         let v = Validator::new(1);
-        let block = Block::new(1, 3, Parent::Genesis);
+        let block = Block::new(1, [3u8; 32], Parent::Genesis);
         let att = Attestation::create(&v, 1, block);
         let m = Message::vote(att);
         assert_eq!(m.from(), 1);
