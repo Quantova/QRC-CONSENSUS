@@ -38,7 +38,7 @@ fn an_off_committee_signer_is_rejected_even_with_a_valid_signature() {
     // A certificate that carries the outsider is rejected outright, valid
     // signature and all.
     let envelope = Envelope::new(1, 0, block, &commitment);
-    let tainted = Certificate::stage_one(
+    let tainted = Certificate::new(
         envelope,
         vec![
             members[0].attest(1, 0, block, &beacon),

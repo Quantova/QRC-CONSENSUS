@@ -45,7 +45,7 @@ fn the_consensus_verification_rejects_an_old_mechanism_membership_draw() {
         .iter()
         .map(|a| a.attest(1, 0, block, &beacon))
         .collect();
-    let good = Certificate::stage_one(Envelope::new(1, 0, block, &commitment), atts.clone());
+    let good = Certificate::new(Envelope::new(1, 0, block, &commitment), atts.clone());
     assert_eq!(good.verify(&commitment, &beacon), Verdict::Verified);
 
     // Replace one member's one time credential with an old style draw that has no
@@ -53,7 +53,7 @@ fn the_consensus_verification_rejects_an_old_mechanism_membership_draw() {
     // verifies, but the membership no longer authenticates, so the consensus
     // rejects the certificate as not entitled instead of finalizing it.
     atts[0].membership = old_style_draw(0);
-    let bad = Certificate::stage_one(Envelope::new(1, 0, block, &commitment), atts);
+    let bad = Certificate::new(Envelope::new(1, 0, block, &commitment), atts);
     assert_eq!(
         bad.verify(&commitment, &beacon),
         Verdict::Rejected(RejectReason::NotEntitled)

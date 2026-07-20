@@ -2,7 +2,8 @@
 
 use qtv_sampler::beacon::Beacon;
 
-use crate::certificate::{Body, Certificate, Envelope, Stage1Body, SuccinctVerifier};
+use crate::attestation::Attestation;
+use crate::certificate::{Certificate, Envelope};
 use crate::committee::CommitteeCommitment;
 use crate::params::is_quorum;
 
@@ -23,8 +24,6 @@ pub enum RejectReason {
     DuplicateAttester,
     /// The distinct entitled signers do not form a supermajority.
     NotAQuorum,
-    /// The stage two succinct proof failed the seam verifier.
-    SuccinctProof,
 }
 
 /// The outcome of verifying a certificate.
@@ -34,8 +33,6 @@ pub enum Verdict {
     Verified,
     /// The certificate does not verify, with the reason.
     Rejected(RejectReason),
-    /// A stage two certificate reached without a succinct verifier. The succinct
-    StageTwoPending,
 }
 
 impl Verdict {
@@ -45,39 +42,15 @@ impl Verdict {
 }
 
 impl Certificate {
-    /// Verify the certificate against a committee commitment and beacon using
+    /// Verify the certificate against a committee commitment and beacon using only public inputs.
     pub fn verify(&self, commitment: &CommitteeCommitment, beacon: &Beacon) -> Verdict {
-        match &self.body {
-            Body::Stage1(body) => verify_stage_one(&self.envelope, body, commitment, beacon),
-            Body::Stage2(_) => Verdict::StageTwoPending,
-        }
-    }
-
-    /// Verify the certificate, checking a stage two body through the given
-    pub fn verify_with(
-        &self,
-        commitment: &CommitteeCommitment,
-        beacon: &Beacon,
-        verifier: &dyn SuccinctVerifier,
-    ) -> Verdict {
-        match &self.body {
-            Body::Stage1(body) => verify_stage_one(&self.envelope, body, commitment, beacon),
-            Body::Stage2(body) => {
-                if self.envelope.committee != commitment.digest() {
-                    Verdict::Rejected(RejectReason::CommitmentMismatch)
-                } else if verifier.verify(&self.envelope, body, commitment) {
-                    Verdict::Verified
-                } else {
-                    Verdict::Rejected(RejectReason::SuccinctProof)
-                }
-            }
-        }
+        verify_body(&self.envelope, &self.attestations, commitment, beacon)
     }
 }
 
-fn verify_stage_one(
+fn verify_body(
     envelope: &Envelope,
-    body: &Stage1Body,
+    attestations: &[Attestation],
     commitment: &CommitteeCommitment,
     beacon: &Beacon,
 ) -> Verdict {
@@ -85,7 +58,7 @@ fn verify_stage_one(
         return Verdict::Rejected(RejectReason::CommitmentMismatch);
     }
     let mut seen: Vec<u64> = Vec::new();
-    for att in &body.attestations {
+    for att in attestations {
         if att.height != envelope.height || att.slot != envelope.slot || att.block != envelope.block
         {
             return Verdict::Rejected(RejectReason::WrongSubject);

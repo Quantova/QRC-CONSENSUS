@@ -6,16 +6,12 @@ pub mod attester;
 pub mod certificate;
 pub mod committee;
 pub mod params;
-pub mod succinct;
 pub mod verify;
 
 pub use attestation::Attestation;
 pub use attester::{Attester, ValidatorId};
-pub use certificate::{
-    Body, Certificate, Envelope, Stage, Stage1Body, Stage2Body, SuccinctProof, SuccinctVerifier,
-};
+pub use certificate::{Certificate, Envelope};
 pub use committee::{CommitteeCommitment, CommitteeDigest, MemberKey};
-pub use succinct::{prove_stage_two, ProverVerifier};
 pub use verify::{RejectReason, Verdict};
 
 // The block and beacon are part of this layer's public surface: an attestation
