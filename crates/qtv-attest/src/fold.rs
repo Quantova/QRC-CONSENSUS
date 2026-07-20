@@ -452,6 +452,39 @@ mod tests {
     }
 
     #[test]
+    fn the_certificate_stays_near_constant_size_as_the_committee_grows() {
+        // The fold's whole purpose: the certificate core is a fixed root and two stakes, and the
+        // openings are a fixed sample, so a committee ten times larger produces a near identical size
+        // certificate. Only each opening's path grows, and only logarithmically. This is the bandwidth
+        // win that the decision brief rests on.
+        let k = 20;
+        // Wide seeds so leaves stay distinct well past 256 members.
+        let build_committee = |n: usize| -> Vec<([u8; 32], u64)> {
+            (0..n)
+                .map(|i| (sha3_256(&(i as u32).to_le_bytes()), 1 + (i as u64 % 7)))
+                .collect()
+        };
+        let small = build_committee(500);
+        let large = build_committee(5_000);
+        let cert_small = build_sampled(&small, total(&small), k);
+        let cert_large = build_sampled(&large, total(&large), k);
+
+        assert_eq!(cert_small.openings.len(), k, "the sample is fixed at k");
+        assert_eq!(cert_large.openings.len(), k, "the sample is fixed at k");
+        assert!(verify_sampled(&cert_small, total(&small), 500, k));
+        assert!(verify_sampled(&cert_large, total(&large), 5_000, k));
+
+        // A tenfold larger committee adds only a few path steps per opening, never tenfold, so the
+        // certificate size is near constant rather than linear in the committee.
+        let steps_small: usize = cert_small.openings.iter().map(|o| o.path.len()).sum();
+        let steps_large: usize = cert_large.openings.iter().map(|o| o.path.len()).sum();
+        assert!(
+            steps_large < steps_small * 2,
+            "paths grow logarithmically ({steps_small} then {steps_large}), not with the committee"
+        );
+    }
+
+    #[test]
     fn a_cherry_picked_sample_is_rejected() {
         // A prover folds the real committee but opens members it chose rather than the ones the root
         // selects, hoping to hide a lie among the unopened members. The root bound check rejects it.
