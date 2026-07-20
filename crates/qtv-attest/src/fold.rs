@@ -38,8 +38,8 @@ pub struct Opening {
 }
 
 impl Opening {
-    /// Recompute the root this opening implies by folding the leaf up its path. A verifier compares
-    pub fn recompute_root(&self) -> [u8; 32] {
+    /// Fold the leaf up its path, returning both the root hash it implies and the total stake it
+    pub fn fold_to_root(&self) -> ([u8; 32], u64) {
         let mut hash = self.leaf;
         let mut stake = self.stake;
         for step in &self.path {
@@ -59,7 +59,7 @@ impl Opening {
                 Step::Carry => {}
             }
         }
-        hash
+        (hash, stake)
     }
 }
 
@@ -182,9 +182,10 @@ pub fn verify(cert: &FoldCertificate, committee_total: u64, sample_size: usize) 
     if !meets_quorum(cert) {
         return false;
     }
-    cert.openings
-        .iter()
-        .all(|opening| opening.recompute_root() == cert.root)
+    cert.openings.iter().all(|opening| {
+        let (root, stake) = opening.fold_to_root();
+        root == cert.root && stake == cert.attested_stake
+    })
 }
 
 /// Domain tag for deriving the sample from the root.
@@ -279,12 +280,15 @@ mod tests {
             let cert = build(&leaves, total(&leaves), &sample);
             assert_eq!(cert.root, root);
             for opening in &cert.openings {
+                let (got_root, got_stake) = opening.fold_to_root();
+                assert_eq!(got_root, root, "opening {} of {n} must land on the root", opening.index);
+                // Every opening's path accumulates the whole tree's stake, which is what lets the
+                // certificate bind its attested stake to the fold.
                 assert_eq!(
-                    opening.recompute_root(),
-                    root,
-                    "opening {} of {} must land on the root",
-                    opening.index,
-                    n
+                    got_stake,
+                    total(&leaves),
+                    "opening {} of {n} must accumulate the total stake",
+                    opening.index
                 );
             }
         }
@@ -344,6 +348,19 @@ mod tests {
         assert!(sub.attested_stake * 2 > full, "the subset is a majority");
         assert!(!meets_quorum(&sub), "but not a two thirds supermajority");
         assert!(!verify(&sub, full, sub_leaves.len()));
+    }
+
+    #[test]
+    fn an_inflated_attested_stake_is_rejected() {
+        // A prover folds the honest committee but claims a larger attested stake than the tree holds,
+        // hoping to clear quorum on paper. Every opening accumulates the true total, so the bound
+        // check rejects the lie even though the root and openings are otherwise honest.
+        let leaves = committee(12);
+        let full = total(&leaves);
+        let sample: Vec<usize> = (0..12).collect();
+        let mut forged = build(&leaves, full, &sample);
+        forged.attested_stake = full * 2;
+        assert!(!verify(&forged, full, 12), "the attested stake must be bound to the fold");
     }
 
     #[test]
