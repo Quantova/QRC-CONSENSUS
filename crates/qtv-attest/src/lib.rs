@@ -22,6 +22,7 @@ pub mod attestation;
 pub mod attester;
 pub mod certificate;
 pub mod committee;
+pub mod fold;
 pub mod params;
 pub mod verify;
 
