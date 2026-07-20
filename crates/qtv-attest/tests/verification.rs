@@ -52,7 +52,7 @@ fn a_certificate_missing_the_supermajority_does_not_verify() {
     // A certificate hand built from the same two attestations is rejected as
     // not a quorum, so it never finalizes the block.
     let envelope = Envelope::new(1, 0, block, &commitment);
-    let cert = Certificate::stage_one(envelope, atts);
+    let cert = Certificate::new(envelope, atts);
     assert_eq!(
         cert.verify(&commitment, &beacon),
         Verdict::Rejected(RejectReason::NotAQuorum)

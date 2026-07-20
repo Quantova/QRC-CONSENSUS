@@ -32,7 +32,7 @@ fn a_forged_signature_is_rejected() {
     let (members, beacon, block, commitment) = setup();
     let mut atts = quorum_attestations(&members, &beacon, block);
     atts[0].sig[0] ^= 255;
-    let cert = Certificate::stage_one(Envelope::new(1, 0, block, &commitment), atts);
+    let cert = Certificate::new(Envelope::new(1, 0, block, &commitment), atts);
     assert_eq!(
         cert.verify(&commitment, &beacon),
         Verdict::Rejected(RejectReason::BadSignature)
@@ -45,7 +45,7 @@ fn a_swapped_block_is_rejected_as_wrong_subject() {
     let mut atts = quorum_attestations(&members, &beacon, block);
     // The envelope commits to `block`; this attestation now names another block.
     atts[0].block = Block::new(1, [10u8; 32], Parent::Genesis);
-    let cert = Certificate::stage_one(Envelope::new(1, 0, block, &commitment), atts);
+    let cert = Certificate::new(Envelope::new(1, 0, block, &commitment), atts);
     assert_eq!(
         cert.verify(&commitment, &beacon),
         Verdict::Rejected(RejectReason::WrongSubject)
@@ -59,7 +59,7 @@ fn a_mangled_membership_credential_is_rejected_as_not_entitled() {
     // The signature stays valid, but the mangled preimage no longer authenticates
     // to the member's registered root, so entitlement no longer verifies.
     atts[0].membership.preimage[0] ^= 1;
-    let cert = Certificate::stage_one(Envelope::new(1, 0, block, &commitment), atts);
+    let cert = Certificate::new(Envelope::new(1, 0, block, &commitment), atts);
     assert_eq!(
         cert.verify(&commitment, &beacon),
         Verdict::Rejected(RejectReason::NotEntitled)

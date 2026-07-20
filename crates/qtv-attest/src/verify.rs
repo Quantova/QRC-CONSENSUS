@@ -3,16 +3,15 @@
 //! carries. It never sees a secret key. From these it decides whether a
 //! certificate finalizes its block.
 //!
-//! A stage one certificate is checked in full: the envelope must match the
-//! commitment, every attestation must be for the subject, from a listed member,
-//! entitled under the sampler proof, and signed under the member module lattice
-//! key, with no duplicate signer, and the distinct signers must be a
-//! supermajority. A stage two certificate is checked through the succinct seam;
-//! without a verifier the client reports it pending rather than accepting it.
+//! A certificate is checked in full: the envelope must match the commitment,
+//! every attestation must be for the subject, from a listed member, entitled
+//! under the sampler proof, and signed under the member module lattice key, with
+//! no duplicate signer, and the distinct signers must be a supermajority.
 
 use qtv_sampler::beacon::Beacon;
 
-use crate::certificate::{Body, Certificate, Envelope, Stage1Body, SuccinctVerifier};
+use crate::attestation::Attestation;
+use crate::certificate::{Certificate, Envelope};
 use crate::committee::CommitteeCommitment;
 use crate::params::is_quorum;
 
@@ -33,8 +32,6 @@ pub enum RejectReason {
     DuplicateAttester,
     /// The distinct entitled signers do not form a supermajority.
     NotAQuorum,
-    /// The stage two succinct proof failed the seam verifier.
-    SuccinctProof,
 }
 
 /// The outcome of verifying a certificate.
@@ -44,10 +41,6 @@ pub enum Verdict {
     Verified,
     /// The certificate does not verify, with the reason.
     Rejected(RejectReason),
-    /// A stage two certificate reached without a succinct verifier. The succinct
-    /// path is the prover's seam, so the client neither accepts nor rejects it
-    /// here.
-    StageTwoPending,
 }
 
 impl Verdict {
@@ -57,42 +50,15 @@ impl Verdict {
 }
 
 impl Certificate {
-    /// Verify the certificate against a committee commitment and beacon using
-    /// only public inputs. A stage two body is reported pending, since the
-    /// succinct verifier is the prover's seam.
+    /// Verify the certificate against a committee commitment and beacon using only public inputs.
     pub fn verify(&self, commitment: &CommitteeCommitment, beacon: &Beacon) -> Verdict {
-        match &self.body {
-            Body::Stage1(body) => verify_stage_one(&self.envelope, body, commitment, beacon),
-            Body::Stage2(_) => Verdict::StageTwoPending,
-        }
-    }
-
-    /// Verify the certificate, checking a stage two body through the given
-    /// succinct verifier. A stage one body is checked exactly as in `verify`.
-    pub fn verify_with(
-        &self,
-        commitment: &CommitteeCommitment,
-        beacon: &Beacon,
-        verifier: &dyn SuccinctVerifier,
-    ) -> Verdict {
-        match &self.body {
-            Body::Stage1(body) => verify_stage_one(&self.envelope, body, commitment, beacon),
-            Body::Stage2(body) => {
-                if self.envelope.committee != commitment.digest() {
-                    Verdict::Rejected(RejectReason::CommitmentMismatch)
-                } else if verifier.verify(&self.envelope, body, commitment) {
-                    Verdict::Verified
-                } else {
-                    Verdict::Rejected(RejectReason::SuccinctProof)
-                }
-            }
-        }
+        verify_body(&self.envelope, &self.attestations, commitment, beacon)
     }
 }
 
-fn verify_stage_one(
+fn verify_body(
     envelope: &Envelope,
-    body: &Stage1Body,
+    attestations: &[Attestation],
     commitment: &CommitteeCommitment,
     beacon: &Beacon,
 ) -> Verdict {
@@ -100,7 +66,7 @@ fn verify_stage_one(
         return Verdict::Rejected(RejectReason::CommitmentMismatch);
     }
     let mut seen: Vec<u64> = Vec::new();
-    for att in &body.attestations {
+    for att in attestations {
         if att.height != envelope.height || att.slot != envelope.slot || att.block != envelope.block
         {
             return Verdict::Rejected(RejectReason::WrongSubject);

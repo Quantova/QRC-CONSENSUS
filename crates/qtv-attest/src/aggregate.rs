@@ -59,7 +59,7 @@ pub fn aggregate(
     }
     if is_quorum(seen.len(), commitment.len()) {
         let envelope = Envelope::new(height, slot, block, commitment);
-        Some(Certificate::stage_one(envelope, admitted))
+        Some(Certificate::new(envelope, admitted))
     } else {
         None
     }
