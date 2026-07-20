@@ -216,6 +216,64 @@ pub fn verify(cert: &FoldCertificate, committee_total: u64, sample_size: usize) 
         .all(|opening| opening.recompute_root() == cert.root)
 }
 
+/// Domain tag for deriving the sample from the root.
+const SAMPLE_DOMAIN: &[u8] = b"QORUS/fold/sample";
+
+/// Derive the sample of member indices from the fold root, so the sample is fixed only after the
+/// prover has committed to the whole tree and cannot cherry pick which members are checked. Each index
+/// is drawn from a hash over the root and a counter, reduced modulo the committee size, skipping
+/// repeats until `k` distinct indices are drawn, or the whole committee if it is smaller than `k`. The
+/// result is sorted so a certificate carries its openings in a canonical order.
+pub fn sample_indices(root: &[u8; 32], n: usize, k: usize) -> Vec<usize> {
+    if n == 0 {
+        return Vec::new();
+    }
+    let k = k.min(n);
+    let mut chosen: Vec<usize> = Vec::with_capacity(k);
+    let mut counter: u64 = 0;
+    while chosen.len() < k {
+        let mut buf = Vec::with_capacity(SAMPLE_DOMAIN.len() + 32 + 8);
+        buf.extend_from_slice(SAMPLE_DOMAIN);
+        buf.extend_from_slice(root);
+        buf.extend_from_slice(&counter.to_le_bytes());
+        let digest = sha3_256(&buf);
+        let draw = u64::from_le_bytes(digest[..8].try_into().expect("eight bytes")) % (n as u64);
+        let idx = draw as usize;
+        if !chosen.contains(&idx) {
+            chosen.push(idx);
+        }
+        counter = counter.wrapping_add(1);
+    }
+    chosen.sort_unstable();
+    chosen
+}
+
+/// Build a certificate opening exactly the members the root selects, so the sample is sound. The root
+/// is computed first, then the sample is derived from it, then those members are opened.
+pub fn build_sampled(leaves: &[([u8; 32], u64)], total_stake: u64, k: usize) -> FoldCertificate {
+    let (root, _) = fold_root(leaves);
+    let sample = sample_indices(&root, leaves.len(), k);
+    build(leaves, total_stake, &sample)
+}
+
+/// Verify a certificate whose sample is bound to its root. In addition to the fold, quorum, and total
+/// checks, the openings must be exactly the members the root selects for the given committee size and
+/// sample count, so a prover cannot substitute a favourable sample.
+pub fn verify_sampled(
+    cert: &FoldCertificate,
+    committee_total: u64,
+    committee_size: usize,
+    k: usize,
+) -> bool {
+    let expected = sample_indices(&cert.root, committee_size, k);
+    let mut got: Vec<usize> = cert.openings.iter().map(|o| o.index).collect();
+    got.sort_unstable();
+    if got != expected {
+        return false;
+    }
+    verify(cert, committee_total, expected.len())
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -331,5 +389,64 @@ mod tests {
         let cert = build(&leaves, full, &[0, 2, 4]);
         assert!(verify(&cert, full, 3));
         assert!(!verify(&cert, full, 4), "a certificate must carry the expected sample count");
+    }
+
+    #[test]
+    fn the_sample_is_deterministic_distinct_and_in_range() {
+        let root = sha3_256(b"a committed root");
+        let a = sample_indices(&root, 40, 12);
+        let b = sample_indices(&root, 40, 12);
+        assert_eq!(a, b, "the same root gives the same sample");
+        assert_eq!(a.len(), 12);
+        // Distinct and sorted and inside the committee.
+        for w in a.windows(2) {
+            assert!(w[0] < w[1], "sorted and distinct");
+        }
+        assert!(a.iter().all(|&i| i < 40));
+
+        // A different root gives a different sample, so the sample tracks the commitment.
+        let other = sha3_256(b"a different root");
+        assert_ne!(sample_indices(&other, 40, 12), a);
+
+        // Asking for more than the committee holds returns the whole committee.
+        let all = sample_indices(&root, 6, 20);
+        assert_eq!(all, vec![0, 1, 2, 3, 4, 5]);
+    }
+
+    #[test]
+    fn a_root_bound_certificate_round_trips() {
+        for n in [3usize, 8, 15, 32] {
+            let leaves = committee(n);
+            let full = total(&leaves);
+            let k = 5.min(n);
+            let cert = build_sampled(&leaves, full, k);
+            assert!(
+                verify_sampled(&cert, full, n, k),
+                "a fresh root bound certificate of {n} members verifies"
+            );
+            // The openings are exactly the members the root selects.
+            let expected = sample_indices(&cert.root, n, k);
+            let got: Vec<usize> = cert.openings.iter().map(|o| o.index).collect();
+            assert_eq!(got, expected);
+        }
+    }
+
+    #[test]
+    fn a_cherry_picked_sample_is_rejected() {
+        // A prover folds the real committee but opens members it chose rather than the ones the root
+        // selects, hoping to hide a lie among the unopened members. The root bound check rejects it.
+        let leaves = committee(20);
+        let full = total(&leaves);
+        let k = 5;
+        let honest = sample_indices(&fold_root(&leaves).0, 20, k);
+        // Pick a sample that is valid in every other way but is not the root's sample.
+        let mut picked: Vec<usize> = (0..20).filter(|i| !honest.contains(i)).take(k).collect();
+        picked.sort_unstable();
+        assert_ne!(picked, honest);
+        let forged = build(&leaves, full, &picked);
+        // Every opening still folds to the root and quorum holds, so the plain check passes.
+        assert!(verify(&forged, full, k));
+        // But it is not the sample the root selects, so the root bound check rejects it.
+        assert!(!verify_sampled(&forged, full, 20, k));
     }
 }
