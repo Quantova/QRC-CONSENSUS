@@ -1,5 +1,3 @@
-//! Votes are aggregated into a single certificate rather than kept as a list.
-
 use crate::committee::supermajority;
 use crate::round::{BlockId, Vote};
 use crate::validator::ValidatorId;

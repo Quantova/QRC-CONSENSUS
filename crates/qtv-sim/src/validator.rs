@@ -1,5 +1,3 @@
-//! Validators are verification only and phone class. Each carries a fault
-
 pub type ValidatorId = u64;
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]

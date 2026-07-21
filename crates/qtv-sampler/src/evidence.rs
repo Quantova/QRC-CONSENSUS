@@ -1,20 +1,14 @@
-//! Attributable sortition faults and the checks any node runs on them. The one
-
 use crate::onetime::Root;
 use crate::sortition::{verify_membership, Credential};
 
-/// Evidence that an account revealed a committed one time leaf out of its
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct OutOfPosition {
     pub root: Root,
-    /// A credential whose preimage genuinely sits at position `credential.position`
     pub credential: Credential,
-    /// The slot the credential was submitted for.
     pub used_slot: u64,
 }
 
 impl OutOfPosition {
-    /// True when the fault is proven: the preimage authenticates to the root at
     pub fn is_proven(&self) -> bool {
         self.used_slot != self.credential.position
             && self.root.verify_membership(
@@ -25,7 +19,6 @@ impl OutOfPosition {
     }
 }
 
-/// Evidence that an account revealed two distinct draws for one slot. A committed
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct DoubleDraw {
     pub root: Root,
@@ -35,7 +28,6 @@ pub struct DoubleDraw {
 }
 
 impl DoubleDraw {
-    /// True when the fault is proven: two distinct credentials, both put forward
     pub fn is_proven(&self) -> bool {
         self.first != self.second
             && self.first.position == self.slot
@@ -54,7 +46,6 @@ mod tests {
     fn an_honest_pair_of_reveals_is_not_a_fault() {
         let v = SamplerValidator::new(1, 100);
         let root = v.root();
-        // The same slot revealed twice is the identical credential, no fault.
         let a = v.reveal(4);
         let b = v.reveal(4);
         let dd = DoubleDraw {
@@ -70,7 +61,6 @@ mod tests {
     fn a_leaf_reused_at_another_slot_is_an_out_of_position_fault() {
         let v = SamplerValidator::new(1, 100);
         let root = v.root();
-        // The genuine leaf for position 3, used at slot 7.
         let credential = v.reveal(3);
         let fault = OutOfPosition {
             root,

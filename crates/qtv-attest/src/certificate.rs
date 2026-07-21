@@ -1,5 +1,3 @@
-//! The finality certificate. A certificate is an envelope and the aggregated module lattice
-
 use qtv_crypto::sha3::shake256;
 
 use qtv_bft::block::{Block, Height};
@@ -8,7 +6,6 @@ use crate::attestation::Attestation;
 use crate::attester::ValidatorId;
 use crate::committee::{CommitteeCommitment, CommitteeDigest};
 
-/// The shared certificate envelope, the subject a certificate binds to.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct Envelope {
     pub height: Height,
@@ -18,7 +15,6 @@ pub struct Envelope {
 }
 
 impl Envelope {
-    /// The envelope for a decision, committing to the committee by its digest.
     pub fn new(height: Height, slot: u64, block: Block, commitment: &CommitteeCommitment) -> Self {
         Envelope {
             height,
@@ -29,7 +25,6 @@ impl Envelope {
     }
 }
 
-/// A finality certificate: the aggregated module lattice attestations of the entitled supermajority,
 #[derive(Clone)]
 pub struct Certificate {
     pub envelope: Envelope,
@@ -37,7 +32,6 @@ pub struct Certificate {
 }
 
 impl Certificate {
-    /// A certificate over an envelope and its aggregated attestations. The attestations are stored in
     pub fn new(envelope: Envelope, mut attestations: Vec<Attestation>) -> Self {
         attestations.sort_by_key(|a| a.from);
         Certificate {
@@ -46,7 +40,6 @@ impl Certificate {
         }
     }
 
-    /// The distinct attester ids the certificate claims, in ascending order.
     pub fn attesters(&self) -> Vec<ValidatorId> {
         let mut ids: Vec<ValidatorId> = self.attestations.iter().map(|a| a.from).collect();
         ids.sort_unstable();
@@ -54,7 +47,6 @@ impl Certificate {
         ids
     }
 
-    /// A canonical digest of the whole certificate. Two certificates aggregated from the same
     pub fn digest(&self) -> [u8; 32] {
         let mut buf = Vec::new();
         buf.extend_from_slice(&self.envelope.height.to_le_bytes());

@@ -1,5 +1,3 @@
-//! qtv-sampler selects the per slot committee and the leader by grinding
-
 pub mod beacon;
 pub mod committee;
 pub mod evidence;

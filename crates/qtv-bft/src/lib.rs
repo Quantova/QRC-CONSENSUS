@@ -1,5 +1,3 @@
-//! qtv-bft is the QORUS stage one byzantine fault tolerant core, implemented as
-
 pub mod attest;
 pub mod block;
 pub mod certificate;

@@ -1,19 +1,15 @@
-//! Validators are phone class and do verification only work. Each holds a real
-
 use core::fmt;
 
 use qtv_crypto::ml_dsa::{keygen, sign, PublicKey, SecretKey, Signature};
 
 pub type ValidatorId = u64;
 
-/// A participant is either a voting validator or a prover that holds no vote.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Role {
     Validator,
     Prover,
 }
 
-/// The behaviour of a participant during a run.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Fault {
     Honest,
@@ -21,7 +17,6 @@ pub enum Fault {
     Offline,
 }
 
-/// Domain tag folded into a validator key seed, separating consensus keys from
 const KEY_DOMAIN: &[u8; 8] = b"QORUSVAL";
 
 fn key_seed(id: ValidatorId) -> [u8; 32] {
@@ -31,7 +26,6 @@ fn key_seed(id: ValidatorId) -> [u8; 32] {
     seed
 }
 
-/// A validator with a deterministic ML-DSA key pair, a role, and a fault mode.
 #[derive(Clone)]
 pub struct Validator {
     pub id: ValidatorId,
@@ -42,7 +36,6 @@ pub struct Validator {
 }
 
 impl Validator {
-    /// A voting validator with an honest fault mode.
     pub fn new(id: ValidatorId) -> Self {
         let (pk, sk) = keygen(&key_seed(id));
         Validator {
@@ -54,7 +47,6 @@ impl Validator {
         }
     }
 
-    /// A prover holds no vote and never attests.
     pub fn prover(id: ValidatorId) -> Self {
         let mut v = Validator::new(id);
         v.role = Role::Prover;
@@ -77,7 +69,6 @@ impl Validator {
         self.fault == Fault::Honest
     }
 
-    /// A prover has zero votes. A validator has one vote unless offline.
     pub fn votes(&self) -> u64 {
         match self.role {
             Role::Prover => 0,
@@ -91,7 +82,6 @@ impl Validator {
         }
     }
 
-    /// Sign a message under a context with the validator secret key. The
     pub fn sign(&self, message: &[u8], context: &[u8]) -> Signature {
         sign(&self.sk, message, context, &[0u8; 32]).expect("context within bound")
     }
@@ -107,20 +97,17 @@ impl fmt::Debug for Validator {
     }
 }
 
-/// The full set of participants. Voting validators carry ids 1..=n. Provers,
 #[derive(Clone, Debug)]
 pub struct ValidatorSet {
     participants: Vec<Validator>,
 }
 
 impl ValidatorSet {
-    /// A set of `count` honest voting validators with ids 1..=count.
     pub fn new(count: usize) -> Self {
         let participants = (1..=count as u64).map(Validator::new).collect();
         ValidatorSet { participants }
     }
 
-    /// Add a prover, which holds no vote, with the next disjoint id.
     pub fn with_prover(mut self) -> Self {
         let id = self.next_prover_id();
         self.participants.push(Validator::prover(id));
@@ -131,7 +118,6 @@ impl ValidatorSet {
         self.participants.iter().map(|v| v.id).max().unwrap_or(0) + 1
     }
 
-    /// Set the fault mode of a participant.
     pub fn set_fault(&mut self, id: ValidatorId, fault: Fault) {
         if let Some(v) = self.participants.iter_mut().find(|v| v.id == id) {
             v.fault = fault;
@@ -142,7 +128,6 @@ impl ValidatorSet {
         self.participants.iter().find(|v| v.id == id)
     }
 
-    /// Ids of the voting validators, ascending. Provers are excluded, so no
     pub fn voting_ids(&self) -> Vec<ValidatorId> {
         let mut ids: Vec<ValidatorId> = self
             .participants

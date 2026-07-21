@@ -1,5 +1,3 @@
-//! An attester is a committee candidate that holds both consensus keys: the
-
 use qtv_bft::block::{Block, Height};
 use qtv_bft::validator::Validator;
 use qtv_crypto::ml_dsa::PublicKey;
@@ -11,14 +9,12 @@ use crate::attestation::Attestation;
 
 pub use qtv_bft::validator::ValidatorId;
 
-/// A committee candidate holding a module lattice key pair and a verifiable
 pub struct Attester {
     signer: Validator,
     sampler: SamplerValidator,
 }
 
 impl Attester {
-    /// An attester for `id` with `stake` native weight, over the default slot count.
     pub fn new(id: ValidatorId, stake: u64) -> Self {
         Attester {
             signer: Validator::new(id),
@@ -26,7 +22,6 @@ impl Attester {
         }
     }
 
-    /// An attester over an explicit one time slot count. The default constructor
     pub fn with_slots(id: ValidatorId, stake: u64, slots: u64) -> Self {
         Attester {
             signer: Validator::new(id),
@@ -34,7 +29,6 @@ impl Attester {
         }
     }
 
-    /// A prover holds no vote and no stake, so it weighs zero and is never
     pub fn prover(id: ValidatorId) -> Self {
         Attester {
             signer: Validator::new(id),
@@ -46,22 +40,18 @@ impl Attester {
         self.signer.id
     }
 
-    /// The native weight this attester brings to sortition.
     pub fn weight(&self) -> u64 {
         self.sampler.weight()
     }
 
-    /// The module lattice public key its attestation signature is checked under.
     pub fn attest_public_key(&self) -> &PublicKey {
         self.signer.public_key()
     }
 
-    /// The committed one time root its committee entitlement is checked against.
     pub fn root(&self) -> Root {
         self.sampler.root()
     }
 
-    /// Attest a block at a height and slot. The attestation carries the committee
     pub fn attest(&self, height: Height, slot: u64, block: Block, beacon: &Beacon) -> Attestation {
         let _ = beacon;
         let membership = self.sampler.reveal(slot);
@@ -87,17 +77,12 @@ mod tests {
 
     #[test]
     fn with_slots_attests_at_a_slot_beyond_the_default() {
-        // A tree sized well above the default serves a slot past the default count.
-        // The whole path holds: the tree builds to the requested count, the reveal
-        // authenticates through a deeper Merkle path, and entitlement checks below
-        // the stake weighted threshold.
         let slots = 4096;
         let a = Attester::with_slots(1, 100, slots);
         let beacon = Beacon::genesis();
         let block = Block::new(1, [7u8; 32], Parent::Genesis);
         let slot = 4000;
         let att = a.attest(1, slot, block, &beacon);
-        // The authentication path is the log of the padded leaf count, twelve here.
         assert_eq!(att.membership.path.siblings.len(), 12);
         assert!(att.signature_verifies(a.attest_public_key()));
         assert!(att.is_entitled(&a.root(), &beacon, a.weight(), a.weight(), 100));
@@ -110,7 +95,6 @@ mod tests {
         let block = Block::new(1, [7u8; 32], Parent::Genesis);
         let att = p.attest(1, 0, block, &beacon);
         assert_eq!(p.weight(), 0);
-        // The signature is genuine, yet zero weight means no passing entitlement.
         assert!(att.signature_verifies(p.attest_public_key()));
         assert!(!att.is_entitled(&p.root(), &beacon, 0, 100, 100));
     }

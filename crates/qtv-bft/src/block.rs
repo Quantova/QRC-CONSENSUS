@@ -1,20 +1,15 @@
-//! A block decides one height. It carries its height, its payload value, the
-
 use crate::params::VALIDATOR_RESOURCE_BUDGET;
 
 pub type Height = u64;
 
-/// A block value is a full 256-bit digest, the block header hash itself, not a
 pub type Value = [u8; 32];
 
-/// The parent link of a block: the value of the previous finalized block, or
 #[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub enum Parent {
     Genesis,
     Value(Value),
 }
 
-/// A proposed block for one height.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub struct Block {
     pub height: Height,
@@ -24,7 +19,6 @@ pub struct Block {
 }
 
 impl Block {
-    /// A block that carries the unit cost, the honest cost in the model.
     pub fn new(height: Height, val: Value, parent: Parent) -> Self {
         Block {
             height,
@@ -34,7 +28,6 @@ impl Block {
         }
     }
 
-    /// A block with an explicit cost, used to model a block that exceeds the
     pub fn with_cost(height: Height, val: Value, parent: Parent, cost: u64) -> Self {
         Block {
             height,
@@ -44,12 +37,10 @@ impl Block {
         }
     }
 
-    /// True when the block cost is within the resource budget. Mirrors
     pub fn within_budget(&self) -> bool {
         self.cost <= VALIDATOR_RESOURCE_BUDGET
     }
 
-    /// Canonical byte encoding, the message an attestation signs and the input
     pub fn to_bytes(&self) -> Vec<u8> {
         let mut out = Vec::with_capacity(8 + 32 + 1 + 32 + 8);
         out.extend_from_slice(&self.height.to_le_bytes());

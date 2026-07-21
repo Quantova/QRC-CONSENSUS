@@ -1,5 +1,3 @@
-//! A fixed size committee is sampled per round from the beacon seed of the
-
 use crate::hash::{combine, mix64};
 use crate::validator::{ValidatorId, ValidatorSet};
 

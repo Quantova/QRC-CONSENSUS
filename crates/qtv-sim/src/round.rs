@@ -1,5 +1,3 @@
-//! One round of the protocol. The proposer offers the canonical block for the
-
 use crate::certificate::{aggregate, Certificate};
 use crate::committee::{rotation_order, sample_committee};
 use crate::hash::combine;

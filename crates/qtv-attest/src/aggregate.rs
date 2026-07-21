@@ -1,5 +1,3 @@
-//! Aggregation of entitled attestations into a stage one certificate. An
-
 use qtv_bft::block::{Block, Height};
 
 use qtv_sampler::beacon::Beacon;
@@ -9,7 +7,6 @@ use crate::certificate::{Certificate, Envelope};
 use crate::committee::CommitteeCommitment;
 use crate::params::is_quorum;
 
-/// Aggregate the entitled supermajority of attestations for a decision into a
 pub fn aggregate(
     height: Height,
     slot: u64,
@@ -60,7 +57,6 @@ mod tests {
     use crate::attester::Attester;
     use qtv_bft::block::Parent;
 
-    // A budget that saturates every member share, so a valid draw is entitled.
     const BUDGET: u64 = 4;
 
     fn committee(attesters: &[&Attester]) -> CommitteeCommitment {
@@ -110,7 +106,6 @@ mod tests {
         let beacon = Beacon::genesis();
         let block = Block::new(1, [9u8; 32], Parent::Genesis);
         let commitment = committee(&[&a, &b, &c, &d]);
-        // a attests twice; only two distinct signers, below the quorum of three.
         let atts = vec![
             a.attest(1, 0, block, &beacon),
             a.attest(1, 0, block, &beacon),
