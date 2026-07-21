@@ -1,7 +1,3 @@
-//! Deterministic multi round driver. The beacon of one round seeds the next,
-//! so a run is fully determined by the validator set, the committee size and
-//! the initial seed.
-
 use crate::round::{run_round, RoundOutcome};
 use crate::validator::ValidatorSet;
 

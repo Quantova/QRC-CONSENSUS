@@ -1,6 +1,3 @@
-//! A fixed size committee is sampled per round from the beacon seed of the
-//! previous block, and the leader rotates deterministically within it.
-
 use crate::hash::{combine, mix64};
 use crate::validator::{ValidatorId, ValidatorSet};
 

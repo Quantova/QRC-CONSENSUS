@@ -1,21 +1,11 @@
-//! Deterministic hashing for committee sampling and the beacon. Built on
-//! SHAKE256 from the crypto crate, a post quantum hash taken at its full 256-bit
-//! width, so the sampler is hash based and seeded from the previous block beacon
-//! as the specification states. Nothing here reads a truncated digest, so no seed,
-//! score, or fold in the model rests on a short handle a collision could grind.
-
 use qtv_crypto::sha3::shake256;
 
-/// A full 256-bit digest of the input.
 pub fn digest_256(data: &[u8]) -> [u8; 32] {
     let mut out = [0u8; 32];
     shake256(data, &mut out);
     out
 }
 
-/// Score a validator against a seed, used to sample the committee. A validator
-/// with a lower score is preferred, compared as a 256-bit value, and the seed
-/// comes from the beacon.
 pub fn score(seed: &[u8; 32], id: u64) -> [u8; 32] {
     let mut buf = [0u8; 40];
     buf[..32].copy_from_slice(seed);
@@ -23,8 +13,6 @@ pub fn score(seed: &[u8; 32], id: u64) -> [u8; 32] {
     digest_256(&buf)
 }
 
-/// Fold a seed and a byte string into the next 256-bit seed. The beacon of one
-/// height is folded from the certificate of that height and feeds the next.
 pub fn fold(seed: &[u8; 32], bytes: &[u8]) -> [u8; 32] {
     let mut buf = Vec::with_capacity(32 + bytes.len());
     buf.extend_from_slice(seed);

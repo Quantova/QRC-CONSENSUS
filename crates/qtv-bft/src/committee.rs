@@ -1,18 +1,9 @@
-//! A committee is sampled per slot from the voting validators, scored by the
-//! beacon seed of the previous block. The leader rotates deterministically
-//! within the committee by height and view. With a full committee in id order
-//! the rotation reduces to Leader(h, v) == ((h + v) % N) + 1 of the formal
-//! model.
-
 use crate::block::Height;
 use crate::hash::score;
 use crate::validator::{ValidatorId, ValidatorSet};
 
 pub type View = u64;
 
-/// Sample a committee of at most `size` voting validators, preferring the
-/// lowest scores under the seed. The result is returned in ascending id order,
-/// the canonical order the leader rotation walks. Provers are never sampled.
 pub fn sample_committee(set: &ValidatorSet, seed: &[u8; 32], size: usize) -> Vec<ValidatorId> {
     let mut scored: Vec<([u8; 32], ValidatorId)> = set
         .voting_ids()
@@ -26,7 +17,6 @@ pub fn sample_committee(set: &ValidatorSet, seed: &[u8; 32], size: usize) -> Vec
     committee
 }
 
-/// The leader of a height and view, drawn deterministically from the committee.
 pub fn leader(committee: &[ValidatorId], height: Height, view: View) -> Option<ValidatorId> {
     if committee.is_empty() {
         return None;

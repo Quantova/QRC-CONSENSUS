@@ -1,14 +1,3 @@
-//! Aggregation of entitled attestations into a stage one certificate. An
-//! attestation is admitted only when it is for this decision, comes from a listed
-//! committee member, carries a membership draw that proves entitlement under the
-//! member stake weighted threshold, and carries a module lattice signature that
-//! verifies under the member key. Everything else is rejected.
-//!
-//! A certificate forms only when the distinct entitled signers are a
-//! supermajority of the committee, two thirds plus one. A prover weighs zero and
-//! is never entitled, so it can never help a block finalize. An offline member
-//! simply does not attest, which lowers the count without any penalty.
-
 use qtv_bft::block::{Block, Height};
 
 use qtv_sampler::beacon::Beacon;
@@ -18,9 +7,6 @@ use crate::certificate::{Certificate, Envelope};
 use crate::committee::CommitteeCommitment;
 use crate::params::is_quorum;
 
-/// Aggregate the entitled supermajority of attestations for a decision into a
-/// stage one certificate, or return None when no supermajority is entitled and
-/// verified. Duplicate signers count once.
 pub fn aggregate(
     height: Height,
     slot: u64,
@@ -71,7 +57,6 @@ mod tests {
     use crate::attester::Attester;
     use qtv_bft::block::Parent;
 
-    // A budget that saturates every member share, so a valid draw is entitled.
     const BUDGET: u64 = 4;
 
     fn committee(attesters: &[&Attester]) -> CommitteeCommitment {
@@ -121,7 +106,6 @@ mod tests {
         let beacon = Beacon::genesis();
         let block = Block::new(1, [9u8; 32], Parent::Genesis);
         let commitment = committee(&[&a, &b, &c, &d]);
-        // a attests twice; only two distinct signers, below the quorum of three.
         let atts = vec![
             a.attest(1, 0, block, &beacon),
             a.attest(1, 0, block, &beacon),

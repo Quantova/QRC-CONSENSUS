@@ -1,15 +1,8 @@
-//! The authenticated messages of the protocol: proposals from a leader and
-//! attestations from committee members. Together they form the growing message
-//! set, mirroring the msgs variable of the formal model, which holds propose
-//! and vote records.
-
 use crate::attest::Attestation;
 use crate::block::{Block, Height};
 use crate::committee::View;
 use crate::validator::ValidatorId;
 
-/// A block proposed by the leader of a height and view. Mirrors a propose
-/// record [kind, from, height, view, block].
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct Proposal {
     pub from: ValidatorId,
@@ -18,8 +11,6 @@ pub struct Proposal {
     pub block: Block,
 }
 
-/// An authenticated protocol message. A vote carries a real attestation, boxed
-/// because an ML-DSA signature is large next to a proposal.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum Message {
     Propose(Proposal),
@@ -27,7 +18,6 @@ pub enum Message {
 }
 
 impl Message {
-    /// Build a vote message from an attestation.
     pub fn vote(attestation: Attestation) -> Self {
         Message::Vote(Box::new(attestation))
     }

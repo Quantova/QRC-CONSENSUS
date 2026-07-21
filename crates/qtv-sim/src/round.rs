@@ -1,8 +1,3 @@
-//! One round of the protocol. The proposer offers the canonical block for the
-//! height, the committee votes, and a validator that votes for two different
-//! blocks at the same height is flagged for slashing. Offline validators are
-//! skipped and never slashed.
-
 use crate::certificate::{aggregate, Certificate};
 use crate::committee::{rotation_order, sample_committee};
 use crate::hash::combine;

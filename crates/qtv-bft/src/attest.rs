@@ -1,10 +1,3 @@
-//! Attestation with a real module lattice signature. A committee member signs
-//! the block it votes for with ML-DSA, the only signature scheme consensus
-//! uses. An attestation is the authenticated fact that a named validator
-//! attested a named block at a height, and it carries the signature bytes so a
-//! verifier can check it. Mirrors the vote messages of the formal model, with
-//! the abstracted authenticated fact replaced by a checkable signature.
-
 use core::fmt;
 
 use qtv_crypto::ml_dsa::{verify, PublicKey, Signature};
@@ -12,12 +5,8 @@ use qtv_crypto::ml_dsa::{verify, PublicKey, Signature};
 use crate::block::{Block, Height};
 use crate::validator::{Validator, ValidatorId};
 
-/// Domain separation context for consensus attestations.
 pub const ATTEST_CONTEXT: &[u8] = b"QORUS-STAGE1-ATTEST";
 
-/// The message a validator signs to attest a block at a height. It binds the
-/// height and the full block, so a signature cannot be replayed at another
-/// height or for another block.
 pub fn attestation_message(height: Height, block: &Block) -> Vec<u8> {
     let mut msg = Vec::with_capacity(8 + 33);
     msg.extend_from_slice(&height.to_le_bytes());
@@ -25,7 +14,6 @@ pub fn attestation_message(height: Height, block: &Block) -> Vec<u8> {
     msg
 }
 
-/// A signed attestation from one validator for one block at one height.
 #[derive(Clone, PartialEq, Eq)]
 pub struct Attestation {
     pub from: ValidatorId,
@@ -35,8 +23,6 @@ pub struct Attestation {
 }
 
 impl Attestation {
-    /// Produce an attestation by signing the block with the validator ML-DSA
-    /// key. Deterministic, since the underlying signing uses a zero randomizer.
     pub fn create(validator: &Validator, height: Height, block: Block) -> Self {
         let msg = attestation_message(height, &block);
         let sig = validator.sign(&msg, ATTEST_CONTEXT);
@@ -48,8 +34,6 @@ impl Attestation {
         }
     }
 
-    /// Verify the attestation signature against a public key. Returns false for
-    /// any forged or tampered signature.
     pub fn verify(&self, public_key: &PublicKey) -> bool {
         let msg = attestation_message(self.height, &self.block);
         verify(public_key, &msg, &self.sig, ATTEST_CONTEXT)

@@ -1,21 +1,10 @@
-//! Equivocation detection. A validator that attests two different blocks at one
-//! height has double signed and is the only slashable fault. An honest
-//! validator never equivocates and an offline validator casts no attestation,
-//! so neither is ever flagged. Mirrors the Equivocators set of the formal
-//! model and supports its OnlyByzantineSlashed and OfflineNeverSlashed
-//! invariants.
-
 use crate::attest::Attestation;
 use crate::validator::ValidatorId;
 
-/// True when two attestations are a double signing: same validator, same
-/// height, different block.
 pub fn is_equivocation(a: &Attestation, b: &Attestation) -> bool {
     a.from == b.from && a.height == b.height && a.block != b.block
 }
 
-/// The validators that double signed at some height, in ascending order. This
-/// is the slashable set.
 pub fn equivocators(attestations: &[Attestation]) -> Vec<ValidatorId> {
     let mut flagged: Vec<ValidatorId> = Vec::new();
     for (i, a) in attestations.iter().enumerate() {

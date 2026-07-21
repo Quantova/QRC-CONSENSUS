@@ -1,14 +1,3 @@
-//! The committee commitment. It is the public record of the entitled committee
-//! for a slot: each member id with its verifiable random key, its module lattice
-//! key, and its native weight, together with the total weight and the committee
-//! budget. A light client is given this commitment and the beacon, and needs no
-//! secret to recheck entitlement or a signature.
-//!
-//! The commitment folds into a single digest that the certificate envelope
-//! carries, so a stage one body and a stage two body over the same envelope are
-//! bound to the same committee. Reproducing the commitment from the beacon is the
-//! sampler's job; this layer only commits to it and verifies against it.
-
 use qtv_crypto::ml_dsa::PublicKey;
 use qtv_crypto::sha3::shake256;
 use qtv_sampler::onetime::Root;
@@ -16,12 +5,8 @@ use qtv_sampler::onetime::Root;
 use crate::attester::{Attester, ValidatorId};
 use crate::params::COMMITTEE_BUDGET;
 
-/// A 32 byte commitment to the committee for a slot.
 pub type CommitteeDigest = [u8; 32];
 
-/// The committed root, module lattice key, and weight of one committee member.
-/// The root is the account's one time sortition identity, the value its committee
-/// entitlement is rechecked against.
 #[derive(Clone)]
 pub struct MemberKey {
     pub id: ValidatorId,
@@ -30,8 +15,6 @@ pub struct MemberKey {
     pub attest_pk: PublicKey,
 }
 
-/// The committee for a slot, with the total weight and budget that the stake
-/// weighted entitlement check reads. Members are held in ascending id order.
 #[derive(Clone)]
 pub struct CommitteeCommitment {
     pub slot: u64,
@@ -41,15 +24,10 @@ pub struct CommitteeCommitment {
 }
 
 impl CommitteeCommitment {
-    /// Commit to the given attesters as the committee for a slot, using the
-    /// protocol committee budget. The total weight is the sum of the member
-    /// weights, the denominator the entitlement threshold is taken against.
     pub fn from_attesters(slot: u64, attesters: &[&Attester]) -> Self {
         Self::from_attesters_with_budget(slot, attesters, COMMITTEE_BUDGET)
     }
 
-    /// Commit to the given attesters under an explicit budget, used to size small
-    /// committees in tests.
     pub fn from_attesters_with_budget(slot: u64, attesters: &[&Attester], budget: u64) -> Self {
         let mut members: Vec<MemberKey> = attesters
             .iter()
@@ -70,7 +48,6 @@ impl CommitteeCommitment {
         }
     }
 
-    /// The number of committee members, the denominator of the supermajority.
     pub fn len(&self) -> usize {
         self.members.len()
     }
@@ -79,7 +56,6 @@ impl CommitteeCommitment {
         self.members.is_empty()
     }
 
-    /// The member record for an id, or None when the id is not on the committee.
     pub fn member(&self, id: ValidatorId) -> Option<&MemberKey> {
         self.members.iter().find(|m| m.id == id)
     }
@@ -88,9 +64,6 @@ impl CommitteeCommitment {
         self.member(id).is_some()
     }
 
-    /// The commitment digest carried by the envelope. It folds the slot, budget,
-    /// total weight, and every member id, weight, and public key in id order, so
-    /// any change to the committee changes the digest.
     pub fn digest(&self) -> CommitteeDigest {
         let mut buf = Vec::new();
         buf.extend_from_slice(b"QORUS-ATTEST-COMMITTEE");

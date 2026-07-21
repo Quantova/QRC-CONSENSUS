@@ -1,19 +1,9 @@
-//! When a supermajority of the committee has attested one block, the
-//! attestations aggregate into a single finality certificate and the block is
-//! final. The certificate keeps only the attester set, not the list of votes,
-//! so consensus votes never consume block space. Each attestation is verified
-//! with its signer ML-DSA key before it counts, so a forged attestation can
-//! never help a block finalize. Mirrors the Finalize action and the certs
-//! variable of the formal model.
-
 use crate::attest::Attestation;
 use crate::block::{Block, Height};
 use crate::hash::fold;
 use crate::params::is_quorum;
 use crate::validator::{ValidatorId, ValidatorSet};
 
-/// A finality certificate for one height. It records the finalized block and
-/// the set of validators whose verified attestations formed the quorum.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct Certificate {
     pub height: Height,
@@ -26,9 +16,6 @@ impl Certificate {
         self.attesters.len()
     }
 
-    /// A compact digest of the certificate: the block bytes followed by the
-    /// attester ids. The beacon for the next height folds this in, so leader
-    /// election derives from the aggregate rather than any single validator.
     pub fn digest_bytes(&self) -> Vec<u8> {
         let mut out = self.block.to_bytes();
         for id in &self.attesters {
@@ -37,18 +24,11 @@ impl Certificate {
         out
     }
 
-    /// The beacon that seeds the next height, folded from a previous seed and
-    /// this certificate.
     pub fn beacon(&self, prev_seed: &[u8; 32]) -> [u8; 32] {
         fold(prev_seed, &self.digest_bytes())
     }
 }
 
-/// Aggregate the attestations for a block at a height into a certificate. An
-/// attestation counts only when it is for this height and block, comes from a
-/// committee member, and its ML-DSA signature verifies under that member key.
-/// A certificate forms only when the distinct verified attesters are a quorum,
-/// meaning more than two thirds of the committee.
 pub fn aggregate(
     height: Height,
     block: Block,
@@ -124,12 +104,10 @@ mod tests {
         let set = ValidatorSet::new(4);
         let committee = vec![1, 2, 3, 4];
         let block = Block::new(1, [9u8; 32], Parent::Genesis);
-        // Two honest attestations plus one attestation with a corrupted signature.
         let mut atts = attest_all(&set, &[1, 2], block);
         let mut forged = Attestation::create(set.get(3).unwrap(), 1, block);
         forged.sig[10] ^= 255;
         atts.push(forged);
-        // Only two verified attesters remain, below the quorum of three.
         assert!(aggregate(1, block, &committee, &atts, &set).is_none());
     }
 

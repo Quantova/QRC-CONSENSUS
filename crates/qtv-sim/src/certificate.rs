@@ -1,8 +1,3 @@
-//! Votes are aggregated into a single certificate rather than kept as a list.
-//! Signatures are abstracted as a validity flag, so the certificate records the
-//! set of voters as a bitmap together with an aggregate validity. A certificate
-//! forms only when one block reaches the supermajority.
-
 use crate::committee::supermajority;
 use crate::round::{BlockId, Vote};
 use crate::validator::ValidatorId;

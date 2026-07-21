@@ -1,13 +1,3 @@
-//! Light client verification. A light client holds only public inputs: the
-//! committee commitment, the beacon, and the member public keys the commitment
-//! carries. It never sees a secret key. From these it decides whether a
-//! certificate finalizes its block.
-//!
-//! A certificate is checked in full: the envelope must match the commitment,
-//! every attestation must be for the subject, from a listed member, entitled
-//! under the sampler proof, and signed under the member module lattice key, with
-//! no duplicate signer, and the distinct signers must be a supermajority.
-
 use qtv_sampler::beacon::Beacon;
 
 use crate::attestation::Attestation;
@@ -15,31 +5,20 @@ use crate::certificate::{Certificate, Envelope};
 use crate::committee::CommitteeCommitment;
 use crate::params::is_quorum;
 
-/// The reason a certificate did not verify.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum RejectReason {
-    /// The envelope committee digest does not match the given commitment.
     CommitmentMismatch,
-    /// An attestation names a different height, slot, or block than the envelope.
     WrongSubject,
-    /// A signer is not on the committee.
     NotOnCommittee,
-    /// A signature does not verify under the member module lattice key.
     BadSignature,
-    /// A membership draw does not prove entitlement under the member stake.
     NotEntitled,
-    /// The same signer appears twice.
     DuplicateAttester,
-    /// The distinct entitled signers do not form a supermajority.
     NotAQuorum,
 }
 
-/// The outcome of verifying a certificate.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Verdict {
-    /// The certificate finalizes its block.
     Verified,
-    /// The certificate does not verify, with the reason.
     Rejected(RejectReason),
 }
 
@@ -50,7 +29,6 @@ impl Verdict {
 }
 
 impl Certificate {
-    /// Verify the certificate against a committee commitment and beacon using only public inputs.
     pub fn verify(&self, commitment: &CommitteeCommitment, beacon: &Beacon) -> Verdict {
         verify_body(&self.envelope, &self.attestations, commitment, beacon)
     }

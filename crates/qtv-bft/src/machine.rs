@@ -1,22 +1,3 @@
-//! The stage one BFT core as a deterministic state machine. The state is the
-//! four variables of the formal model: the message set, the certificate set,
-//! the per height view, and the stabilization flag. Each transition method
-//! corresponds to an action of the Next relation in formal/QorusBFT.tla, so a
-//! reviewer can line the two up:
-//!
-//!   honest_propose  <->  HonestPropose(h)
-//!   byz_propose     <->  ByzPropose(h, b)
-//!   vote            <->  Vote(x, h, b)
-//!   byz_vote        <->  ByzVote(x, h, b)
-//!   finalize        <->  Finalize(h, b)
-//!   timeout         <->  Timeout(h)
-//!   stabilize       <->  Stabilize
-//!
-//! The committee is sampled per slot from the beacon rather than fixed, and an
-//! attestation is a real ML-DSA signature rather than an abstracted fact, but
-//! the guards and effects match the model action for action. A slot is 150
-//! milliseconds of logical time, which the untimed core replaces with views.
-
 use std::collections::BTreeMap;
 
 use crate::attest::Attestation;
@@ -28,7 +9,6 @@ use crate::message::{Message, Proposal};
 use crate::params::MIN_HEIGHT;
 use crate::validator::{Fault, ValidatorId, ValidatorSet};
 
-/// The consensus state machine over one growing chain of heights.
 #[derive(Clone, Debug)]
 pub struct Machine {
     set: ValidatorSet,
@@ -43,8 +23,6 @@ pub struct Machine {
 }
 
 impl Machine {
-    /// A fresh machine, mirroring Init: no messages, no certificates, every
-    /// view at zero, and an unstable network.
     pub fn new(
         set: ValidatorSet,
         committee_size: usize,
@@ -69,8 +47,6 @@ impl Machine {
         }
     }
 
-    // Read only accessors.
-
     pub fn certificates(&self) -> &[Certificate] {
         &self.certs
     }
@@ -87,14 +63,10 @@ impl Machine {
         *self.views.get(&height).unwrap_or(&0)
     }
 
-    // Derived predicates, mirroring the model operators.
-
-    /// Decided(h): a certificate exists for the height.
     pub fn decided(&self, height: Height) -> bool {
         self.certs.iter().any(|c| c.height == height)
     }
 
-    /// The finalized block of a decided height.
     pub fn final_block_of(&self, height: Height) -> Option<Block> {
         self.certs
             .iter()
@@ -102,8 +74,6 @@ impl Machine {
             .map(|c| c.block)
     }
 
-    /// ParentVal(h): Genesis at the first height, otherwise the value of the
-    /// block finalized below.
     fn parent_val(&self, height: Height) -> Parent {
         if height == MIN_HEIGHT {
             Parent::Genesis
@@ -115,7 +85,6 @@ impl Machine {
         }
     }
 
-    /// Working(h): undecided, and every earlier height already decided.
     pub fn working(&self, height: Height) -> bool {
         if height < MIN_HEIGHT || height > self.max_height {
             return false;
@@ -126,8 +95,6 @@ impl Machine {
         (MIN_HEIGHT..height).all(|g| self.decided(g))
     }
 
-    /// The seed that samples the committee for a height, folded forward from the
-    /// genesis seed through the certificates of the heights below.
     fn seed_for_height(&self, height: Height) -> [u8; 32] {
         let mut seed = self.genesis_seed;
         let mut h = MIN_HEIGHT;
@@ -141,12 +108,10 @@ impl Machine {
         seed
     }
 
-    /// The committee sampled for a slot.
     pub fn committee_for(&self, height: Height) -> Vec<ValidatorId> {
         sample_committee(&self.set, &self.seed_for_height(height), self.committee_size)
     }
 
-    /// Leader(h, v): the leader drawn from the committee at a view.
     pub fn leader_of(&self, height: Height, view: View) -> Option<ValidatorId> {
         leader(&self.committee_for(height), height, view)
     }
@@ -155,23 +120,18 @@ impl Machine {
         self.committee_for(height).contains(&id)
     }
 
-    /// The canonical honest value for a height, derived from the committee seed.
     fn honest_val(&self, height: Height) -> Value {
         fold(&self.seed_for_height(height), b"HONEST-VAL")
     }
 
-    /// HonestProposal(h): the single valid block an honest leader offers.
     pub fn honest_block(&self, height: Height) -> Block {
         Block::new(height, self.honest_val(height), self.parent_val(height))
     }
 
-    /// ValidBlock(b, h): shaped for the height, descending from the previous
-    /// finalized value, and within the resource budget.
     pub fn valid_block(&self, block: &Block, height: Height) -> bool {
         block.height == height && block.parent == self.parent_val(height) && block.within_budget()
     }
 
-    /// VotedFor(x, h, b): the validator cast an attestation for the block.
     pub fn voted_for(&self, x: ValidatorId, height: Height, block: &Block) -> bool {
         self.msgs
             .iter()
@@ -186,8 +146,6 @@ impl Machine {
             .any(|a| a.from == x && a.height == height && &a.block != block)
     }
 
-    /// SawProposal(h, b): a proposal for the block from the legitimate leader of
-    /// a view already reached.
     fn saw_proposal(&self, height: Height, block: &Block) -> bool {
         let view = self.view_of(height);
         self.msgs.iter().filter_map(|m| m.as_proposal()).any(|p| {
@@ -211,10 +169,6 @@ impl Machine {
             .collect()
     }
 
-    // Transitions, one per Next action.
-
-    /// HonestPropose(h): the honest online leader of the current view proposes
-    /// its single valid block.
     pub fn honest_propose(&mut self, height: Height) -> bool {
         if !self.working(height) {
             return false;
@@ -241,8 +195,6 @@ impl Machine {
         true
     }
 
-    /// ByzPropose(h, b): a byzantine leader proposes any block for the height,
-    /// including an invalid one or a second block in the same view.
     pub fn byz_propose(&mut self, height: Height, block: Block) -> bool {
         if !self.working(height) || block.height != height {
             return false;
@@ -268,8 +220,6 @@ impl Machine {
         true
     }
 
-    /// Vote(x, h, b): an honest committee member attests a validly proposed
-    /// block, and never attests a second block at this height.
     pub fn vote(&mut self, x: ValidatorId, height: Height, block: Block) -> bool {
         if !self.working(height) {
             return false;
@@ -295,8 +245,6 @@ impl Machine {
         true
     }
 
-    /// ByzVote(x, h, b): a byzantine committee member may attest any block, and
-    /// may attest two different blocks at one height, which is equivocation.
     pub fn byz_vote(&mut self, x: ValidatorId, height: Height, block: Block) -> bool {
         if !self.working(height) || block.height != height {
             return false;
@@ -316,11 +264,6 @@ impl Machine {
         true
     }
 
-    /// Finalize(h, b): when a quorum has attested one block and every earlier
-    /// height is decided, the verified attestations aggregate into a
-    /// certificate. This does not forbid a second certificate at the height, so
-    /// a conflicting finalization would surface if the quorum arithmetic ever
-    /// allowed one, exactly as in the model.
     pub fn finalize(&mut self, height: Height, block: Block) -> bool {
         if height < MIN_HEIGHT || height > self.max_height {
             return false;
@@ -339,9 +282,6 @@ impl Machine {
         false
     }
 
-    /// Timeout(h): advance the view of an undecided height, rotating the leader.
-    /// Before stabilization it may fire freely; after stabilization it only
-    /// rotates past a leader that is offline or byzantine.
     pub fn timeout(&mut self, height: Height) -> bool {
         if !self.working(height) || self.view_of(height) >= self.max_view {
             return false;
@@ -361,7 +301,6 @@ impl Machine {
         true
     }
 
-    /// Stabilize: the network reaches partial synchrony.
     pub fn stabilize(&mut self) -> bool {
         if self.stable {
             return false;
@@ -370,9 +309,6 @@ impl Machine {
         true
     }
 
-    // Driver.
-
-    /// The slashable set: validators that double signed at some height.
     pub fn slashed(&self) -> Vec<ValidatorId> {
         let attestations: Vec<Attestation> = self
             .msgs
@@ -383,15 +319,10 @@ impl Machine {
         crate::equivocation::equivocators(&attestations)
     }
 
-    /// True once every height has finalized.
     pub fn all_finalized(&self) -> bool {
         (MIN_HEIGHT..=self.max_height).all(|h| self.decided(h))
     }
 
-    /// Drive one height to finality after stabilization. An honest online leader
-    /// proposes, the honest online committee members attest, and the block
-    /// finalizes; an offline or byzantine leader is rotated past by a timeout.
-    /// Returns whether the height finalized within the view bound.
     pub fn advance_height(&mut self, height: Height) -> bool {
         loop {
             if self.decided(height) {
@@ -421,8 +352,6 @@ impl Machine {
         }
     }
 
-    /// Run the core to finality over every height. Stabilizes, then finalizes
-    /// each height in order. Returns the finalized certificates.
     pub fn run(&mut self) -> Vec<Certificate> {
         self.stabilize();
         for height in MIN_HEIGHT..=self.max_height {
@@ -474,14 +403,12 @@ mod tests {
 
     #[test]
     fn timeout_rotates_past_a_byzantine_leader_when_stable() {
-        // Leader of height 1 view 0 is ((1+0) % 4) + 1 = 2. Make 2 byzantine.
         let mut set = ValidatorSet::new(4);
         set.set_fault(2, Fault::Byzantine);
         let mut m = Machine::new(set, 4, [192u8; 32], 1, 3);
         assert_eq!(m.leader_of(1, 0), Some(2));
         let certs = m.run();
         assert_eq!(certs.len(), 1);
-        // A byzantine leader never had to be trusted; view advanced past it.
         assert!(m.view_of(1) >= 1);
     }
 }
