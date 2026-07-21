@@ -1,5 +1,3 @@
-//! The canonical certificate attestation. It binds the height, the slot, the
-
 use qtv_bft::block::{Block, Height};
 use qtv_bft::validator::{Validator, ValidatorId};
 use qtv_crypto::ml_dsa::{verify, PublicKey, Signature};
@@ -9,7 +7,6 @@ use qtv_sampler::sortition::{verify_selection, Credential};
 
 use crate::params::{ATTEST_CONTEXT, DOMAIN_COMMITTEE};
 
-/// The message a signer binds: the height, the slot, and the full block bytes.
 pub fn attestation_message(height: Height, slot: u64, block: &Block) -> Vec<u8> {
     let mut msg = Vec::with_capacity(16 + 33);
     msg.extend_from_slice(&height.to_le_bytes());
@@ -18,7 +15,6 @@ pub fn attestation_message(height: Height, slot: u64, block: &Block) -> Vec<u8> 
     msg
 }
 
-/// A signed attestation from one entitled committee member for one block at one
 #[derive(Clone)]
 pub struct Attestation {
     pub from: ValidatorId,
@@ -30,7 +26,6 @@ pub struct Attestation {
 }
 
 impl Attestation {
-    /// Produce an attestation by signing the block with the signer module
     pub fn create(
         signer: &Validator,
         height: Height,
@@ -50,13 +45,11 @@ impl Attestation {
         }
     }
 
-    /// True when the module lattice signature verifies under the attester public
     pub fn signature_verifies(&self, attest_pk: &PublicKey) -> bool {
         let msg = attestation_message(self.height, self.slot, &self.block);
         verify(attest_pk, &msg, &self.sig, ATTEST_CONTEXT)
     }
 
-    /// True when the membership credential proves the signer was an entitled
     pub fn is_entitled(
         &self,
         root: &Root,
@@ -84,8 +77,6 @@ mod tests {
     use qtv_bft::block::Parent;
     use qtv_sampler::validator::SamplerValidator;
 
-    // A budget that saturates a single validator's whole stake share, so a valid
-    // draw is always below threshold and the member is entitled.
     const SATURATING_BUDGET: u64 = 100;
 
     fn parts(id: u64, stake: u64) -> (Validator, SamplerValidator) {
@@ -130,10 +121,8 @@ mod tests {
         let impostor = SamplerValidator::new(9, 100);
         let beacon = Beacon::genesis();
         let block = Block::new(1, [5u8; 32], Parent::Genesis);
-        // Reveal with the impostor's tree but sign with the real signer key.
         let membership = impostor.reveal(0);
         let att = Attestation::create(&signer, 1, 0, block, membership);
-        // The credential does not authenticate to the signer's own registered root.
         assert!(!att.is_entitled(&sampler.root(), &beacon, 100, 100, SATURATING_BUDGET));
     }
 }

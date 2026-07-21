@@ -1,14 +1,10 @@
-//! Equivocation detection. A validator that attests two different blocks at one
-
 use crate::attest::Attestation;
 use crate::validator::ValidatorId;
 
-/// True when two attestations are a double signing: same validator, same
 pub fn is_equivocation(a: &Attestation, b: &Attestation) -> bool {
     a.from == b.from && a.height == b.height && a.block != b.block
 }
 
-/// The validators that double signed at some height, in ascending order. This
 pub fn equivocators(attestations: &[Attestation]) -> Vec<ValidatorId> {
     let mut flagged: Vec<ValidatorId> = Vec::new();
     for (i, a) in attestations.iter().enumerate() {

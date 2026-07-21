@@ -1,5 +1,3 @@
-//! Deterministic multi round driver. The beacon of one round seeds the next,
-
 use crate::round::{run_round, RoundOutcome};
 use crate::validator::ValidatorSet;
 

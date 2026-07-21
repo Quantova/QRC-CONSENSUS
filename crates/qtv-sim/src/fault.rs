@@ -1,5 +1,3 @@
-//! Fault injection. A configuration assigns fault modes to specific validators
-
 use crate::validator::{Fault, ValidatorId, ValidatorSet};
 
 #[derive(Clone, Debug, Default, PartialEq, Eq)]

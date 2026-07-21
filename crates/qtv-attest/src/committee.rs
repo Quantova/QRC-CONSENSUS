@@ -1,5 +1,3 @@
-//! The committee commitment. It is the public record of the entitled committee
-
 use qtv_crypto::ml_dsa::PublicKey;
 use qtv_crypto::sha3::shake256;
 use qtv_sampler::onetime::Root;
@@ -7,10 +5,8 @@ use qtv_sampler::onetime::Root;
 use crate::attester::{Attester, ValidatorId};
 use crate::params::COMMITTEE_BUDGET;
 
-/// A 32 byte commitment to the committee for a slot.
 pub type CommitteeDigest = [u8; 32];
 
-/// The committed root, module lattice key, and weight of one committee member.
 #[derive(Clone)]
 pub struct MemberKey {
     pub id: ValidatorId,
@@ -19,7 +15,6 @@ pub struct MemberKey {
     pub attest_pk: PublicKey,
 }
 
-/// The committee for a slot, with the total weight and budget that the stake
 #[derive(Clone)]
 pub struct CommitteeCommitment {
     pub slot: u64,
@@ -29,12 +24,10 @@ pub struct CommitteeCommitment {
 }
 
 impl CommitteeCommitment {
-    /// Commit to the given attesters as the committee for a slot, using the
     pub fn from_attesters(slot: u64, attesters: &[&Attester]) -> Self {
         Self::from_attesters_with_budget(slot, attesters, COMMITTEE_BUDGET)
     }
 
-    /// Commit to the given attesters under an explicit budget, used to size small
     pub fn from_attesters_with_budget(slot: u64, attesters: &[&Attester], budget: u64) -> Self {
         let mut members: Vec<MemberKey> = attesters
             .iter()
@@ -55,7 +48,6 @@ impl CommitteeCommitment {
         }
     }
 
-    /// The number of committee members, the denominator of the supermajority.
     pub fn len(&self) -> usize {
         self.members.len()
     }
@@ -64,7 +56,6 @@ impl CommitteeCommitment {
         self.members.is_empty()
     }
 
-    /// The member record for an id, or None when the id is not on the committee.
     pub fn member(&self, id: ValidatorId) -> Option<&MemberKey> {
         self.members.iter().find(|m| m.id == id)
     }
@@ -73,7 +64,6 @@ impl CommitteeCommitment {
         self.member(id).is_some()
     }
 
-    /// The commitment digest carried by the envelope. It folds the slot, budget,
     pub fn digest(&self) -> CommitteeDigest {
         let mut buf = Vec::new();
         buf.extend_from_slice(b"QORUS-ATTEST-COMMITTEE");

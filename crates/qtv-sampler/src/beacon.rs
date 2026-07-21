@@ -1,35 +1,27 @@
-//! The epoch beacon. The beacon produces a 32 byte seed for each block. It is
-
 use qtv_crypto::sha3::shake256;
 
-/// Length in bytes of a beacon seed and of a certificate digest.
 pub const SEED_BYTES: usize = 32;
 
-/// A beacon seed for one block.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct Beacon {
     seed: [u8; SEED_BYTES],
 }
 
 impl Beacon {
-    /// The fixed genesis seed, used by the first block before any certificate
     pub fn genesis() -> Self {
         let mut seed = [0u8; SEED_BYTES];
         shake256(b"QORUS/beacon/genesis", &mut seed);
         Beacon { seed }
     }
 
-    /// A beacon from an explicit seed.
     pub fn from_seed(seed: [u8; SEED_BYTES]) -> Self {
         Beacon { seed }
     }
 
-    /// The raw seed bytes.
     pub fn seed(&self) -> &[u8; SEED_BYTES] {
         &self.seed
     }
 
-    /// Advance to the next beacon from the aggregated certificate digest of this
     pub fn advance(&self, cert_digest: &[u8; SEED_BYTES], height: u64) -> Beacon {
         let mut input = [0u8; SEED_BYTES + SEED_BYTES + 8];
         input[..SEED_BYTES].copy_from_slice(&self.seed);
@@ -40,7 +32,6 @@ impl Beacon {
         Beacon { seed: next }
     }
 
-    /// The verifiable random input for a sortition draw over this beacon. The
     pub fn sortition_input(&self, domain: &[u8], slot: u64) -> Vec<u8> {
         let mut input = Vec::with_capacity(SEED_BYTES + domain.len() + 8);
         input.extend_from_slice(&self.seed);

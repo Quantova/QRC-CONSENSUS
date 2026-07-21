@@ -1,22 +1,15 @@
-//! Stake weight for sortition. Only native QTOV secures consensus. An origin
-
-/// The origin of a held asset. A bridged asset is identified by the pair of
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct OriginTag {
     pub chain: u32,
     pub asset: u32,
 }
 
-/// The origin of a staked asset. Only the native asset counts toward stake.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum AssetOrigin {
-    /// The native QTOV asset, the only asset that secures consensus.
     Native,
-    /// An origin tagged bridged asset, never valid as validator stake.
     Bridged(OriginTag),
 }
 
-/// A holding a validator offers as stake: an amount and the origin of the asset.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct Stake {
     pub amount: u64,
@@ -24,7 +17,6 @@ pub struct Stake {
 }
 
 impl Stake {
-    /// A native stake of the given amount.
     pub fn native(amount: u64) -> Self {
         Stake {
             amount,
@@ -32,7 +24,6 @@ impl Stake {
         }
     }
 
-    /// A bridged holding, which is never valid as stake.
     pub fn bridged(amount: u64, tag: OriginTag) -> Self {
         Stake {
             amount,
@@ -40,12 +31,10 @@ impl Stake {
         }
     }
 
-    /// True only when the origin is native. A bridged asset is rejected.
     pub fn is_valid(&self) -> bool {
         matches!(self.origin, AssetOrigin::Native)
     }
 
-    /// The weight this holding contributes. A bridged asset contributes zero
     pub fn weight(&self) -> u64 {
         match self.origin {
             AssetOrigin::Native => self.amount,
@@ -54,7 +43,6 @@ impl Stake {
     }
 }
 
-/// Total native weight of a set of holdings. Bridged holdings are skipped.
 pub fn total_weight(stakes: &[Stake]) -> u64 {
     stakes.iter().map(Stake::weight).sum()
 }
