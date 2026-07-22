@@ -102,6 +102,51 @@ pub fn leader_score(output: &[u8; OUTPUT_BYTES], weight: u64) -> f64 {
     -output_unit_interval(output).ln() / (weight as f64)
 }
 
+pub const LEADER_SCORE_FRAC_BITS: u32 = 48;
+
+/// A fixed point rendering of minus the base two logarithm of the sortition output
+/// read as a fraction in the half open unit interval, carrying
+/// `LEADER_SCORE_FRAC_BITS` fractional bits. The output's leading eight bytes give a
+/// value in `[0, 2^64)`; adding one places the fraction in `(0, 1]`, so the result is
+/// never negative and is zero only at the maximum output. The routine is integer only,
+/// so it lands on the same value on every machine, unlike a floating point logarithm.
+pub fn leader_neg_log2(output: &[u8; OUTPUT_BYTES]) -> u128 {
+    let frac = LEADER_SCORE_FRAC_BITS;
+    let v = output_value(output) as u128 + 1;
+    let floor_log2 = 127 - v.leading_zeros();
+    let mut mantissa = if floor_log2 <= frac {
+        v << (frac - floor_log2)
+    } else {
+        v >> (floor_log2 - frac)
+    };
+    let mut log2 = (floor_log2 as u128) << frac;
+    for i in 0..frac {
+        mantissa = (mantissa * mantissa) >> frac;
+        if mantissa >= (2u128 << frac) {
+            mantissa >>= 1;
+            log2 |= 1u128 << (frac - 1 - i);
+        }
+    }
+    (64u128 << frac) - log2
+}
+
+/// Whether the candidate is a strictly better leader than the current best: a lower
+/// score, which is `leader_neg_log2` divided by weight, decided by an exact cross
+/// multiplication so no division or floating point enters, with ties broken by the
+/// lower id. The same inputs give the same verdict on every machine.
+pub fn leader_prefers(
+    cand_neg_log2: u128,
+    cand_weight: u64,
+    cand_id: u64,
+    best_neg_log2: u128,
+    best_weight: u64,
+    best_id: u64,
+) -> bool {
+    let lhs = cand_neg_log2 * best_weight as u128;
+    let rhs = best_neg_log2 * cand_weight as u128;
+    lhs < rhs || (lhs == rhs && cand_id < best_id)
+}
+
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct Credential {
     pub position: u64,
@@ -214,5 +259,50 @@ mod tests {
         assert!(small > big);
         assert!(big.is_finite() && big > 0.0);
         assert!((small / big - 4.0).abs() < 1e-9);
+    }
+
+    #[test]
+    fn the_integer_neg_log2_is_deterministic_and_monotone() {
+        let low = output_with_prefix(1);
+        let mid = output_with_prefix(1 << 40);
+        let high = output_with_prefix(u64::MAX);
+        assert_eq!(leader_neg_log2(&mid), leader_neg_log2(&mid));
+        assert!(leader_neg_log2(&low) > leader_neg_log2(&mid));
+        assert!(leader_neg_log2(&mid) > leader_neg_log2(&high));
+        assert_eq!(leader_neg_log2(&high), 0);
+    }
+
+    #[test]
+    fn the_integer_preference_matches_the_floating_reference() {
+        let mut out = [0u8; OUTPUT_BYTES];
+        let weights = [500u64, 2_000, 2_000, 7_500, 40_000];
+        for trial in 0..4_000u64 {
+            let mut base = Vec::new();
+            base.extend_from_slice(b"leader-agreement");
+            base.extend_from_slice(&trial.to_le_bytes());
+            let n = 2 + (trial % 5);
+            let mut best_int: Option<(u128, u64, u64)> = None;
+            let mut best_flt: Option<(f64, u64)> = None;
+            for c in 0..n {
+                let mut seed = base.clone();
+                seed.extend_from_slice(&c.to_le_bytes());
+                shake256(&seed, &mut out);
+                let w = weights[(c as usize) % weights.len()];
+                let id = c + 1;
+                let nl = leader_neg_log2(&out);
+                if best_int.map_or(true, |(bnl, bw, bid)| leader_prefers(nl, w, id, bnl, bw, bid)) {
+                    best_int = Some((nl, w, id));
+                }
+                let s = leader_score(&out, w);
+                if best_flt.map_or(true, |(bs, bid)| s < bs || (s == bs && id < bid)) {
+                    best_flt = Some((s, id));
+                }
+            }
+            assert_eq!(
+                best_int.unwrap().2,
+                best_flt.unwrap().1,
+                "the integer and floating leaders differ at trial {trial}"
+            );
+        }
     }
 }
