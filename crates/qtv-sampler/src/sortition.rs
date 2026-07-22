@@ -80,6 +80,10 @@ pub fn expected_committee_size(weights: &[u64], budget: u64) -> f64 {
         .sum()
 }
 
+pub fn expected_committee(weights: &[u64], budget: u64) -> u64 {
+    expected_committee_size(weights, budget).round() as u64
+}
+
 fn output_unit_interval(output: &[u8; OUTPUT_BYTES]) -> f64 {
     let mut u = 0.0f64;
     for &b in output.iter().rev() {

@@ -82,7 +82,7 @@ fn an_impostor_certificate_under_the_victim_commitment_is_rejected() {
 
     // No certificate forms: none of the forged attestations is admitted under the
     // victims' commitment, so an entitled supermajority never assembles.
-    assert!(aggregate(1, 0, block, &commitment, &beacon, &forged).is_none());
+    assert!(aggregate(1, 0, block, &commitment, &beacon, &forged, 3).is_none());
 }
 
 #[test]
@@ -119,7 +119,7 @@ fn the_draw_and_finality_still_finalize_with_real_keys() {
 
     // A genuine supermajority of honest attesters, each holding its own secret.
     let atts: Vec<_> = members[..3].iter().map(|a| a.attest(1, 0, block, &beacon)).collect();
-    let cert = aggregate(1, 0, block, &commitment, &beacon, &atts).expect("an honest quorum finalizes");
-    assert_eq!(cert.verify(&commitment, &beacon), Verdict::Verified);
+    let cert = aggregate(1, 0, block, &commitment, &beacon, &atts, 3).expect("an honest quorum finalizes");
+    assert_eq!(cert.verify(&commitment, &beacon, 3), Verdict::Verified);
     assert_eq!(cert.attesters(), vec![1, 2, 3]);
 }

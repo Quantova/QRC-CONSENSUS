@@ -3,7 +3,6 @@ use qtv_sampler::beacon::Beacon;
 use crate::attestation::Attestation;
 use crate::certificate::{Certificate, Envelope};
 use crate::committee::CommitteeCommitment;
-use crate::params::is_quorum;
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum RejectReason {
@@ -29,8 +28,8 @@ impl Verdict {
 }
 
 impl Certificate {
-    pub fn verify(&self, commitment: &CommitteeCommitment, beacon: &Beacon) -> Verdict {
-        verify_body(&self.envelope, &self.attestations, commitment, beacon)
+    pub fn verify(&self, commitment: &CommitteeCommitment, beacon: &Beacon, tau: u64) -> Verdict {
+        verify_body(&self.envelope, &self.attestations, commitment, beacon, tau)
     }
 }
 
@@ -39,6 +38,7 @@ fn verify_body(
     attestations: &[Attestation],
     commitment: &CommitteeCommitment,
     beacon: &Beacon,
+    tau: u64,
 ) -> Verdict {
     if envelope.committee != commitment.digest() {
         return Verdict::Rejected(RejectReason::CommitmentMismatch);
@@ -70,7 +70,7 @@ fn verify_body(
         }
         seen.push(att.from);
     }
-    if is_quorum(seen.len(), commitment.len()) {
+    if seen.len() as u64 >= tau {
         Verdict::Verified
     } else {
         Verdict::Rejected(RejectReason::NotAQuorum)

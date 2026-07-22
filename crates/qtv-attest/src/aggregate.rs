@@ -5,7 +5,6 @@ use qtv_sampler::beacon::Beacon;
 use crate::attestation::Attestation;
 use crate::certificate::{Certificate, Envelope};
 use crate::committee::CommitteeCommitment;
-use crate::params::is_quorum;
 
 pub fn aggregate(
     height: Height,
@@ -14,6 +13,7 @@ pub fn aggregate(
     commitment: &CommitteeCommitment,
     beacon: &Beacon,
     attestations: &[Attestation],
+    tau: u64,
 ) -> Option<Certificate> {
     let mut admitted: Vec<Attestation> = Vec::new();
     let mut seen: Vec<u64> = Vec::new();
@@ -43,7 +43,7 @@ pub fn aggregate(
         seen.push(att.from);
         admitted.push(att.clone());
     }
-    if is_quorum(seen.len(), commitment.len()) {
+    if seen.len() as u64 >= tau {
         let envelope = Envelope::new(height, slot, block, commitment);
         Some(Certificate::new(envelope, admitted))
     } else {
@@ -58,6 +58,7 @@ mod tests {
     use qtv_bft::block::Parent;
 
     const BUDGET: u64 = 4;
+    const TAU: u64 = 3;
 
     fn committee(attesters: &[&Attester]) -> CommitteeCommitment {
         CommitteeCommitment::from_attesters_with_budget(0, attesters, BUDGET)
@@ -77,7 +78,7 @@ mod tests {
             b.attest(1, 0, block, &beacon),
             c.attest(1, 0, block, &beacon),
         ];
-        let cert = aggregate(1, 0, block, &commitment, &beacon, &atts).expect("quorum");
+        let cert = aggregate(1, 0, block, &commitment, &beacon, &atts, TAU).expect("quorum");
         assert_eq!(cert.attesters(), vec![1, 2, 3]);
     }
 
@@ -94,7 +95,7 @@ mod tests {
             a.attest(1, 0, block, &beacon),
             b.attest(1, 0, block, &beacon),
         ];
-        assert!(aggregate(1, 0, block, &commitment, &beacon, &atts).is_none());
+        assert!(aggregate(1, 0, block, &commitment, &beacon, &atts, TAU).is_none());
     }
 
     #[test]
@@ -111,6 +112,6 @@ mod tests {
             a.attest(1, 0, block, &beacon),
             b.attest(1, 0, block, &beacon),
         ];
-        assert!(aggregate(1, 0, block, &commitment, &beacon, &atts).is_none());
+        assert!(aggregate(1, 0, block, &commitment, &beacon, &atts, TAU).is_none());
     }
 }

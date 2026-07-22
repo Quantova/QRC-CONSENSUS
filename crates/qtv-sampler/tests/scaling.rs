@@ -6,8 +6,10 @@
 
 use qtv_sampler::beacon::Beacon;
 use qtv_sampler::committee::Registry;
-use qtv_sampler::params::COMMITTEE_BUDGET;
-use qtv_sampler::sortition::expected_committee_size;
+use qtv_sampler::params::{
+    finality_threshold, ADVERSARY_STAKE_DEN, ADVERSARY_STAKE_NUM, COMMITTEE_BUDGET,
+};
+use qtv_sampler::sortition::{expected_committee, expected_committee_size};
 use qtv_sampler::validator::SamplerValidator;
 
 /// Every validator equally staked, above the two thousand floor.
@@ -45,6 +47,24 @@ fn a_thousandfold_larger_set_finalises_with_the_same_size_committee() {
         (five_hundred - half_a_million).abs() < 1.0,
         "committee at 500 was {five_hundred}, at 500k was {half_a_million}, they must match"
     );
+}
+
+#[test]
+fn the_threshold_is_a_two_thirds_supermajority_the_adversary_cannot_span() {
+    let budget = COMMITTEE_BUDGET;
+    let weights = vec![STAKE; (budget * 20) as usize];
+    let expected = expected_committee(&weights, budget);
+    assert_eq!(expected, budget);
+    let tau = finality_threshold(expected);
+    assert_eq!(tau, budget * 2 / 3 + 1);
+    let adversary = expected * ADVERSARY_STAKE_NUM / ADVERSARY_STAKE_DEN;
+    let honest = expected - adversary;
+    assert!(adversary < tau, "the adversary expectation must fall below the threshold");
+    assert!(
+        2 * tau - expected > adversary,
+        "two agreeing sets share more than the adversary can hold"
+    );
+    assert!(tau <= honest, "the honest set must reach the threshold");
 }
 
 #[test]
