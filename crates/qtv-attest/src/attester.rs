@@ -46,6 +46,17 @@ impl Attester {
         }
     }
 
+    pub fn at_epoch(&self, epoch: u64) -> Self {
+        Attester {
+            signer: self.signer.clone(),
+            sampler: self.sampler.rotate_to(epoch),
+        }
+    }
+
+    pub fn epoch(&self) -> u64 {
+        self.sampler.epoch()
+    }
+
     pub fn id(&self) -> ValidatorId {
         self.signer.id
     }
