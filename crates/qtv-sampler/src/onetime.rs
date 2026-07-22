@@ -42,27 +42,30 @@ pub struct MerklePath {
 }
 
 pub fn derive_preimage(seed: &[u8; 32], position: u64) -> [u8; PREIMAGE_BYTES] {
-    let mut input = Vec::with_capacity(32 + DOMAIN_PREIMAGE.len() + 8);
-    input.extend_from_slice(seed);
-    input.extend_from_slice(DOMAIN_PREIMAGE);
-    input.extend_from_slice(&position.to_le_bytes());
+    const D: usize = DOMAIN_PREIMAGE.len();
+    let mut input = [0u8; 32 + D + 8];
+    input[..32].copy_from_slice(seed);
+    input[32..32 + D].copy_from_slice(DOMAIN_PREIMAGE);
+    input[32 + D..].copy_from_slice(&position.to_le_bytes());
     let mut out = [0u8; PREIMAGE_BYTES];
     shake256(&input, &mut out);
     out
 }
 
 pub fn leaf_hash(preimage: &[u8; PREIMAGE_BYTES]) -> [u8; NODE_BYTES] {
-    let mut buf = Vec::with_capacity(DOMAIN_LEAF.len() + PREIMAGE_BYTES);
-    buf.extend_from_slice(DOMAIN_LEAF);
-    buf.extend_from_slice(preimage);
+    const D: usize = DOMAIN_LEAF.len();
+    let mut buf = [0u8; D + PREIMAGE_BYTES];
+    buf[..D].copy_from_slice(DOMAIN_LEAF);
+    buf[D..].copy_from_slice(preimage);
     sha3_256(&buf)
 }
 
 pub fn node_hash(left: &[u8; NODE_BYTES], right: &[u8; NODE_BYTES]) -> [u8; NODE_BYTES] {
-    let mut buf = Vec::with_capacity(DOMAIN_NODE.len() + 2 * NODE_BYTES);
-    buf.extend_from_slice(DOMAIN_NODE);
-    buf.extend_from_slice(left);
-    buf.extend_from_slice(right);
+    const D: usize = DOMAIN_NODE.len();
+    let mut buf = [0u8; D + 2 * NODE_BYTES];
+    buf[..D].copy_from_slice(DOMAIN_NODE);
+    buf[D..D + NODE_BYTES].copy_from_slice(left);
+    buf[D + NODE_BYTES..].copy_from_slice(right);
     sha3_256(&buf)
 }
 
