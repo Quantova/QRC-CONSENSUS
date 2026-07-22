@@ -1,3 +1,5 @@
+use qtv_crypto::sha3::shake256;
+
 use crate::onetime::{OneTimeTree, Root};
 use crate::sortition::Credential;
 use crate::stake::Stake;
@@ -18,13 +20,21 @@ pub enum Fault {
     Offline,
 }
 
-const SEED_DOMAIN: &[u8; 8] = b"QORUSSMP";
+// Domain tag under which a validator's secret is expanded into the seed of its one
+// time sortition tree. It is distinct from the signing key domain in qtv-bft, so
+// the one secret a validator holds yields two independent derived seeds and neither
+// derived seed reveals the other or the secret.
+const SORTITION_TREE_DOMAIN: &[u8] = b"QORUS/validator-keying/v1/sortition-tree";
 
-fn tree_seed(id: ValidatorId) -> [u8; 32] {
-    let mut seed = [0u8; 32];
-    seed[..8].copy_from_slice(&id.to_le_bytes());
-    seed[8..16].copy_from_slice(SEED_DOMAIN);
-    seed
+/// Expand a validator's 32 byte secret into the seed of its one time sortition
+pub fn sortition_tree_seed(secret: &[u8; 32]) -> [u8; 32] {
+    const D: usize = SORTITION_TREE_DOMAIN.len();
+    let mut buf = [0u8; D + 32];
+    buf[..D].copy_from_slice(SORTITION_TREE_DOMAIN);
+    buf[D..].copy_from_slice(secret);
+    let mut out = [0u8; 32];
+    shake256(&buf, &mut out);
+    out
 }
 
 pub struct SamplerValidator {
@@ -32,6 +42,7 @@ pub struct SamplerValidator {
     pub role: Role,
     pub fault: Fault,
     stake: Stake,
+    seed: [u8; 32],
     tree: OneTimeTree,
 }
 
@@ -42,34 +53,42 @@ impl Clone for SamplerValidator {
             role: self.role,
             fault: self.fault,
             stake: self.stake,
-            tree: OneTimeTree::new(tree_seed(self.id), self.tree.slots()),
+            seed: self.seed,
+            tree: OneTimeTree::new(self.seed, self.tree.slots()),
         }
     }
 }
 
 impl SamplerValidator {
-    pub fn new(id: ValidatorId, stake: u64) -> Self {
-        Self::with_slots(id, stake, DEFAULT_SLOTS)
+    pub fn from_secret(id: ValidatorId, secret: &[u8; 32], stake: u64) -> Self {
+        Self::from_secret_with_slots(id, secret, stake, DEFAULT_SLOTS)
     }
 
-    pub fn with_slots(id: ValidatorId, stake: u64, slots: u64) -> Self {
+    pub fn from_secret_with_slots(
+        id: ValidatorId,
+        secret: &[u8; 32],
+        stake: u64,
+        slots: u64,
+    ) -> Self {
+        let seed = sortition_tree_seed(secret);
         SamplerValidator {
             id,
             role: Role::Validator,
             fault: Fault::Honest,
             stake: Stake::native(stake),
-            tree: OneTimeTree::new(tree_seed(id), slots),
+            seed,
+            tree: OneTimeTree::new(seed, slots),
         }
     }
 
-    pub fn with_stake(id: ValidatorId, stake: Stake) -> Self {
-        let mut v = SamplerValidator::new(id, 0);
+    pub fn from_secret_with_stake(id: ValidatorId, secret: &[u8; 32], stake: Stake) -> Self {
+        let mut v = SamplerValidator::from_secret(id, secret, 0);
         v.stake = stake;
         v
     }
 
-    pub fn prover(id: ValidatorId) -> Self {
-        let mut v = SamplerValidator::new(id, 0);
+    pub fn prover_from_secret(id: ValidatorId, secret: &[u8; 32]) -> Self {
+        let mut v = SamplerValidator::from_secret(id, secret, 0);
         v.role = Role::Prover;
         v
     }
@@ -118,6 +137,46 @@ impl SamplerValidator {
     }
 }
 
+// Test and simulation fixtures. These construct a validator from a deterministic,
+// per id seed so the test suite and the local devnet simulation are reproducible.
+// They are compiled only under `cfg(test)` or the `test-fixtures` feature and are
+// never part of a node binary: a production validator is always built from a real
+// secret through `from_secret`, so no key material is ever derived from the public
+// id on any running path.
+#[cfg(any(test, feature = "test-fixtures"))]
+const FIXTURE_SECRET_DOMAIN: &[u8] = b"QORUS/TEST-ONLY/insecure-fixture-secret/v1";
+
+/// A deterministic, per id secret for tests and the devnet simulation only. This is
+#[cfg(any(test, feature = "test-fixtures"))]
+pub fn fixture_secret(id: ValidatorId) -> [u8; 32] {
+    const D: usize = FIXTURE_SECRET_DOMAIN.len();
+    let mut buf = [0u8; D + 8];
+    buf[..D].copy_from_slice(FIXTURE_SECRET_DOMAIN);
+    buf[D..].copy_from_slice(&id.to_le_bytes());
+    let mut out = [0u8; 32];
+    shake256(&buf, &mut out);
+    out
+}
+
+#[cfg(any(test, feature = "test-fixtures"))]
+impl SamplerValidator {
+    pub fn new(id: ValidatorId, stake: u64) -> Self {
+        Self::from_secret(id, &fixture_secret(id), stake)
+    }
+
+    pub fn with_slots(id: ValidatorId, stake: u64, slots: u64) -> Self {
+        Self::from_secret_with_slots(id, &fixture_secret(id), stake, slots)
+    }
+
+    pub fn with_stake(id: ValidatorId, stake: Stake) -> Self {
+        Self::from_secret_with_stake(id, &fixture_secret(id), stake)
+    }
+
+    pub fn prover(id: ValidatorId) -> Self {
+        Self::prover_from_secret(id, &fixture_secret(id))
+    }
+}
+
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct Registration {
     pub id: ValidatorId,
@@ -148,15 +207,29 @@ mod tests {
     use crate::stake::{OriginTag, Stake};
 
     #[test]
-    fn roots_are_deterministic_across_construction() {
-        let a = SamplerValidator::new(7, 2_000);
-        let b = SamplerValidator::new(7, 2_000);
+    fn roots_are_deterministic_in_the_secret() {
+        let secret = [7u8; 32];
+        let a = SamplerValidator::from_secret(7, &secret, 2_000);
+        let b = SamplerValidator::from_secret(7, &secret, 2_000);
         assert_eq!(a.root(), b.root());
     }
 
     #[test]
+    fn two_secrets_commit_two_roots() {
+        let a = SamplerValidator::from_secret(7, &[1u8; 32], 2_000);
+        let b = SamplerValidator::from_secret(7, &[2u8; 32], 2_000);
+        assert_ne!(a.root(), b.root());
+    }
+
+    #[test]
+    fn the_tree_seed_is_not_the_secret() {
+        let secret = [9u8; 32];
+        assert_ne!(sortition_tree_seed(&secret), secret);
+    }
+
+    #[test]
     fn a_clone_commits_the_same_root_and_reveals() {
-        let a = SamplerValidator::new(3, 2_000);
+        let a = SamplerValidator::from_secret(3, &[3u8; 32], 2_000);
         let b = a.clone();
         assert_eq!(a.root(), b.root());
         assert_eq!(a.reveal(4), b.reveal(4));
@@ -164,7 +237,7 @@ mod tests {
 
     #[test]
     fn prover_weighs_zero() {
-        let p = SamplerValidator::prover(9);
+        let p = SamplerValidator::prover_from_secret(9, &[9u8; 32]);
         assert!(p.is_prover());
         assert_eq!(p.weight(), 0);
     }
@@ -172,13 +245,13 @@ mod tests {
     #[test]
     fn bridged_holding_weighs_zero() {
         let tag = OriginTag { chain: 1, asset: 1 };
-        let v = SamplerValidator::with_stake(3, Stake::bridged(1_000_000, tag));
+        let v = SamplerValidator::from_secret_with_stake(3, &[3u8; 32], Stake::bridged(1_000_000, tag));
         assert_eq!(v.weight(), 0);
     }
 
     #[test]
     fn offline_validator_keeps_its_weight_and_candidacy() {
-        let mut v = SamplerValidator::new(2, 2_000);
+        let mut v = SamplerValidator::from_secret(2, &[2u8; 32], 2_000);
         v.fault = Fault::Offline;
         assert!(v.is_offline());
         assert_eq!(v.weight(), 2_000);
@@ -186,7 +259,7 @@ mod tests {
 
     #[test]
     fn a_reveal_authenticates_to_the_registered_root() {
-        let v = SamplerValidator::new(1, 100);
+        let v = SamplerValidator::from_secret(1, &[1u8; 32], 100);
         let reg = Registration::of(&v);
         let cred = v.reveal(5);
         assert!(reg.root.verify_membership(5, &cred.preimage, &cred.path));
