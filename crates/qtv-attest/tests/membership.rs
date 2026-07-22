@@ -32,7 +32,7 @@ fn an_off_committee_signer_is_rejected_even_with_a_valid_signature() {
         .map(|a| a.attest(1, 0, block, &beacon))
         .collect();
     atts.push(outsider_att.clone());
-    let cert = aggregate(1, 0, block, &commitment, &beacon, &atts).expect("quorum");
+    let cert = aggregate(1, 0, block, &commitment, &beacon, &atts, 3).expect("quorum");
     assert_eq!(cert.attesters(), vec![1, 2, 3]);
 
     // A certificate that carries the outsider is rejected outright, valid
@@ -47,7 +47,7 @@ fn an_off_committee_signer_is_rejected_even_with_a_valid_signature() {
         ],
     );
     assert_eq!(
-        tainted.verify(&commitment, &beacon),
+        tainted.verify(&commitment, &beacon, 3),
         Verdict::Rejected(RejectReason::NotOnCommittee)
     );
 }

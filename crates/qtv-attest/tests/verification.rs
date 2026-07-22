@@ -24,10 +24,10 @@ fn an_entitled_supermajority_certificate_verifies() {
         .map(|a| a.attest(1, 0, block, &beacon))
         .collect();
 
-    let cert = aggregate(1, 0, block, &commitment, &beacon, &atts).expect("quorum");
+    let cert = aggregate(1, 0, block, &commitment, &beacon, &atts, 3).expect("quorum");
     assert_eq!(cert.attesters(), vec![1, 2, 3]);
-    assert!(cert.verify(&commitment, &beacon).is_verified());
-    assert_eq!(cert.verify(&commitment, &beacon), Verdict::Verified);
+    assert!(cert.verify(&commitment, &beacon, 3).is_verified());
+    assert_eq!(cert.verify(&commitment, &beacon, 3), Verdict::Verified);
 }
 
 #[test]
@@ -45,14 +45,14 @@ fn a_certificate_missing_the_supermajority_does_not_verify() {
         .collect();
 
     // Aggregation refuses to form a certificate.
-    assert!(aggregate(1, 0, block, &commitment, &beacon, &atts).is_none());
+    assert!(aggregate(1, 0, block, &commitment, &beacon, &atts, 3).is_none());
 
     // A certificate hand built from the same two attestations is rejected as
     // not a quorum, so it never finalizes the block.
     let envelope = Envelope::new(1, 0, block, &commitment);
     let cert = Certificate::new(envelope, atts);
     assert_eq!(
-        cert.verify(&commitment, &beacon),
+        cert.verify(&commitment, &beacon, 3),
         Verdict::Rejected(RejectReason::NotAQuorum)
     );
 }

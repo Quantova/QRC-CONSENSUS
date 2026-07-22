@@ -19,7 +19,7 @@ fn the_same_attestations_produce_the_same_certificate() {
         .iter()
         .map(|a| a.attest(1, 0, block, &beacon))
         .collect();
-    let cert_a = aggregate(1, 0, block, &commitment_a, &beacon, &atts_a).expect("quorum");
+    let cert_a = aggregate(1, 0, block, &commitment_a, &beacon, &atts_a, 3).expect("quorum");
 
     // A wholly fresh construction of the same committee and attestations.
     let second = committee_of_four();
@@ -29,7 +29,7 @@ fn the_same_attestations_produce_the_same_certificate() {
         .iter()
         .map(|a| a.attest(1, 0, block, &beacon))
         .collect();
-    let cert_b = aggregate(1, 0, block, &commitment_b, &beacon, &atts_b).expect("quorum");
+    let cert_b = aggregate(1, 0, block, &commitment_b, &beacon, &atts_b, 3).expect("quorum");
 
     assert_eq!(commitment_a.digest(), commitment_b.digest());
     assert_eq!(cert_a.digest(), cert_b.digest());
@@ -54,9 +54,10 @@ fn the_certificate_is_independent_of_attestation_order() {
         &commitment,
         &beacon,
         &[a1.clone(), a2.clone(), a3.clone()],
+        3,
     )
     .expect("quorum");
-    let reverse = aggregate(1, 0, block, &commitment, &beacon, &[a3, a2, a1]).expect("quorum");
+    let reverse = aggregate(1, 0, block, &commitment, &beacon, &[a3, a2, a1], 3).expect("quorum");
 
     assert_eq!(forward.attesters(), reverse.attesters());
     assert_eq!(forward.digest(), reverse.digest());
