@@ -1,6 +1,6 @@
 use qtv_crypto::sha3::shake256;
 
-use crate::beacon::Beacon;
+use crate::beacon::{Beacon, SEED_BYTES};
 use crate::onetime::{MerklePath, Root, PREIMAGE_BYTES};
 
 pub const OUTPUT_BYTES: usize = 32;
@@ -13,19 +13,34 @@ pub fn output_value(output: &[u8; OUTPUT_BYTES]) -> u64 {
     u64::from_be_bytes(head)
 }
 
+const INLINE_DOMAIN: usize = 32;
+
 pub fn sortition_output(
     preimage: &[u8; PREIMAGE_BYTES],
     beacon: &Beacon,
     domain: &[u8],
     slot: u64,
 ) -> [u8; OUTPUT_BYTES] {
-    let mut buf = Vec::with_capacity(domain.len() + PREIMAGE_BYTES + beacon.seed().len() + 8);
-    buf.extend_from_slice(domain);
-    buf.extend_from_slice(preimage);
-    buf.extend_from_slice(beacon.seed());
-    buf.extend_from_slice(&slot.to_le_bytes());
     let mut out = [0u8; OUTPUT_BYTES];
-    shake256(&buf, &mut out);
+    if domain.len() <= INLINE_DOMAIN {
+        let mut buf = [0u8; INLINE_DOMAIN + PREIMAGE_BYTES + SEED_BYTES + 8];
+        let mut n = domain.len();
+        buf[..n].copy_from_slice(domain);
+        buf[n..n + PREIMAGE_BYTES].copy_from_slice(preimage);
+        n += PREIMAGE_BYTES;
+        buf[n..n + SEED_BYTES].copy_from_slice(beacon.seed());
+        n += SEED_BYTES;
+        buf[n..n + 8].copy_from_slice(&slot.to_le_bytes());
+        n += 8;
+        shake256(&buf[..n], &mut out);
+    } else {
+        let mut buf = Vec::with_capacity(domain.len() + PREIMAGE_BYTES + SEED_BYTES + 8);
+        buf.extend_from_slice(domain);
+        buf.extend_from_slice(preimage);
+        buf.extend_from_slice(beacon.seed());
+        buf.extend_from_slice(&slot.to_le_bytes());
+        shake256(&buf, &mut out);
+    }
     out
 }
 
