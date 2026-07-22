@@ -1,5 +1,6 @@
 pub mod beacon;
 pub mod committee;
+pub mod epoch;
 pub mod evidence;
 pub mod onetime;
 pub mod params;
