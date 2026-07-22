@@ -58,6 +58,11 @@ impl Attester {
         self.sampler.root()
     }
 
+    /// The attester's own sortition reveal for a slot.
+    pub fn reveal(&self, slot: u64) -> qtv_sampler::sortition::Credential {
+        self.sampler.reveal(slot)
+    }
+
     pub fn attest(&self, height: Height, slot: u64, block: Block, beacon: &Beacon) -> Attestation {
         let _ = beacon;
         let membership = self.sampler.reveal(slot);
