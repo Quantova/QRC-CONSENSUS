@@ -1,11 +1,9 @@
-// Per draw and per verify cost of the one time key sortition, against the old
-// signature lottery it replaces. Run with:
+// Per draw and per verify cost of the one time key sortition. Run with:
 //     cargo run -p qtv-sampler --example draw_cost --release
 
 use std::hint::black_box;
 use std::time::Instant;
 
-use qtv_crypto::vrf_mldsa;
 use qtv_sampler::beacon::Beacon;
 use qtv_sampler::params::DOMAIN_COMMITTEE;
 use qtv_sampler::sortition::{verify_selection, Credential};
@@ -65,28 +63,4 @@ fn main() {
             "\nMeasured at {slots} slots (depth {depth}):\n   draw     {draw:>8.1} ns\n   verify   {verify:>8.1} ns"
         );
     }
-
-    // The old lottery: one attempt is one ML-DSA sign, then a hash of the ~3309
-    // byte signature; checking a draw is a full ML-DSA verify. A validator with a
-    // small stake share must repeat the sign until an output lands under its
-    // threshold, so a successful old draw is on the order of a hundred signings.
-    let (sk, pk) = vrf_mldsa::keygen(b"quantova draw cost lottery key");
-    let input = Beacon::genesis().sortition_input(DOMAIN_COMMITTEE, 32);
-    let sign = ns_per_op(2_000, || {
-        black_box(vrf_mldsa::prove(&sk, black_box(&input)));
-    });
-    let (out, proof) = vrf_mldsa::prove(&sk, &input);
-    let sig_verify = ns_per_op(20_000, || {
-        black_box(vrf_mldsa::verify(&pk, &input, &out, &proof));
-    });
-
-    println!("\nOld signature lottery, for comparison:");
-    println!("   one attempt (ML-DSA sign + hash of the signature)   {sign:>10.1} ns");
-    println!("   check a draw (ML-DSA verify)                        {sig_verify:>10.1} ns");
-    println!(
-        "   a 1% validator lands a draw in ~100 attempts, so a successful old draw is ~{:.0} ns",
-        sign * 100.0
-    );
-    println!("\nThe one time draw is a single hash with no search, so it is both one");
-    println!("attempt and far cheaper per attempt than the signature it replaces.");
 }

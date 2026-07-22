@@ -4,8 +4,6 @@ pub const VALIDATOR_RESOURCE_BUDGET: u64 = 1;
 
 pub const VALIDATOR_STAKE_QTOV: u64 = 2_000;
 
-pub const UNBONDING_DAYS: u64 = 14;
-
 pub const MIN_HEIGHT: u64 = 1;
 
 pub fn supermajority(committee_size: usize) -> usize {
