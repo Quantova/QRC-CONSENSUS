@@ -8,5 +8,14 @@ publish = false
 [lib]
 name = "qtv_sampler"
 
+[features]
+# Deterministic, per id validator constructors for the test suite and the local
+# devnet simulation. Off by default, so a node binary never carries an id derived
+# key path. Enabled for this crate's own tests through the dev-dependency below.
+test-fixtures = []
+
 [dependencies]
 qtv-crypto = { git = "https://github.com/Quantova/Q-Crypto.git", tag = "v0.3.0" }
+
+[dev-dependencies]
+qtv-sampler = { path = ".", features = ["test-fixtures"] }

@@ -48,9 +48,14 @@ fn tree_hashing_matches_its_pinned_vectors() {
 
 #[test]
 fn a_committed_root_matches_its_pinned_vector() {
-    let v = SamplerValidator::new(1, 100);
+    // The committed root under a fixed validator secret. The secret is an explicit
+    // known input here, not a function of the id, so this vector locks the whole
+    // path from a validator's secret through the domain separated tree seed to the
+    // published root.
+    let secret = [0x11u8; 32];
+    let v = SamplerValidator::from_secret(1, &secret, 100);
     assert_eq!(
         hex(&v.root().digest),
-        "d96799f21d24945def52bcf3e8da5b02606b1071029407e931a0ba6c52e28f55"
+        "592d119920d539bdaf1bb6cfcd76001370bb0c13549953d28e6b7e9291046680"
     );
 }
