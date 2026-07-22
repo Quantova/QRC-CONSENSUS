@@ -7,4 +7,5 @@ pub mod hash;
 pub mod machine;
 pub mod message;
 pub mod params;
+pub mod slashing;
 pub mod validator;
