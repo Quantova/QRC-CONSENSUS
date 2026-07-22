@@ -1,7 +1,7 @@
 use crate::beacon::Beacon;
 use crate::onetime::Root;
 use crate::params::{COMMITTEE_BUDGET, DOMAIN_COMMITTEE, DOMAIN_LEADER, MIN_SELF_STAKE};
-use crate::sortition::{leader_score, verify_membership, verify_selection, Credential};
+use crate::sortition::{leader_neg_log2, leader_prefers, verify_membership, verify_selection, Credential};
 use crate::validator::{Registration, ValidatorId};
 
 pub struct Member {
@@ -41,21 +41,22 @@ pub fn verify_leader(root: &Root, slot: u64, credential: &Credential) -> bool {
     verify_membership(root, slot, credential)
 }
 
-/// The lowest score member of a committee is its leader for the slot.
+/// The lowest score member of a committee is its leader for the slot. The score is
+/// compared by exact integer arithmetic, so every node elects the identical leader.
 pub fn elect_leader(committee: &Committee, beacon: &Beacon, slot: u64) -> Option<Leader> {
-    let mut best: Option<(f64, ValidatorId, Credential)> = None;
+    let mut best: Option<(u128, u64, ValidatorId, Credential)> = None;
     for m in &committee.members {
         let output = m.credential.output(beacon, DOMAIN_LEADER, slot);
-        let score = leader_score(&output, m.weight);
+        let neg_log2 = leader_neg_log2(&output);
         let take = match &best {
             None => true,
-            Some((bs, bid, _)) => score < *bs || (score == *bs && m.id < *bid),
+            Some((bnl, bw, bid, _)) => leader_prefers(neg_log2, m.weight, m.id, *bnl, *bw, *bid),
         };
         if take {
-            best = Some((score, m.id, m.credential.clone()));
+            best = Some((neg_log2, m.weight, m.id, m.credential.clone()));
         }
     }
-    best.map(|(_, id, credential)| Leader { id, credential })
+    best.map(|(_, _, id, credential)| Leader { id, credential })
 }
 
 /// A validator's own sortition reveal for a slot, its id and its one time credential.
@@ -396,5 +397,31 @@ mod tests {
         assert!(committee.contains(1));
         assert!(committee.contains(3));
         assert!(!committee.contains(2), "a silent validator was admitted");
+    }
+
+    #[test]
+    fn the_elected_leader_matches_the_floating_reference_and_is_stable() {
+        use crate::sortition::leader_score;
+        let set = validators(&[500, 2_000, 2_000, 7_500, 40_000, 2_000, 15_000]);
+        let reg = Registry::new(set.iter().map(|v| v.clone()).collect())
+            .with_budget(500)
+            .with_floor(0);
+        for slot in 0..64u64 {
+            let beacon = Beacon::genesis();
+            let committee = reg.sample_committee(&beacon, slot);
+            if committee.is_empty() {
+                continue;
+            }
+            let elected = elect_leader(&committee, &beacon, slot).unwrap().id;
+            assert_eq!(elected, elect_leader(&committee, &beacon, slot).unwrap().id);
+            let mut best: Option<(f64, ValidatorId)> = None;
+            for m in &committee.members {
+                let score = leader_score(&m.credential.output(&beacon, DOMAIN_LEADER, slot), m.weight);
+                if best.map_or(true, |(bs, bid)| score < bs || (score == bs && m.id < bid)) {
+                    best = Some((score, m.id));
+                }
+            }
+            assert_eq!(elected, best.unwrap().1, "the leader differs at slot {slot}");
+        }
     }
 }
