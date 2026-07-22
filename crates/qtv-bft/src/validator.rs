@@ -1,6 +1,7 @@
 use core::fmt;
 
 use qtv_crypto::ml_dsa::{keygen, sign, PublicKey, SecretKey, Signature};
+use qtv_crypto::sha3::shake256;
 
 pub type ValidatorId = u64;
 
@@ -17,13 +18,22 @@ pub enum Fault {
     Offline,
 }
 
-const KEY_DOMAIN: &[u8; 8] = b"QORUSVAL";
+// Domain tag under which a validator's secret is expanded into the seed of its
+// ML-DSA-65 signing key. It is distinct from the sortition tree domain in
+// qtv-sampler, so the one secret a validator holds yields two independent derived
+// seeds and knowledge of one derived seed or of the public key reveals neither the
+// other seed nor the secret.
+const SIGNING_KEY_DOMAIN: &[u8] = b"QORUS/validator-keying/v1/ml-dsa-65-signing";
 
-fn key_seed(id: ValidatorId) -> [u8; 32] {
-    let mut seed = [0u8; 32];
-    seed[..8].copy_from_slice(&id.to_le_bytes());
-    seed[8..16].copy_from_slice(KEY_DOMAIN);
-    seed
+/// Expand a validator's 32 byte secret into the ML-DSA-65 keygen seed. The secret
+pub fn signing_key_seed(secret: &[u8; 32]) -> [u8; 32] {
+    const D: usize = SIGNING_KEY_DOMAIN.len();
+    let mut buf = [0u8; D + 32];
+    buf[..D].copy_from_slice(SIGNING_KEY_DOMAIN);
+    buf[D..].copy_from_slice(secret);
+    let mut out = [0u8; 32];
+    shake256(&buf, &mut out);
+    out
 }
 
 #[derive(Clone)]
@@ -36,8 +46,8 @@ pub struct Validator {
 }
 
 impl Validator {
-    pub fn new(id: ValidatorId) -> Self {
-        let (pk, sk) = keygen(&key_seed(id));
+    pub fn from_secret(id: ValidatorId, secret: &[u8; 32]) -> Self {
+        let (pk, sk) = keygen(&signing_key_seed(secret));
         Validator {
             id,
             role: Role::Validator,
@@ -47,8 +57,8 @@ impl Validator {
         }
     }
 
-    pub fn prover(id: ValidatorId) -> Self {
-        let mut v = Validator::new(id);
+    pub fn prover_from_secret(id: ValidatorId, secret: &[u8; 32]) -> Self {
+        let mut v = Validator::from_secret(id, secret);
         v.role = Role::Prover;
         v
     }
@@ -97,25 +107,46 @@ impl fmt::Debug for Validator {
     }
 }
 
+// Test and simulation fixtures. These construct a validator from a deterministic,
+// per id seed so the test suite and the local devnet simulation are reproducible.
+// They are compiled only under `cfg(test)` or the `test-fixtures` feature and are
+// never part of a node binary: a production validator is always built from a real
+// secret through `from_secret`, so no signing key is ever derived from the public id
+// on any running path.
+#[cfg(any(test, feature = "test-fixtures"))]
+const FIXTURE_SECRET_DOMAIN: &[u8] = b"QORUS/TEST-ONLY/insecure-fixture-secret/v1";
+
+/// A deterministic, per id secret for tests and the devnet simulation only. This is
+#[cfg(any(test, feature = "test-fixtures"))]
+pub fn fixture_secret(id: ValidatorId) -> [u8; 32] {
+    const D: usize = FIXTURE_SECRET_DOMAIN.len();
+    let mut buf = [0u8; D + 8];
+    buf[..D].copy_from_slice(FIXTURE_SECRET_DOMAIN);
+    buf[D..].copy_from_slice(&id.to_le_bytes());
+    let mut out = [0u8; 32];
+    shake256(&buf, &mut out);
+    out
+}
+
+#[cfg(any(test, feature = "test-fixtures"))]
+impl Validator {
+    pub fn new(id: ValidatorId) -> Self {
+        Self::from_secret(id, &fixture_secret(id))
+    }
+
+    pub fn prover(id: ValidatorId) -> Self {
+        Self::prover_from_secret(id, &fixture_secret(id))
+    }
+}
+
 #[derive(Clone, Debug)]
 pub struct ValidatorSet {
     participants: Vec<Validator>,
 }
 
 impl ValidatorSet {
-    pub fn new(count: usize) -> Self {
-        let participants = (1..=count as u64).map(Validator::new).collect();
+    pub fn from_participants(participants: Vec<Validator>) -> Self {
         ValidatorSet { participants }
-    }
-
-    pub fn with_prover(mut self) -> Self {
-        let id = self.next_prover_id();
-        self.participants.push(Validator::prover(id));
-        self
-    }
-
-    fn next_prover_id(&self) -> ValidatorId {
-        self.participants.iter().map(|v| v.id).max().unwrap_or(0) + 1
     }
 
     pub fn set_fault(&mut self, id: ValidatorId, fault: Fault) {
@@ -152,6 +183,21 @@ impl ValidatorSet {
     }
 }
 
+#[cfg(any(test, feature = "test-fixtures"))]
+impl ValidatorSet {
+    pub fn new(count: usize) -> Self {
+        let participants = (1..=count as u64).map(Validator::new).collect();
+        ValidatorSet { participants }
+    }
+
+    pub fn with_prover(mut self) -> Self {
+        let id = self.participants.iter().map(|v| v.id).max().unwrap_or(0) + 1;
+        self.participants
+            .push(Validator::prover_from_secret(id, &fixture_secret(id)));
+        self
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -179,9 +225,23 @@ mod tests {
     }
 
     #[test]
-    fn keys_are_deterministic_across_construction() {
-        let a = Validator::new(7);
-        let b = Validator::new(7);
+    fn keys_are_deterministic_in_the_secret() {
+        let secret = [7u8; 32];
+        let a = Validator::from_secret(7, &secret);
+        let b = Validator::from_secret(7, &secret);
         assert_eq!(a.public_key(), b.public_key());
+    }
+
+    #[test]
+    fn two_secrets_commit_two_public_keys() {
+        let a = Validator::from_secret(7, &[1u8; 32]);
+        let b = Validator::from_secret(7, &[2u8; 32]);
+        assert_ne!(a.public_key(), b.public_key());
+    }
+
+    #[test]
+    fn the_signing_seed_is_not_the_secret() {
+        let secret = [9u8; 32];
+        assert_ne!(signing_key_seed(&secret), secret);
     }
 }

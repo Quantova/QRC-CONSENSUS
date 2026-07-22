@@ -9,30 +9,36 @@ use crate::attestation::Attestation;
 
 pub use qtv_bft::validator::ValidatorId;
 
+/// A validator that attests. It holds one high entropy secret and derives from it,
 pub struct Attester {
     signer: Validator,
     sampler: SamplerValidator,
 }
 
 impl Attester {
-    pub fn new(id: ValidatorId, stake: u64) -> Self {
+    pub fn from_secret(id: ValidatorId, secret: &[u8; 32], stake: u64) -> Self {
         Attester {
-            signer: Validator::new(id),
-            sampler: SamplerValidator::new(id, stake),
+            signer: Validator::from_secret(id, secret),
+            sampler: SamplerValidator::from_secret(id, secret, stake),
         }
     }
 
-    pub fn with_slots(id: ValidatorId, stake: u64, slots: u64) -> Self {
+    pub fn from_secret_with_slots(
+        id: ValidatorId,
+        secret: &[u8; 32],
+        stake: u64,
+        slots: u64,
+    ) -> Self {
         Attester {
-            signer: Validator::new(id),
-            sampler: SamplerValidator::with_slots(id, stake, slots),
+            signer: Validator::from_secret(id, secret),
+            sampler: SamplerValidator::from_secret_with_slots(id, secret, stake, slots),
         }
     }
 
-    pub fn prover(id: ValidatorId) -> Self {
+    pub fn prover_from_secret(id: ValidatorId, secret: &[u8; 32]) -> Self {
         Attester {
-            signer: Validator::new(id),
-            sampler: SamplerValidator::prover(id),
+            signer: Validator::prover_from_secret(id, secret),
+            sampler: SamplerValidator::prover_from_secret(id, secret),
         }
     }
 
@@ -59,6 +65,42 @@ impl Attester {
     }
 }
 
+// Test and simulation fixtures. An attester built here derives its one secret from a
+// deterministic, per id seed so the test suite and the local devnet simulation are
+// reproducible. They are compiled only under `cfg(test)` or the `test-fixtures`
+// feature and are never part of a node binary: a production attester is always built
+// from a real secret through `from_secret`, so neither its signing key nor its
+// sortition tree is ever derived from the public id on any running path.
+#[cfg(any(test, feature = "test-fixtures"))]
+const FIXTURE_SECRET_DOMAIN: &[u8] = b"QORUS/TEST-ONLY/insecure-fixture-secret/v1";
+
+/// A deterministic, per id secret for tests and the devnet simulation only, shared
+#[cfg(any(test, feature = "test-fixtures"))]
+pub fn fixture_secret(id: ValidatorId) -> [u8; 32] {
+    const D: usize = FIXTURE_SECRET_DOMAIN.len();
+    let mut buf = [0u8; D + 8];
+    buf[..D].copy_from_slice(FIXTURE_SECRET_DOMAIN);
+    buf[D..].copy_from_slice(&id.to_le_bytes());
+    let mut out = [0u8; 32];
+    qtv_crypto::sha3::shake256(&buf, &mut out);
+    out
+}
+
+#[cfg(any(test, feature = "test-fixtures"))]
+impl Attester {
+    pub fn new(id: ValidatorId, stake: u64) -> Self {
+        Self::from_secret(id, &fixture_secret(id), stake)
+    }
+
+    pub fn with_slots(id: ValidatorId, stake: u64, slots: u64) -> Self {
+        Self::from_secret_with_slots(id, &fixture_secret(id), stake, slots)
+    }
+
+    pub fn prover(id: ValidatorId) -> Self {
+        Self::prover_from_secret(id, &fixture_secret(id))
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -73,6 +115,20 @@ mod tests {
         assert_eq!(att.from, a.id());
         assert!(att.signature_verifies(a.attest_public_key()));
         assert!(att.is_entitled(&a.root(), &beacon, a.weight(), a.weight(), 100));
+    }
+
+    #[test]
+    fn one_secret_drives_the_signing_key_and_the_sortition_tree() {
+        let secret = [42u8; 32];
+        let a = Attester::from_secret(1, &secret, 100);
+        let b = Attester::from_secret(1, &secret, 100);
+        // The one secret reproduces both commitments exactly.
+        assert_eq!(a.attest_public_key(), b.attest_public_key());
+        assert_eq!(a.root(), b.root());
+        // A different secret moves both commitments.
+        let c = Attester::from_secret(1, &[43u8; 32], 100);
+        assert_ne!(a.attest_public_key(), c.attest_public_key());
+        assert_ne!(a.root(), c.root());
     }
 
     #[test]
