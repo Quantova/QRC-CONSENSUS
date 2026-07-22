@@ -7,6 +7,7 @@ use crate::committee::{leader, sample_committee, View};
 use crate::hash::fold;
 use crate::message::{Message, Proposal};
 use crate::params::MIN_HEIGHT;
+use crate::slashing::{slash_from_evidence, EquivocationDetector, Slash, SlashLedger};
 use crate::validator::{Fault, ValidatorId, ValidatorSet};
 
 #[derive(Clone, Debug)]
@@ -20,6 +21,8 @@ pub struct Machine {
     certs: Vec<Certificate>,
     views: BTreeMap<Height, View>,
     stable: bool,
+    detector: EquivocationDetector,
+    ledger: SlashLedger,
 }
 
 impl Machine {
@@ -44,6 +47,8 @@ impl Machine {
             certs: Vec::new(),
             views,
             stable: false,
+            detector: EquivocationDetector::new(),
+            ledger: SlashLedger::new(),
         }
     }
 
@@ -237,11 +242,13 @@ impl Machine {
             Some(v) => v,
             None => return false,
         };
-        let message = Message::vote(Attestation::create(validator, height, block));
+        let attestation = Attestation::create(validator, height, block);
+        let message = Message::vote(attestation.clone());
         if self.has_message(&message) {
             return false;
         }
         self.msgs.push(message);
+        self.detect_and_slash(&attestation);
         true
     }
 
@@ -256,12 +263,34 @@ impl Machine {
             Some(v) => v,
             None => return false,
         };
-        let message = Message::vote(Attestation::create(validator, height, block));
+        let attestation = Attestation::create(validator, height, block);
+        let message = Message::vote(attestation.clone());
         if self.has_message(&message) {
             return false;
         }
         self.msgs.push(message);
+        self.detect_and_slash(&attestation);
         true
+    }
+
+    /// Feed one attestation to the runtime detector as it is admitted. When it completes
+    /// a conflicting pair for a validator at a height, the resulting evidence is checked
+    /// against that validator's registered key and drives an attributable slash, the whole
+    /// bond burned and the validator banned.
+    fn detect_and_slash(&mut self, attestation: &Attestation) {
+        if let Some(evidence) = self.detector.observe(attestation) {
+            if let Some(slash) = slash_from_evidence(&evidence, &self.set) {
+                self.ledger.apply(slash);
+            }
+        }
+    }
+
+    pub fn slashes(&self) -> &[Slash] {
+        self.ledger.slashes()
+    }
+
+    pub fn is_slashed(&self, id: ValidatorId) -> bool {
+        self.ledger.is_banned(id)
     }
 
     pub fn finalize(&mut self, height: Height, block: Block) -> bool {
@@ -410,5 +439,35 @@ mod tests {
         let certs = m.run();
         assert_eq!(certs.len(), 1);
         assert!(m.view_of(1) >= 1);
+    }
+
+    #[test]
+    fn a_runtime_equivocator_is_detected_and_slashed_while_peers_are_not() {
+        let mut set = ValidatorSet::new(4);
+        set.set_fault(2, Fault::Byzantine);
+        let mut m = Machine::new(set, 4, [5u8; 32], 1, 3);
+        m.stabilize();
+        assert!(m.committee_for(1).contains(&2));
+
+        let first = Block::new(1, [1u8; 32], Parent::Genesis);
+        let second = Block::new(1, [2u8; 32], Parent::Genesis);
+        assert!(m.byz_vote(2, 1, first));
+        assert!(m.slashes().is_empty(), "one vote is not yet a fault");
+        assert!(m.byz_vote(2, 1, second));
+
+        assert!(m.is_slashed(2), "the equivocator is slashed live as its second vote lands");
+        assert_eq!(m.slashes().len(), 1);
+        assert_eq!(m.slashes()[0].validator, 2);
+        for peer in [1u64, 3, 4] {
+            assert!(!m.is_slashed(peer), "an honest peer must never be slashed");
+        }
+    }
+
+    #[test]
+    fn an_honest_run_slashes_nobody() {
+        let mut m = Machine::new(ValidatorSet::new(4), 4, [42u8; 32], 3, 3);
+        m.run();
+        assert!(m.all_finalized());
+        assert!(m.slashes().is_empty());
     }
 }
