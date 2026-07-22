@@ -1,3 +1,4 @@
+use qtv_crypto::ml_dsa::{verify as ml_verify, PublicKey, Signature};
 use qtv_crypto::sha3::sha3_256;
 
 const NODE_DOMAIN: &[u8] = b"QORUS/fold/node";
@@ -220,6 +221,134 @@ pub fn verify_sampled(
     verify(cert, committee_total, expected.len())
 }
 
+const ATTESTED_LEAF_DOMAIN: &[u8] = b"QORUS/fold/attested-leaf";
+
+/// The fold leaf for an attesting committee member, binding the member's attestation
+pub fn attested_leaf(public_key: &PublicKey, stake: u64) -> [u8; 32] {
+    let mut buf = Vec::with_capacity(ATTESTED_LEAF_DOMAIN.len() + public_key.len() + 8);
+    buf.extend_from_slice(ATTESTED_LEAF_DOMAIN);
+    buf.extend_from_slice(public_key);
+    buf.extend_from_slice(&stake.to_le_bytes());
+    sha3_256(&buf)
+}
+
+#[derive(Clone)]
+pub struct AttestedOpening {
+    pub index: usize,
+    pub public_key: PublicKey,
+    pub stake: u64,
+    pub signature: Signature,
+    pub path: Vec<Step>,
+}
+
+impl AttestedOpening {
+    pub fn leaf(&self) -> [u8; 32] {
+        attested_leaf(&self.public_key, self.stake)
+    }
+
+    pub fn fold_to_root(&self) -> ([u8; 32], u64) {
+        let mut hash = self.leaf();
+        let mut stake = self.stake;
+        for step in &self.path {
+            match step {
+                Step::Sibling {
+                    hash: sib,
+                    stake: sib_stake,
+                    on_left,
+                } => {
+                    hash = if *on_left {
+                        node_hash(sib, &hash, *sib_stake, stake)
+                    } else {
+                        node_hash(&hash, sib, stake, *sib_stake)
+                    };
+                    stake = stake.saturating_add(*sib_stake);
+                }
+                Step::Carry => {}
+            }
+        }
+        (hash, stake)
+    }
+
+    pub fn signature_verifies(&self, message: &[u8], context: &[u8]) -> bool {
+        ml_verify(&self.public_key, message, &self.signature, context)
+    }
+}
+
+#[derive(Clone)]
+pub struct AttestedFoldCertificate {
+    pub root: [u8; 32],
+    pub attested_stake: u64,
+    pub total_stake: u64,
+    pub openings: Vec<AttestedOpening>,
+}
+
+/// Build a signature carrying fold certificate over the attesters. Each attester is its
+pub fn build_attested(
+    attesters: &[(PublicKey, u64, Signature)],
+    committee_total: u64,
+    k: usize,
+) -> AttestedFoldCertificate {
+    let leaves: Vec<([u8; 32], u64)> = attesters
+        .iter()
+        .map(|(pk, stake, _)| (attested_leaf(pk, *stake), *stake))
+        .collect();
+    let (root, attested_stake) = fold_root(&leaves);
+    let sample = sample_indices(&root, leaves.len(), k);
+    let levels = build_levels(&leaves);
+    let openings = sample
+        .iter()
+        .filter(|&&i| i < attesters.len())
+        .map(|&i| {
+            let (pk, stake, sig) = &attesters[i];
+            AttestedOpening {
+                index: i,
+                public_key: *pk,
+                stake: *stake,
+                signature: *sig,
+                path: opening_path(&levels, i),
+            }
+        })
+        .collect();
+    AttestedFoldCertificate {
+        root,
+        attested_stake,
+        total_stake: committee_total,
+        openings,
+    }
+}
+
+/// Verify a signature carrying fold certificate. Beyond the stake totals, the quorum,
+pub fn verify_attested(
+    cert: &AttestedFoldCertificate,
+    committee_total: u64,
+    attester_count: usize,
+    k: usize,
+    message: &[u8],
+    context: &[u8],
+) -> bool {
+    if cert.total_stake != committee_total {
+        return false;
+    }
+    if (cert.attested_stake as u128) * 3 <= (cert.total_stake as u128) * 2 {
+        return false;
+    }
+    let expected = sample_indices(&cert.root, attester_count, k);
+    if cert.openings.len() != expected.len() {
+        return false;
+    }
+    let mut got: Vec<usize> = cert.openings.iter().map(|o| o.index).collect();
+    got.sort_unstable();
+    if got != expected {
+        return false;
+    }
+    cert.openings.iter().all(|opening| {
+        let (root, stake) = opening.fold_to_root();
+        root == cert.root
+            && stake == cert.attested_stake
+            && opening.signature_verifies(message, context)
+    })
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -413,5 +542,70 @@ mod tests {
         let forged = build(&leaves, full, &picked);
         assert!(verify(&forged, full, k));
         assert!(!verify_sampled(&forged, full, 20, k));
+    }
+
+    use crate::attester::Attester;
+    use qtv_bft::block::{Block, Parent};
+    use qtv_sampler::beacon::Beacon;
+
+    fn signed_committee(
+        n: usize,
+        block: Block,
+        height: u64,
+        slot: u64,
+    ) -> (Vec<(PublicKey, u64, Signature)>, Vec<u8>, &'static [u8]) {
+        let beacon = Beacon::genesis();
+        let subject = crate::attestation::attestation_message(height, slot, &block);
+        let members: Vec<(PublicKey, u64, Signature)> = (1..=n as u64)
+            .map(|id| {
+                let a = Attester::new(id, 100);
+                let att = a.attest(height, slot, block, &beacon);
+                (*a.attest_public_key(), a.weight(), att.sig)
+            })
+            .collect();
+        (members, subject, crate::params::ATTEST_CONTEXT)
+    }
+
+    #[test]
+    fn a_signed_fold_certificate_verifies_but_a_forged_signature_is_rejected() {
+        let (n, k, height, slot) = (16usize, 5usize, 1u64, 0u64);
+        let block = Block::new(height, [9u8; 32], Parent::Genesis);
+        let (members, subject, context) = signed_committee(n, block, height, slot);
+        let full: u64 = members.iter().map(|(_, s, _)| s).sum();
+
+        let cert = build_attested(&members, full, k);
+        assert!(verify_attested(&cert, full, n, k, &subject, context));
+
+        let leaves: Vec<([u8; 32], u64)> = members
+            .iter()
+            .map(|(pk, s, _)| (attested_leaf(pk, *s), *s))
+            .collect();
+        assert!(verify_sampled(&build_sampled(&leaves, full, k), full, n, k));
+
+        let mut forged = cert.clone();
+        forged.openings[0].signature[0] ^= 1;
+        assert!(!verify_attested(&forged, full, n, k, &subject, context));
+    }
+
+    #[test]
+    fn a_swapped_key_a_swapped_signature_or_a_wrong_subject_is_rejected() {
+        let (n, k, height, slot) = (16usize, 5usize, 1u64, 0u64);
+        let block = Block::new(height, [9u8; 32], Parent::Genesis);
+        let (members, subject, context) = signed_committee(n, block, height, slot);
+        let full: u64 = members.iter().map(|(_, s, _)| s).sum();
+        let cert = build_attested(&members, full, k);
+        assert!(verify_attested(&cert, full, n, k, &subject, context));
+
+        let mut swapped_sig = cert.clone();
+        swapped_sig.openings[0].signature = cert.openings[1].signature;
+        assert!(!verify_attested(&swapped_sig, full, n, k, &subject, context));
+
+        let mut swapped_key = cert.clone();
+        swapped_key.openings[0].public_key = cert.openings[1].public_key;
+        assert!(!verify_attested(&swapped_key, full, n, k, &subject, context));
+
+        let other = Block::new(height, [10u8; 32], Parent::Genesis);
+        let wrong = crate::attestation::attestation_message(height, slot, &other);
+        assert!(!verify_attested(&cert, full, n, k, &wrong, context));
     }
 }
