@@ -1,6 +1,10 @@
 use qtv_crypto::sha3::shake256;
 
+use crate::onetime::PREIMAGE_BYTES;
+
 pub const SEED_BYTES: usize = 32;
+
+const REVEAL_BEACON_DOMAIN: &[u8] = b"QORUS/beacon/reveals";
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct Beacon {
@@ -27,6 +31,23 @@ impl Beacon {
         input[..SEED_BYTES].copy_from_slice(&self.seed);
         input[SEED_BYTES..2 * SEED_BYTES].copy_from_slice(cert_digest);
         input[2 * SEED_BYTES..].copy_from_slice(&height.to_le_bytes());
+        let mut next = [0u8; SEED_BYTES];
+        shake256(&input, &mut next);
+        Beacon { seed: next }
+    }
+
+    /// Advance the beacon from the committee's one time sortition reveals for the slot.
+    pub fn advance_from_reveals(&self, slot: u64, reveals: &[[u8; PREIMAGE_BYTES]]) -> Beacon {
+        let mut input = Vec::with_capacity(
+            SEED_BYTES + REVEAL_BEACON_DOMAIN.len() + 16 + reveals.len() * PREIMAGE_BYTES,
+        );
+        input.extend_from_slice(&self.seed);
+        input.extend_from_slice(REVEAL_BEACON_DOMAIN);
+        input.extend_from_slice(&slot.to_le_bytes());
+        input.extend_from_slice(&(reveals.len() as u64).to_le_bytes());
+        for reveal in reveals {
+            input.extend_from_slice(reveal);
+        }
         let mut next = [0u8; SEED_BYTES];
         shake256(&input, &mut next);
         Beacon { seed: next }
@@ -67,6 +88,29 @@ mod tests {
         let a = Beacon::genesis().advance(&d, 1);
         let b = Beacon::from_seed([9u8; SEED_BYTES]).advance(&d, 1);
         assert_ne!(a, b);
+    }
+
+    #[test]
+    fn advance_from_reveals_is_deterministic_and_binds_every_reveal() {
+        let b = Beacon::genesis();
+        let reveals = [[1u8; PREIMAGE_BYTES], [2u8; PREIMAGE_BYTES], [3u8; PREIMAGE_BYTES]];
+        assert_eq!(b.advance_from_reveals(5, &reveals), b.advance_from_reveals(5, &reveals));
+        assert_ne!(b.advance_from_reveals(5, &reveals), b.advance_from_reveals(6, &reveals));
+
+        let mut moved = reveals;
+        moved[1][0] ^= 1;
+        assert_ne!(
+            b.advance_from_reveals(5, &reveals),
+            b.advance_from_reveals(5, &moved),
+            "a change to one reveal must move the seed"
+        );
+
+        let other = Beacon::from_seed([9u8; SEED_BYTES]);
+        assert_ne!(
+            b.advance_from_reveals(5, &reveals),
+            other.advance_from_reveals(5, &reveals),
+            "the next seed chains from the previous one"
+        );
     }
 
     #[test]

@@ -1,5 +1,5 @@
 use crate::beacon::Beacon;
-use crate::onetime::Root;
+use crate::onetime::{Root, PREIMAGE_BYTES};
 use crate::params::{COMMITTEE_BUDGET, DOMAIN_COMMITTEE, DOMAIN_LEADER, MIN_SELF_STAKE};
 use crate::sortition::{leader_neg_log2, leader_prefers, verify_membership, verify_selection, Credential};
 use crate::validator::{Registration, ValidatorId};
@@ -29,6 +29,16 @@ impl Committee {
 
     pub fn contains(&self, id: ValidatorId) -> bool {
         self.members.iter().any(|m| m.id == id)
+    }
+
+    /// The committee's reveal preimages in ascending member id order. Each is fixed by
+    pub fn reveals(&self) -> Vec<[u8; PREIMAGE_BYTES]> {
+        self.members.iter().map(|m| m.credential.preimage).collect()
+    }
+
+    /// The next slot beacon, advanced from this committee's reveals rather than from any
+    pub fn next_beacon(&self, beacon: &Beacon, slot: u64) -> Beacon {
+        beacon.advance_from_reveals(slot, &self.reveals())
     }
 }
 
@@ -416,5 +426,57 @@ mod tests {
             }
             assert_eq!(elected, best.unwrap().1, "the leader differs at slot {slot}");
         }
+    }
+
+    #[test]
+    fn a_proposer_cannot_shift_its_own_next_slot_draw() {
+        use crate::beacon::SEED_BYTES;
+        use qtv_crypto::sha3::shake256;
+        use std::collections::BTreeSet;
+
+        let set = validators(&[100, 100, 100, 100, 100]);
+        let reg = Registry::new(set.iter().map(|v| v.clone()).collect())
+            .with_budget(10)
+            .with_floor(0);
+        let beacon = Beacon::genesis();
+        let slot = 3u64;
+        let next_slot = slot + 1;
+        let committee = reg.sample_committee(&beacon, slot);
+        assert!(!committee.is_empty());
+        let proposer = &set[0];
+        assert!(committee.contains(proposer.id));
+
+        let unbiased = committee.next_beacon(&beacon, slot);
+        let fixed = proposer
+            .reveal(next_slot)
+            .value(&unbiased, DOMAIN_LEADER, next_slot);
+
+        let mut reveal_draws = BTreeSet::new();
+        let mut digest_draws = BTreeSet::new();
+        for candidate in 0u64..64 {
+            let mut digest = [0u8; SEED_BYTES];
+            shake256(&candidate.to_le_bytes(), &mut digest);
+
+            let reveal_next = committee.next_beacon(&beacon, slot);
+            reveal_draws.insert(
+                proposer
+                    .reveal(next_slot)
+                    .value(&reveal_next, DOMAIN_LEADER, next_slot),
+            );
+
+            let digest_next = beacon.advance(&digest, slot);
+            digest_draws.insert(
+                proposer
+                    .reveal(next_slot)
+                    .value(&digest_next, DOMAIN_LEADER, next_slot),
+            );
+        }
+
+        assert_eq!(reveal_draws.len(), 1, "the reveal beacon leaves the proposer no lever");
+        assert_eq!(*reveal_draws.iter().next().unwrap(), fixed);
+        assert!(
+            digest_draws.len() > 1,
+            "the old certificate digest beacon let the proposer grind its next draw"
+        );
     }
 }
