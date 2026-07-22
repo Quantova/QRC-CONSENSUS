@@ -1,8 +1,8 @@
 use crate::beacon::Beacon;
 use crate::onetime::Root;
 use crate::params::{COMMITTEE_BUDGET, DOMAIN_COMMITTEE, DOMAIN_LEADER, MIN_SELF_STAKE};
-use crate::sortition::{is_selected, leader_score, verify_membership, Credential};
-use crate::validator::{Registration, SamplerValidator, ValidatorId};
+use crate::sortition::{leader_score, verify_membership, verify_selection, Credential};
+use crate::validator::{Registration, ValidatorId};
 
 pub struct Member {
     pub id: ValidatorId,
@@ -41,16 +41,47 @@ pub fn verify_leader(root: &Root, slot: u64, credential: &Credential) -> bool {
     verify_membership(root, slot, credential)
 }
 
-pub struct Registry {
-    validators: Vec<SamplerValidator>,
+/// The lowest score member of a committee is its leader for the slot.
+pub fn elect_leader(committee: &Committee, beacon: &Beacon, slot: u64) -> Option<Leader> {
+    let mut best: Option<(f64, ValidatorId, Credential)> = None;
+    for m in &committee.members {
+        let output = m.credential.output(beacon, DOMAIN_LEADER, slot);
+        let score = leader_score(&output, m.weight);
+        let take = match &best {
+            None => true,
+            Some((bs, bid, _)) => score < *bs || (score == *bs && m.id < *bid),
+        };
+        if take {
+            best = Some((score, m.id, m.credential.clone()));
+        }
+    }
+    best.map(|(_, id, credential)| Leader { id, credential })
+}
+
+/// A validator's own sortition reveal for a slot, its id and its one time credential.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct PublishedReveal {
+    pub id: ValidatorId,
+    pub credential: Credential,
+}
+
+impl PublishedReveal {
+    pub fn new(id: ValidatorId, credential: Credential) -> Self {
+        PublishedReveal { id, credential }
+    }
+}
+
+/// A view over the registered validator set holding only each validator's registration,
+pub struct CommitteeView {
+    registrations: Vec<Registration>,
     budget: u64,
     floor: u64,
 }
 
-impl Registry {
-    pub fn new(validators: Vec<SamplerValidator>) -> Self {
-        Registry {
-            validators,
+impl CommitteeView {
+    pub fn new(registrations: Vec<Registration>) -> Self {
+        CommitteeView {
+            registrations,
             budget: COMMITTEE_BUDGET,
             floor: MIN_SELF_STAKE,
         }
@@ -74,76 +105,201 @@ impl Registry {
         self.budget
     }
 
-    pub fn get(&self, id: ValidatorId) -> Option<&SamplerValidator> {
-        self.validators.iter().find(|v| v.id == id)
-    }
-
-    pub fn registration(&self, id: ValidatorId) -> Option<Registration> {
-        self.get(id).map(Registration::of)
+    pub fn registration(&self, id: ValidatorId) -> Option<&Registration> {
+        self.registrations.iter().find(|r| r.id == id)
     }
 
     pub fn total_weight(&self) -> u64 {
-        self.validators
+        self.registrations
             .iter()
-            .map(SamplerValidator::weight)
+            .map(|r| r.weight)
             .filter(|&w| w >= self.floor)
             .sum()
     }
 
     pub fn weights(&self) -> Vec<u64> {
-        self.validators
+        self.registrations
             .iter()
-            .filter(|v| !v.is_prover() && v.weight() >= self.floor)
-            .map(SamplerValidator::weight)
+            .filter(|r| r.weight >= self.floor)
+            .map(|r| r.weight)
             .collect()
     }
 
-    pub fn sample_committee(&self, beacon: &Beacon, slot: u64) -> Committee {
+    /// Whether a credential published by `id` authenticates to that validator's
+    pub fn admits(
+        &self,
+        beacon: &Beacon,
+        slot: u64,
+        id: ValidatorId,
+        credential: &Credential,
+    ) -> bool {
+        let total = self.total_weight();
+        match self.registration(id) {
+            Some(reg) if reg.weight >= self.floor => verify_selection(
+                &reg.root,
+                beacon,
+                DOMAIN_COMMITTEE,
+                slot,
+                reg.weight,
+                total,
+                self.budget,
+                credential,
+            ),
+            _ => false,
+        }
+    }
+
+    /// Assemble the committee for a slot from the reveals validators publish for
+    pub fn form_committee(
+        &self,
+        beacon: &Beacon,
+        slot: u64,
+        published: &[PublishedReveal],
+    ) -> Committee {
         let total = self.total_weight();
         let mut members: Vec<Member> = Vec::new();
-        for v in &self.validators {
-            if v.is_prover() || v.weight() < self.floor {
+        for reveal in published {
+            if members.iter().any(|m| m.id == reveal.id) {
                 continue;
             }
-            let credential = v.reveal(slot);
-            let value = credential.value(beacon, DOMAIN_COMMITTEE, slot);
-            if is_selected(value, v.weight(), total, self.budget) {
-                members.push(Member {
-                    id: v.id,
-                    weight: v.weight(),
-                    credential,
-                });
+            let reg = match self.registration(reveal.id) {
+                Some(reg) if reg.weight >= self.floor => reg,
+                _ => continue,
+            };
+            if !verify_selection(
+                &reg.root,
+                beacon,
+                DOMAIN_COMMITTEE,
+                slot,
+                reg.weight,
+                total,
+                self.budget,
+                &reveal.credential,
+            ) {
+                continue;
             }
+            members.push(Member {
+                id: reveal.id,
+                weight: reg.weight,
+                credential: reveal.credential.clone(),
+            });
         }
         members.sort_by_key(|m| m.id);
         Committee { members }
     }
 
-    pub fn elect_leader(
-        &self,
-        committee: &Committee,
-        beacon: &Beacon,
-        slot: u64,
-    ) -> Option<Leader> {
-        let mut best: Option<(f64, ValidatorId, Credential)> = None;
-        for m in &committee.members {
-            let output = m.credential.output(beacon, DOMAIN_LEADER, slot);
-            let score = leader_score(&output, m.weight);
-            let take = match &best {
-                None => true,
-                Some((bs, bid, _)) => score < *bs || (score == *bs && m.id < *bid),
-            };
-            if take {
-                best = Some((score, m.id, m.credential.clone()));
+    pub fn elect_leader(&self, committee: &Committee, beacon: &Beacon, slot: u64) -> Option<Leader> {
+        elect_leader(committee, beacon, slot)
+    }
+}
+
+// Roster backed sampler for the test suite and the local simulation, the reference the
+// sortition math is proven against. Compiled only under cfg(test) or the test-fixtures
+// feature and absent from a default build.
+#[cfg(any(test, feature = "test-fixtures"))]
+pub use roster::Registry;
+
+#[cfg(any(test, feature = "test-fixtures"))]
+mod roster {
+    use super::{elect_leader, Committee, Leader, Member};
+    use crate::beacon::Beacon;
+    use crate::params::{COMMITTEE_BUDGET, DOMAIN_COMMITTEE, MIN_SELF_STAKE};
+    use crate::sortition::is_selected;
+    use crate::validator::{Registration, SamplerValidator, ValidatorId};
+
+    pub struct Registry {
+        validators: Vec<SamplerValidator>,
+        budget: u64,
+        floor: u64,
+    }
+
+    impl Registry {
+        pub fn new(validators: Vec<SamplerValidator>) -> Self {
+            Registry {
+                validators,
+                budget: COMMITTEE_BUDGET,
+                floor: MIN_SELF_STAKE,
             }
         }
-        best.map(|(_, id, credential)| Leader { id, credential })
+
+        pub fn with_budget(mut self, budget: u64) -> Self {
+            self.budget = budget;
+            self
+        }
+
+        pub fn with_floor(mut self, floor: u64) -> Self {
+            self.floor = floor;
+            self
+        }
+
+        pub fn floor(&self) -> u64 {
+            self.floor
+        }
+
+        pub fn budget(&self) -> u64 {
+            self.budget
+        }
+
+        pub fn get(&self, id: ValidatorId) -> Option<&SamplerValidator> {
+            self.validators.iter().find(|v| v.id == id)
+        }
+
+        pub fn registration(&self, id: ValidatorId) -> Option<Registration> {
+            self.get(id).map(Registration::of)
+        }
+
+        pub fn total_weight(&self) -> u64 {
+            self.validators
+                .iter()
+                .map(SamplerValidator::weight)
+                .filter(|&w| w >= self.floor)
+                .sum()
+        }
+
+        pub fn weights(&self) -> Vec<u64> {
+            self.validators
+                .iter()
+                .filter(|v| !v.is_prover() && v.weight() >= self.floor)
+                .map(SamplerValidator::weight)
+                .collect()
+        }
+
+        pub fn sample_committee(&self, beacon: &Beacon, slot: u64) -> Committee {
+            let total = self.total_weight();
+            let mut members: Vec<Member> = Vec::new();
+            for v in &self.validators {
+                if v.is_prover() || v.weight() < self.floor {
+                    continue;
+                }
+                let credential = v.reveal(slot);
+                let value = credential.value(beacon, DOMAIN_COMMITTEE, slot);
+                if is_selected(value, v.weight(), total, self.budget) {
+                    members.push(Member {
+                        id: v.id,
+                        weight: v.weight(),
+                        credential,
+                    });
+                }
+            }
+            members.sort_by_key(|m| m.id);
+            Committee { members }
+        }
+
+        pub fn elect_leader(
+            &self,
+            committee: &Committee,
+            beacon: &Beacon,
+            slot: u64,
+        ) -> Option<Leader> {
+            elect_leader(committee, beacon, slot)
+        }
     }
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::validator::SamplerValidator;
 
     fn validators(stakes: &[u64]) -> Vec<SamplerValidator> {
         stakes
@@ -165,5 +321,74 @@ mod tests {
         assert!(committee.contains(leader.id));
         let root = reg.registration(leader.id).unwrap().root;
         assert!(verify_leader(&root, 0, &leader.credential));
+    }
+
+    #[test]
+    fn a_published_reveal_committee_reproduces_the_sortition_committee() {
+        let set = validators(&[100, 100, 100, 100, 100]);
+        let reg = Registry::new(set.iter().map(|v| v.clone()).collect())
+            .with_budget(3)
+            .with_floor(0);
+        let view = CommitteeView::new(set.iter().map(Registration::of).collect())
+            .with_budget(3)
+            .with_floor(0);
+        for slot in 0..16u64 {
+            let beacon = Beacon::genesis();
+            let published: Vec<PublishedReveal> = set
+                .iter()
+                .map(|v| PublishedReveal::new(v.id, v.reveal(slot)))
+                .collect();
+            let drawn = reg.sample_committee(&beacon, slot);
+            let assembled = view.form_committee(&beacon, slot, &published);
+            assert_eq!(
+                assembled.ids(),
+                drawn.ids(),
+                "the assembled committee differs at slot {slot}"
+            );
+            let a = view.elect_leader(&assembled, &beacon, slot).map(|l| l.id);
+            let b = reg.elect_leader(&drawn, &beacon, slot).map(|l| l.id);
+            assert_eq!(a, b, "the leader differs at slot {slot}");
+        }
+    }
+
+    #[test]
+    fn a_reveal_that_does_not_authenticate_is_not_admitted() {
+        let set = validators(&[100, 100, 100]);
+        let view = CommitteeView::new(set.iter().map(Registration::of).collect())
+            .with_budget(10)
+            .with_floor(0);
+        let beacon = Beacon::genesis();
+        let slot = 0;
+        let honest: Vec<PublishedReveal> = set
+            .iter()
+            .map(|v| PublishedReveal::new(v.id, v.reveal(slot)))
+            .collect();
+        assert!(view.form_committee(&beacon, slot, &honest).contains(1));
+
+        let forged = vec![PublishedReveal::new(1, set[1].reveal(slot))];
+        let committee = view.form_committee(&beacon, slot, &forged);
+        assert!(
+            !committee.contains(1),
+            "a reveal that does not open the committed root admitted its author"
+        );
+        assert!(committee.is_empty());
+    }
+
+    #[test]
+    fn a_validator_that_never_publishes_is_absent() {
+        let set = validators(&[100, 100, 100]);
+        let view = CommitteeView::new(set.iter().map(Registration::of).collect())
+            .with_budget(10)
+            .with_floor(0);
+        let beacon = Beacon::genesis();
+        let slot = 0;
+        let published = vec![
+            PublishedReveal::new(1, set[0].reveal(slot)),
+            PublishedReveal::new(3, set[2].reveal(slot)),
+        ];
+        let committee = view.form_committee(&beacon, slot, &published);
+        assert!(committee.contains(1));
+        assert!(committee.contains(3));
+        assert!(!committee.contains(2), "a silent validator was admitted");
     }
 }

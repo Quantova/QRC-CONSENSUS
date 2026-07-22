@@ -29,7 +29,7 @@ impl CommitteeCommitment {
     }
 
     pub fn from_attesters_with_budget(slot: u64, attesters: &[&Attester], budget: u64) -> Self {
-        let mut members: Vec<MemberKey> = attesters
+        let members: Vec<MemberKey> = attesters
             .iter()
             .map(|a| MemberKey {
                 id: a.id(),
@@ -38,6 +38,11 @@ impl CommitteeCommitment {
                 attest_pk: *a.attest_public_key(),
             })
             .collect();
+        Self::from_member_keys(slot, members, budget)
+    }
+
+    /// Build the committee commitment from the public member keys, each a validator's
+    pub fn from_member_keys(slot: u64, mut members: Vec<MemberKey>, budget: u64) -> Self {
         members.sort_by_key(|m| m.id);
         let total_weight = members.iter().map(|m| m.weight).sum();
         CommitteeCommitment {
