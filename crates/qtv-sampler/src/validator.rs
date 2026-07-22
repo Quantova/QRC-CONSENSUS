@@ -47,6 +47,7 @@ pub struct SamplerValidator {
     pub fault: Fault,
     stake: Stake,
     seed: [u8; 32],
+    epoch: u64,
     tree: OneTimeTree,
 }
 
@@ -58,7 +59,11 @@ impl Clone for SamplerValidator {
             fault: self.fault,
             stake: self.stake,
             seed: self.seed,
-            tree: OneTimeTree::new(self.seed, self.tree.slots()),
+            epoch: self.epoch,
+            tree: OneTimeTree::new(
+                crate::epoch::epoch_tree_seed(&self.seed, self.epoch),
+                self.tree.slots(),
+            ),
         }
     }
 }
@@ -81,7 +86,27 @@ impl SamplerValidator {
             fault: Fault::Honest,
             stake: Stake::native(stake),
             seed,
+            epoch: 0,
             tree: OneTimeTree::new(seed, slots),
+        }
+    }
+
+    pub fn epoch(&self) -> u64 {
+        self.epoch
+    }
+
+    pub fn rotate_to(&self, epoch: u64) -> SamplerValidator {
+        SamplerValidator {
+            id: self.id,
+            role: self.role,
+            fault: self.fault,
+            stake: self.stake,
+            seed: self.seed,
+            epoch,
+            tree: OneTimeTree::new(
+                crate::epoch::epoch_tree_seed(&self.seed, epoch),
+                self.tree.slots(),
+            ),
         }
     }
 
@@ -269,5 +294,42 @@ mod tests {
         let reg = Registration::of(&v);
         let cred = v.reveal(5);
         assert!(reg.root.verify_membership(5, &cred.preimage, &cred.path));
+    }
+
+    #[test]
+    fn rotation_commits_a_fresh_root_each_epoch() {
+        let base = SamplerValidator::from_secret(1, &[1u8; 32], 100);
+        let one = base.rotate_to(1);
+        let two = base.rotate_to(2);
+        assert_eq!(base.epoch(), 0);
+        assert_eq!(one.epoch(), 1);
+        assert_ne!(base.root(), one.root());
+        assert_ne!(one.root(), two.root());
+        assert_eq!(one.root(), base.rotate_to(1).root());
+    }
+
+    #[test]
+    fn rotated_reveals_carry_the_committee_past_the_old_fixed_ceiling() {
+        let epoch_len = 8u64;
+        let slots = epoch_len;
+        let old_ceiling = crate::validator::DEFAULT_SLOTS;
+        let base = SamplerValidator::from_secret_with_slots(1, &[3u8; 32], 100, slots);
+        let mut highest = 0u64;
+        for height in 0..(old_ceiling + slots + 4) {
+            let epoch = crate::epoch::epoch_of(height, epoch_len);
+            let slot = crate::epoch::slot_in_epoch(height, epoch_len);
+            let rotated = base.rotate_to(epoch);
+            let reg = Registration::of(&rotated);
+            let cred = rotated.reveal(slot);
+            assert!(
+                reg.root.verify_membership(slot, &cred.preimage, &cred.path),
+                "the rotated reveal failed to authenticate at height {height}"
+            );
+            highest = height;
+        }
+        assert!(
+            highest > old_ceiling,
+            "the run did not pass the old fixed slot ceiling"
+        );
     }
 }
