@@ -3,33 +3,43 @@
 use qtv_sampler::beacon::Beacon;
 use qtv_sampler::evidence::{DoubleDraw, OutOfPosition};
 use qtv_sampler::params::DOMAIN_COMMITTEE;
-use qtv_sampler::sortition::{verify_selection, Credential};
+use qtv_sampler::sortition::{verify_membership, verify_selection, Credential};
 use qtv_sampler::validator::SamplerValidator;
 
 const SATURATING_BUDGET: u64 = 100;
 
 #[test]
-fn two_draws_for_one_slot_are_provable() {
+fn a_forged_second_draw_over_a_genuine_reveal_is_not_a_fault() {
     let v = SamplerValidator::new(1, 100);
     let root = v.root();
     let slot = 2;
 
-    // The account's genuine committed draw for the slot, and a second draw that
-    // carries a different preimage for the same slot, the forged extra output. The
-    // second is exactly what the enforcement rejects at verification.
+    // The account's genuine committed draw for the slot, and a fabricated second
+    // draw that carries a preimage from another slot, so it does not authenticate
+    // at this slot.
     let honest = v.reveal(slot);
     let mut forged = v.reveal(slot);
     forged.preimage = v.reveal(9).preimage;
     assert_ne!(honest, forged);
 
+    // A genuine reveal paired with bytes that do not authenticate is not two draws.
     let fault = DoubleDraw {
         root,
         slot,
-        first: honest,
-        second: forged,
+        first: honest.clone(),
+        second: forged.clone(),
     };
-    // Any node proves the fault from the registered root and the two credentials.
-    assert!(fault.is_proven());
+    assert!(!fault.is_proven());
+
+    // The pair fails either way round, so a lone genuine reveal never frames its
+    // author.
+    let swapped = DoubleDraw {
+        root,
+        slot,
+        first: forged,
+        second: honest,
+    };
+    assert!(!swapped.is_proven());
 }
 
 #[test]
@@ -46,6 +56,36 @@ fn an_honest_single_reveal_is_not_a_double_draw() {
         second: v.reveal(slot),
     };
     assert!(!fault.is_proven());
+}
+
+#[test]
+fn a_double_draw_needs_two_distinct_authenticating_openings() {
+    let v = SamplerValidator::new(1, 100);
+    let root = v.root();
+    let slot = 2;
+
+    // Each side of the check is satisfiable by a real opening: the committed reveal
+    // authenticates to the root at the slot.
+    let genuine = v.reveal(slot);
+    assert!(verify_membership(&root, slot, &genuine));
+
+    // The one time root binds a single opening for the slot, so no other preimage
+    // authenticates at it and no distinct second opening can be produced.
+    for other in [0u64, 1, 3, 9, 40] {
+        let mut alt = v.reveal(slot);
+        alt.preimage = v.reveal(other).preimage;
+        assert!(!verify_membership(&root, slot, &alt));
+    }
+
+    // When both openings authenticate, the pair is accepted only when the two
+    // draws differ; the same opening twice is one draw, so it stands as no fault.
+    let both_authenticate = DoubleDraw {
+        root,
+        slot,
+        first: genuine.clone(),
+        second: genuine,
+    };
+    assert!(!both_authenticate.is_proven());
 }
 
 #[test]
@@ -97,10 +137,10 @@ fn a_fabricated_out_of_position_over_a_foreign_leaf_is_not_proven() {
 }
 
 #[test]
-fn the_forged_second_draw_is_both_rejected_and_provable() {
-    // The link between the enforcement and the evidence. The forged second draw is
-    // rejected by verification, the budget of one, and the same pair is provable as
-    // an attributable fault, the slashing hook.
+fn the_forged_second_draw_is_rejected_at_verification_and_frames_no_one() {
+    // The budget of one is enforced at verification: the forged second draw is
+    // rejected there, and it is not turned into a slashable fault against the
+    // author of the genuine reveal it was pinned to.
     let v = SamplerValidator::new(1, 100);
     let beacon = Beacon::genesis();
     let root = v.root();
@@ -132,14 +172,14 @@ fn the_forged_second_draw_is_both_rejected_and_provable() {
         &forged,
     ));
 
-    // Provable as a fault.
+    // Not a provable fault: the forged half does not authenticate to the root.
     let fault = DoubleDraw {
         root,
         slot,
         first: honest,
         second: forged,
     };
-    assert!(fault.is_proven());
+    assert!(!fault.is_proven());
 }
 
 #[test]
