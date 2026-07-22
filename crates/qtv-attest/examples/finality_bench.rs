@@ -23,6 +23,10 @@ fn measure(committee_size: usize) {
     let commitment = CommitteeCommitment::from_attesters_with_budget(0, &refs, budget);
     let beacon = Beacon::genesis();
     let block = Block::new(1, [7u8; 32], Parent::Genesis);
+    let weights = vec![STAKE; committee_size];
+    let tau = qtv_attest::params::finality_threshold(qtv_attest::params::expected_committee(
+        &weights, budget,
+    ));
 
     let attestations: Vec<Attestation> = attesters
         .iter()
@@ -30,12 +34,12 @@ fn measure(committee_size: usize) {
         .collect();
 
     let t0 = Instant::now();
-    let cert = aggregate(1, 0, block, &commitment, &beacon, &attestations)
+    let cert = aggregate(1, 0, block, &commitment, &beacon, &attestations, tau)
         .expect("an entitled committee aggregates");
     let aggregate_ms = t0.elapsed().as_secs_f64() * 1e3;
 
     let t1 = Instant::now();
-    let verdict = cert.verify(&commitment, &beacon);
+    let verdict = cert.verify(&commitment, &beacon, tau);
     let verify_ms = t1.elapsed().as_secs_f64() * 1e3;
     assert!(verdict.is_verified(), "the certificate must verify before a number is trusted");
 

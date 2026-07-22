@@ -31,7 +31,7 @@ fn a_certificate_verifies_at_a_slot_beyond_the_default() {
     // the reveal at a slot past the default authenticates through the deeper tree.
     assert_eq!(atts[0].membership.path.siblings.len(), 12);
 
-    let cert = aggregate(1, slot, block, &commitment, &beacon, &atts).expect("quorum forms");
-    assert!(cert.verify(&commitment, &beacon).is_verified());
+    let cert = aggregate(1, slot, block, &commitment, &beacon, &atts, 3).expect("quorum forms");
+    assert!(cert.verify(&commitment, &beacon, 3).is_verified());
     assert_eq!(cert.attesters(), vec![1, 2, 3, 4]);
 }
