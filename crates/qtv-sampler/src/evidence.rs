@@ -32,8 +32,8 @@ impl DoubleDraw {
         self.first != self.second
             && self.first.position == self.slot
             && self.second.position == self.slot
-            && (verify_membership(&self.root, self.slot, &self.first)
-                || verify_membership(&self.root, self.slot, &self.second))
+            && verify_membership(&self.root, self.slot, &self.first)
+            && verify_membership(&self.root, self.slot, &self.second)
     }
 }
 
@@ -55,6 +55,34 @@ mod tests {
             second: b,
         };
         assert!(!dd.is_proven());
+    }
+
+    #[test]
+    fn a_genuine_reveal_paired_with_fabricated_bytes_is_not_a_fault() {
+        let v = SamplerValidator::new(1, 100);
+        let root = v.root();
+        let slot = 4;
+
+        let genuine = v.reveal(slot);
+        let mut fabricated = v.reveal(slot);
+        fabricated.preimage = v.reveal(9).preimage;
+        assert_ne!(genuine, fabricated);
+
+        let dd = DoubleDraw {
+            root,
+            slot,
+            first: genuine.clone(),
+            second: fabricated.clone(),
+        };
+        assert!(!dd.is_proven());
+
+        let swapped = DoubleDraw {
+            root,
+            slot,
+            first: fabricated,
+            second: genuine,
+        };
+        assert!(!swapped.is_proven());
     }
 
     #[test]
