@@ -1,6 +1,6 @@
 use qtv_bft::block::{Block, Height};
 use qtv_bft::validator::Validator;
-use qtv_crypto::ml_dsa::PublicKey;
+use qtv_crypto::ml_dsa::{verify, PublicKey, Signature};
 use qtv_sampler::beacon::Beacon;
 use qtv_sampler::onetime::Root;
 use qtv_sampler::validator::SamplerValidator;
@@ -8,6 +8,28 @@ use qtv_sampler::validator::SamplerValidator;
 use crate::attestation::Attestation;
 
 pub use qtv_bft::validator::ValidatorId;
+
+pub const EPOCH_REG_CONTEXT: &[u8] = b"QORUS-EPOCH-REGISTER";
+
+pub fn epoch_registration_message(id: ValidatorId, epoch: u64, root: &Root) -> Vec<u8> {
+    let mut msg = Vec::with_capacity(8 + 8 + 32 + 8);
+    msg.extend_from_slice(&id.to_le_bytes());
+    msg.extend_from_slice(&epoch.to_le_bytes());
+    msg.extend_from_slice(&root.digest);
+    msg.extend_from_slice(&root.slots.to_le_bytes());
+    msg
+}
+
+pub fn epoch_registration_verifies(
+    attest_pk: &PublicKey,
+    id: ValidatorId,
+    epoch: u64,
+    root: &Root,
+    sig: &Signature,
+) -> bool {
+    let msg = epoch_registration_message(id, epoch, root);
+    verify(attest_pk, &msg, sig, EPOCH_REG_CONTEXT)
+}
 
 /// A validator that attests. It holds one high entropy secret and derives from it,
 pub struct Attester {
@@ -40,6 +62,24 @@ impl Attester {
             signer: Validator::prover_from_secret(id, secret),
             sampler: SamplerValidator::prover_from_secret(id, secret),
         }
+    }
+
+    pub fn at_epoch(&self, epoch: u64) -> Self {
+        Attester {
+            signer: self.signer.clone(),
+            sampler: self.sampler.rotate_to(epoch),
+        }
+    }
+
+    pub fn epoch(&self) -> u64 {
+        self.sampler.epoch()
+    }
+
+    pub fn epoch_registration(&self, epoch: u64) -> (Root, Signature) {
+        let root = self.sampler.rotate_to(epoch).root();
+        let msg = epoch_registration_message(self.id(), epoch, &root);
+        let sig = self.signer.sign(&msg, EPOCH_REG_CONTEXT);
+        (root, sig)
     }
 
     pub fn id(&self) -> ValidatorId {
@@ -147,6 +187,30 @@ mod tests {
         assert_eq!(att.membership.path.siblings.len(), 12);
         assert!(att.signature_verifies(a.attest_public_key()));
         assert!(att.is_entitled(&a.root(), &beacon, a.weight(), a.weight(), 100));
+    }
+
+    #[test]
+    fn an_epoch_registration_authenticates_the_rotated_root_to_the_stable_key() {
+        let a = Attester::new(1, 100);
+        let (root, sig) = a.epoch_registration(3);
+        assert_eq!(root, a.at_epoch(3).root());
+        assert_ne!(root, a.root(), "the rotated root differs from the genesis root");
+        assert!(epoch_registration_verifies(
+            a.attest_public_key(),
+            a.id(),
+            3,
+            &root,
+            &sig
+        ));
+        assert!(
+            !epoch_registration_verifies(a.attest_public_key(), a.id(), 4, &root, &sig),
+            "the signature does not carry to another epoch"
+        );
+        let other = Attester::new(2, 100);
+        assert!(
+            !epoch_registration_verifies(other.attest_public_key(), a.id(), 3, &root, &sig),
+            "another key does not verify the registration"
+        );
     }
 
     #[test]
