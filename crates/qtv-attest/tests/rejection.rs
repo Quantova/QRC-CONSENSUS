@@ -21,7 +21,7 @@ fn quorum_attestations(
 ) -> Vec<qtv_attest::Attestation> {
     members[..3]
         .iter()
-        .map(|a| a.attest(1, 0, block, beacon))
+        .map(|a| a.attest(1, 0, 0, block, beacon))
         .collect()
 }
 
