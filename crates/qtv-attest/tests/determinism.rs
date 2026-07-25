@@ -17,7 +17,7 @@ fn the_same_attestations_produce_the_same_certificate() {
     let commitment_a = CommitteeCommitment::from_attesters(0, &first_refs);
     let atts_a: Vec<_> = first[..3]
         .iter()
-        .map(|a| a.attest(1, 0, block, &beacon))
+        .map(|a| a.attest(1, 0, 0, block, &beacon))
         .collect();
     let cert_a = aggregate(1, 0, block, &commitment_a, &beacon, &atts_a, 3).expect("quorum");
 
@@ -27,7 +27,7 @@ fn the_same_attestations_produce_the_same_certificate() {
     let commitment_b = CommitteeCommitment::from_attesters(0, &second_refs);
     let atts_b: Vec<_> = second[..3]
         .iter()
-        .map(|a| a.attest(1, 0, block, &beacon))
+        .map(|a| a.attest(1, 0, 0, block, &beacon))
         .collect();
     let cert_b = aggregate(1, 0, block, &commitment_b, &beacon, &atts_b, 3).expect("quorum");
 
@@ -43,9 +43,9 @@ fn the_certificate_is_independent_of_attestation_order() {
     let refs: Vec<&Attester> = members.iter().collect();
     let commitment = CommitteeCommitment::from_attesters(0, &refs);
 
-    let a1 = members[0].attest(1, 0, block, &beacon);
-    let a2 = members[1].attest(1, 0, block, &beacon);
-    let a3 = members[2].attest(1, 0, block, &beacon);
+    let a1 = members[0].attest(1, 0, 0, block, &beacon);
+    let a2 = members[1].attest(1, 0, 0, block, &beacon);
+    let a3 = members[2].attest(1, 0, 0, block, &beacon);
 
     let forward = aggregate(
         1,
