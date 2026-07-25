@@ -30,7 +30,7 @@ fn measure(committee_size: usize) {
 
     let attestations: Vec<Attestation> = attesters
         .iter()
-        .map(|a| a.attest(1, 0, block, &beacon))
+        .map(|a| a.attest(1, 0, 0, block, &beacon))
         .collect();
 
     let t0 = Instant::now();
