@@ -1,4 +1,5 @@
 use qtv_bft::block::{Block, Height};
+use qtv_bft::committee::View;
 use qtv_bft::validator::{Validator, ValidatorId};
 use qtv_crypto::ml_dsa::{verify, PublicKey, Signature};
 use qtv_sampler::beacon::Beacon;
@@ -7,10 +8,11 @@ use qtv_sampler::sortition::{verify_selection, Credential};
 
 use crate::params::{ATTEST_CONTEXT, DOMAIN_COMMITTEE};
 
-pub fn attestation_message(height: Height, slot: u64, block: &Block) -> Vec<u8> {
-    let mut msg = Vec::with_capacity(16 + 33);
+pub fn attestation_message(height: Height, slot: u64, view: View, block: &Block) -> Vec<u8> {
+    let mut msg = Vec::with_capacity(24 + 33);
     msg.extend_from_slice(&height.to_le_bytes());
     msg.extend_from_slice(&slot.to_le_bytes());
+    msg.extend_from_slice(&view.to_le_bytes());
     msg.extend_from_slice(&block.to_bytes());
     msg
 }
@@ -20,6 +22,7 @@ pub struct Attestation {
     pub from: ValidatorId,
     pub height: Height,
     pub slot: u64,
+    pub view: View,
     pub block: Block,
     pub membership: Credential,
     pub sig: Signature,
@@ -30,15 +33,17 @@ impl Attestation {
         signer: &Validator,
         height: Height,
         slot: u64,
+        view: View,
         block: Block,
         membership: Credential,
     ) -> Self {
-        let msg = attestation_message(height, slot, &block);
+        let msg = attestation_message(height, slot, view, &block);
         let sig = signer.sign(&msg, ATTEST_CONTEXT);
         Attestation {
             from: signer.id,
             height,
             slot,
+            view,
             block,
             membership,
             sig,
@@ -46,7 +51,7 @@ impl Attestation {
     }
 
     pub fn signature_verifies(&self, attest_pk: &PublicKey) -> bool {
-        let msg = attestation_message(self.height, self.slot, &self.block);
+        let msg = attestation_message(self.height, self.slot, self.view, &self.block);
         verify(attest_pk, &msg, &self.sig, ATTEST_CONTEXT)
     }
 
@@ -89,7 +94,7 @@ mod tests {
         let beacon = Beacon::genesis();
         let block = Block::new(1, [5u8; 32], Parent::Genesis);
         let membership = sampler.reveal(0);
-        let att = Attestation::create(&signer, 1, 0, block, membership);
+        let att = Attestation::create(&signer, 1, 0, 0, block, membership);
 
         assert!(att.signature_verifies(signer.public_key()));
         assert!(att.is_entitled(&sampler.root(), &beacon, 100, 100, SATURATING_BUDGET));
@@ -101,7 +106,7 @@ mod tests {
         let other = Validator::new(2);
         let block = Block::new(1, [5u8; 32], Parent::Genesis);
         let membership = sampler.reveal(0);
-        let att = Attestation::create(&signer, 1, 0, block, membership);
+        let att = Attestation::create(&signer, 1, 0, 0, block, membership);
         assert!(!att.signature_verifies(other.public_key()));
     }
 
@@ -110,7 +115,7 @@ mod tests {
         let (signer, sampler) = parts(1, 100);
         let block = Block::new(1, [5u8; 32], Parent::Genesis);
         let membership = sampler.reveal(0);
-        let mut att = Attestation::create(&signer, 1, 0, block, membership);
+        let mut att = Attestation::create(&signer, 1, 0, 0, block, membership);
         att.block = Block::new(1, [6u8; 32], Parent::Genesis);
         assert!(!att.signature_verifies(signer.public_key()));
     }
@@ -122,7 +127,7 @@ mod tests {
         let beacon = Beacon::genesis();
         let block = Block::new(1, [5u8; 32], Parent::Genesis);
         let membership = impostor.reveal(0);
-        let att = Attestation::create(&signer, 1, 0, block, membership);
+        let att = Attestation::create(&signer, 1, 0, 0, block, membership);
         assert!(!att.is_entitled(&sampler.root(), &beacon, 100, 100, SATURATING_BUDGET));
     }
 }
