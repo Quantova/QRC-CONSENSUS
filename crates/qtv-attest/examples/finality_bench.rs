@@ -1,3 +1,6 @@
+// Copyright 2026 Quantova Inc
+// SPDX-License-Identifier: Apache-2.0 OR MIT
+
 //! Finality certificate cost against committee size.
 //!
 //! This measures the finality half of the throughput story, as the execution example parallel_bench

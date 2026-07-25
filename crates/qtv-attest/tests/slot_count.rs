@@ -1,3 +1,6 @@
+// Copyright 2026 Quantova Inc
+// SPDX-License-Identifier: Apache-2.0 OR MIT
+
 //! The one time slot count is a construction parameter, not a fixed ceiling. The
 //! default constructor sizes the tree small, but a caller can size it up through
 //! the with_slots path, and the whole draw and verify path holds at the larger

@@ -1,3 +1,6 @@
+// Copyright 2026 Quantova Inc
+// SPDX-License-Identifier: Apache-2.0 OR MIT
+
 //! A certificate built from an entitled supermajority verifies, and a
 //! certificate short of the supermajority does not. A light client reaches both
 //! verdicts from public inputs alone: the committee commitment and the beacon.

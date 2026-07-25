@@ -1,3 +1,6 @@
+// Copyright 2026 Quantova Inc
+// SPDX-License-Identifier: Apache-2.0 OR MIT
+
 //! Conformance vector: the consensus verification rejects a draw made by the old
 //! grindable mechanism.
 //!

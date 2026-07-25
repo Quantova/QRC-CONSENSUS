@@ -1,3 +1,6 @@
+// Copyright 2026 Quantova Inc
+// SPDX-License-Identifier: Apache-2.0 OR MIT
+
 //! Conformance vectors for the grinding budget of the one time key sortition.
 //! These make the budget of one draw per bonded account per slot a tested fact,
 //! not an assertion, and they are the first thing proven because the budget is the

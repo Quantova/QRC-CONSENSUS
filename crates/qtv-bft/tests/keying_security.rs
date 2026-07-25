@@ -1,3 +1,6 @@
+// Copyright 2026 Quantova Inc
+// SPDX-License-Identifier: Apache-2.0 OR MIT
+
 //! The ML-DSA-65 attestation signing key rests on a secret the validator alone
 //! holds, not on its public id. These vectors prove the key is a function of the
 //! secret and nothing public, that the id is not an input, and that a party holding

@@ -1,3 +1,6 @@
+// Copyright 2026 Quantova Inc
+// SPDX-License-Identifier: Apache-2.0 OR MIT
+
 use crate::block::Height;
 use crate::hash::score;
 use crate::validator::{ValidatorId, ValidatorSet};

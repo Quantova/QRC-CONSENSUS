@@ -1,3 +1,6 @@
+// Copyright 2026 Quantova Inc
+// SPDX-License-Identifier: Apache-2.0 OR MIT
+
 //! The acceptance bar for the one time key sortition: the grinding budget is
 //! exactly one draw per bonded account per slot. These vectors put an adversary in
 //! front of a fixed slot and beacon and let it search wide. The findings any node

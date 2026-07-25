@@ -1,3 +1,6 @@
+// Copyright 2026 Quantova Inc
+// SPDX-License-Identifier: Apache-2.0 OR MIT
+
 //! The core is deterministic: the same validator set, committee size, seed, and
 //! bounds always produce the same decisions, down to the signature bytes.
 

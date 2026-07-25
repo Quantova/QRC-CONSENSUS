@@ -1,3 +1,6 @@
+// Copyright 2026 Quantova Inc
+// SPDX-License-Identifier: Apache-2.0 OR MIT
+
 //! An offline validator is skipped and is never slashed, mirroring the
 //! OfflineNeverSlashed invariant and the MC_Liveness configuration where one of
 //! four validators stays offline and the height still finalizes.

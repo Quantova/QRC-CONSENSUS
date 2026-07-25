@@ -1,3 +1,6 @@
+// Copyright 2026 Quantova Inc
+// SPDX-License-Identifier: Apache-2.0 OR MIT
+
 use qtv_sim::fault::FaultConfig;
 use qtv_sim::round::canonical_block;
 use qtv_sim::sim::Simulation;

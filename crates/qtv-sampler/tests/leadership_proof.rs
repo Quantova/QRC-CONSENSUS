@@ -1,3 +1,6 @@
+// Copyright 2026 Quantova Inc
+// SPDX-License-Identifier: Apache-2.0 OR MIT
+
 //! Deterministic conformance for leadership neutrality, the proof made executable
 //! with no random draws. Where leadership.rs samples the real construction and
 //! confirms it tracks the proven value, this vector evaluates the theorem's own

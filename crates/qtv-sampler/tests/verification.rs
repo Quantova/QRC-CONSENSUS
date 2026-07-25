@@ -1,3 +1,6 @@
+// Copyright 2026 Quantova Inc
+// SPDX-License-Identifier: Apache-2.0 OR MIT
+
 //! A selected account produces a credential that verifies against its registered
 //! root, and an account that is not entitled cannot produce a passing credential.
 //! Verification uses only the registered root, the public stake, and the beacon,

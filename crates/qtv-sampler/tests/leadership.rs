@@ -1,3 +1,6 @@
+// Copyright 2026 Quantova Inc
+// SPDX-License-Identifier: Apache-2.0 OR MIT
+
 //! Conformance vector for stake neutral leadership. Committee membership is stake
 //! neutral under splitting because the threshold scales with stake. Leadership is
 //! the one soft spot the design names: more accounts give more chances at a

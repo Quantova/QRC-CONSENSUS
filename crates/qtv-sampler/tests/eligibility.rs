@@ -1,3 +1,6 @@
+// Copyright 2026 Quantova Inc
+// SPDX-License-Identifier: Apache-2.0 OR MIT
+
 //! Conformance vector for the minimum self stake floor. The floor is load bearing
 //! for the leadership neutrality proof, not only for the break even economics,
 //! because the proof is exact only while every account's stake fraction sits above

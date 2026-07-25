@@ -1,3 +1,6 @@
+// Copyright 2026 Quantova Inc
+// SPDX-License-Identifier: Apache-2.0 OR MIT
+
 //! Wire format vectors for the one time key sortition. The sortition output, the
 //! preimage derivation, the leaf and node hashes, and a committed root are pinned
 //! to fixed bytes, so the on chain format is locked and cannot drift.

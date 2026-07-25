@@ -1,3 +1,6 @@
+// Copyright 2026 Quantova Inc
+// SPDX-License-Identifier: Apache-2.0 OR MIT
+
 //! The one time sortition key rests on a secret the validator alone holds, not on
 //! its public id. These vectors are the acceptance bar for that: a validator's tree
 //! seed is a function of its secret and nothing public, the published root reveals

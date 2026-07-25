@@ -1,3 +1,6 @@
+// Copyright 2026 Quantova Inc
+// SPDX-License-Identifier: Apache-2.0 OR MIT
+
 //! The same beacon and roots give the same committee and the same leader. The
 //! outputs are a deterministic hash of the committed preimage and the beacon, so
 //! two nodes sampling the same slot agree exactly, and a different beacon changes

@@ -1,3 +1,6 @@
+// Copyright 2026 Quantova Inc
+// SPDX-License-Identifier: Apache-2.0 OR MIT
+
 //! Determinism. The same attestations aggregate into the same certificate, and
 //! the order the attestations arrive in does not change the result. Keys and
 //! signatures are deterministic, and aggregation stores signers in a canonical

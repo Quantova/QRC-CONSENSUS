@@ -1,3 +1,6 @@
+// Copyright 2026 Quantova Inc
+// SPDX-License-Identifier: Apache-2.0 OR MIT
+
 //! A prover holds zero votes and is never in a committee. Provers are excluded
 //! from the draw and never counted in the weights, so no beacon and no budget
 //! can place one in the committee.

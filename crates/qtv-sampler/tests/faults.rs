@@ -1,3 +1,6 @@
+// Copyright 2026 Quantova Inc
+// SPDX-License-Identifier: Apache-2.0 OR MIT
+
 //! Conformance vector for the attributable sortition faults. The one time
 //! construction makes an honest account's draw for a slot unique, so evidence any
 //! node checks stands from the account's registered root alone. The slash, a full

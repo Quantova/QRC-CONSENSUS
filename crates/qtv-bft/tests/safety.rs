@@ -1,3 +1,6 @@
+// Copyright 2026 Quantova Inc
+// SPDX-License-Identifier: Apache-2.0 OR MIT
+
 //! Safety: no two conflicting blocks are ever finalized at one height, the
 //! Agreement invariant of the formal model. This is checked over a set of runs
 //! that include an equivocating byzantine validator, mirroring the MC_Safety

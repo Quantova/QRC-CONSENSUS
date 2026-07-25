@@ -1,3 +1,6 @@
+// Copyright 2026 Quantova Inc
+// SPDX-License-Identifier: Apache-2.0 OR MIT
+
 //! Finality cost does not grow as validators join. The committee that finalises a block is a
 //! sortition sample bounded by the budget, not the whole validator set. The work a certificate
 //! carries is proportional to the committee, so it stays flat however large the set grows. This is

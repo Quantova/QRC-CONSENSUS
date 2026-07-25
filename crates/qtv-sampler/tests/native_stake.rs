@@ -1,3 +1,6 @@
+// Copyright 2026 Quantova Inc
+// SPDX-License-Identifier: Apache-2.0 OR MIT
+
 //! Only native stake counts. A bridged origin tagged holding is rejected as
 //! weight however large its amount, so it never lifts a validator into the
 //! committee and never lifts the total weight.

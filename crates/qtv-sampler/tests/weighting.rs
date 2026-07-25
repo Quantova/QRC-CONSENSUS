@@ -1,3 +1,6 @@
+// Copyright 2026 Quantova Inc
+// SPDX-License-Identifier: Apache-2.0 OR MIT
+
 //! Stake weighting holds in distribution over many draws. The verifiable random
 //! function supplies a uniform output; the sampler weights it by stake through
 //! the selection threshold. Driving many uniform outputs through the real
