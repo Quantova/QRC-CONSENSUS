@@ -1,3 +1,6 @@
+// Copyright 2026 Quantova Inc
+// SPDX-License-Identifier: Apache-2.0 OR MIT
+
 //! The committee size respects the budget bound. The budget is the target
 
 use qtv_sampler::beacon::Beacon;

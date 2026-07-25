@@ -1,3 +1,6 @@
+// Copyright 2026 Quantova Inc
+// SPDX-License-Identifier: Apache-2.0 OR MIT
+
 pub fn mix64(mut x: u64) -> u64 {
     x = x.wrapping_add(11400714819323198485);
     x = (x ^ (x >> 30)).wrapping_mul(13787848793156543929);

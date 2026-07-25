@@ -1,3 +1,6 @@
+// Copyright 2026 Quantova Inc
+// SPDX-License-Identifier: Apache-2.0 OR MIT
+
 //! An offline validator is skipped and is never slashed, mirroring the
 
 use qtv_bft::machine::Machine;

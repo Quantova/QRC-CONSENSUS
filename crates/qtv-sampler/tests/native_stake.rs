@@ -1,3 +1,6 @@
+// Copyright 2026 Quantova Inc
+// SPDX-License-Identifier: Apache-2.0 OR MIT
+
 //! Only native stake counts. A bridged origin tagged holding is rejected as
 
 use qtv_sampler::beacon::Beacon;

@@ -1,3 +1,6 @@
+// Copyright 2026 Quantova Inc
+// SPDX-License-Identifier: Apache-2.0 OR MIT
+
 //! The same beacon and roots give the same committee and the same leader. The
 
 use qtv_sampler::beacon::Beacon;

@@ -1,3 +1,6 @@
+// Copyright 2026 Quantova Inc
+// SPDX-License-Identifier: Apache-2.0 OR MIT
+
 //! End to end acceptance for real validator key material behind the draw and the
 
 use qtv_attest::aggregate::aggregate;

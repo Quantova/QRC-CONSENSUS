@@ -1,3 +1,6 @@
+// Copyright 2026 Quantova Inc
+// SPDX-License-Identifier: Apache-2.0 OR MIT
+
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct OriginTag {
     pub chain: u32,

@@ -1,3 +1,6 @@
+// Copyright 2026 Quantova Inc
+// SPDX-License-Identifier: Apache-2.0 OR MIT
+
 //! Conformance vector for the minimum self stake floor. The floor is load bearing
 
 use qtv_sampler::beacon::Beacon;

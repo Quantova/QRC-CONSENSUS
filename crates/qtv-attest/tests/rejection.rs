@@ -1,3 +1,6 @@
+// Copyright 2026 Quantova Inc
+// SPDX-License-Identifier: Apache-2.0 OR MIT
+
 //! A forged or tampered attestation carried in a certificate is rejected. A
 
 use qtv_attest::verify::RejectReason;

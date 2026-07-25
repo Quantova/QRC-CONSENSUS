@@ -1,3 +1,6 @@
+// Copyright 2026 Quantova Inc
+// SPDX-License-Identifier: Apache-2.0 OR MIT
+
 //! The one time sortition key rests on a secret the validator alone holds, not on
 
 use qtv_sampler::beacon::Beacon;

@@ -1,3 +1,6 @@
+// Copyright 2026 Quantova Inc
+// SPDX-License-Identifier: Apache-2.0 OR MIT
+
 // Per draw and per verify cost of the one time key sortition. Run with:
 //     cargo run -p qtv-sampler --example draw_cost --release
 

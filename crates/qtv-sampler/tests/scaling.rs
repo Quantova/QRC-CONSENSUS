@@ -1,3 +1,6 @@
+// Copyright 2026 Quantova Inc
+// SPDX-License-Identifier: Apache-2.0 OR MIT
+
 //! Finality cost does not grow as validators join. The committee that finalises a block is a
 
 use qtv_sampler::beacon::Beacon;

@@ -1,3 +1,6 @@
+// Copyright 2026 Quantova Inc
+// SPDX-License-Identifier: Apache-2.0 OR MIT
+
 //! Attestations use real module lattice signatures. A genuine attestation
 
 use qtv_bft::attest::Attestation;

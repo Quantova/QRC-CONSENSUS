@@ -1,3 +1,6 @@
+// Copyright 2026 Quantova Inc
+// SPDX-License-Identifier: Apache-2.0 OR MIT
+
 pub const SLOT_MS: u64 = 150;
 
 pub const VALIDATOR_RESOURCE_BUDGET: u64 = 1;

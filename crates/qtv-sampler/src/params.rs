@@ -1,3 +1,6 @@
+// Copyright 2026 Quantova Inc
+// SPDX-License-Identifier: Apache-2.0 OR MIT
+
 pub const COMMITTEE_BUDGET: u64 = 500;
 
 pub const MIN_SELF_STAKE: u64 = 2_000;

@@ -1,3 +1,6 @@
+// Copyright 2026 Quantova Inc
+// SPDX-License-Identifier: Apache-2.0 OR MIT
+
 //! The one time slot count is a construction parameter, not a fixed ceiling. The
 
 use qtv_attest::aggregate::aggregate;

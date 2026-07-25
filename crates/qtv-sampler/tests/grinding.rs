@@ -1,3 +1,6 @@
+// Copyright 2026 Quantova Inc
+// SPDX-License-Identifier: Apache-2.0 OR MIT
+
 //! The acceptance bar for the one time key sortition: the grinding budget is
 
 use qtv_sampler::beacon::Beacon;
