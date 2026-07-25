@@ -555,11 +555,11 @@ mod tests {
         slot: u64,
     ) -> (Vec<(PublicKey, u64, Signature)>, Vec<u8>, &'static [u8]) {
         let beacon = Beacon::genesis();
-        let subject = crate::attestation::attestation_message(height, slot, &block);
+        let subject = crate::attestation::attestation_message(height, slot, 0, &block);
         let members: Vec<(PublicKey, u64, Signature)> = (1..=n as u64)
             .map(|id| {
                 let a = Attester::new(id, 100);
-                let att = a.attest(height, slot, block, &beacon);
+                let att = a.attest(height, slot, 0, block, &beacon);
                 (*a.attest_public_key(), a.weight(), att.sig)
             })
             .collect();
@@ -605,7 +605,7 @@ mod tests {
         assert!(!verify_attested(&swapped_key, full, n, k, &subject, context));
 
         let other = Block::new(height, [10u8; 32], Parent::Genesis);
-        let wrong = crate::attestation::attestation_message(height, slot, &other);
+        let wrong = crate::attestation::attestation_message(height, slot, 0, &other);
         assert!(!verify_attested(&cert, full, n, k, &wrong, context));
     }
 }
