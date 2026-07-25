@@ -1,3 +1,6 @@
+// Copyright 2026 Quantova Inc
+// SPDX-License-Identifier: Apache-2.0 OR MIT
+
 use crate::committee::supermajority;
 use crate::round::{BlockId, Vote};
 use crate::validator::ValidatorId;

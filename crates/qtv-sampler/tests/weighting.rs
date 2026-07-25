@@ -1,3 +1,6 @@
+// Copyright 2026 Quantova Inc
+// SPDX-License-Identifier: Apache-2.0 OR MIT
+
 //! Stake weighting holds in distribution over many draws. The verifiable random
 
 use qtv_sampler::sortition::is_selected;

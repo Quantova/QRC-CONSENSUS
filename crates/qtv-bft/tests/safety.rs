@@ -1,3 +1,6 @@
+// Copyright 2026 Quantova Inc
+// SPDX-License-Identifier: Apache-2.0 OR MIT
+
 //! Safety: no two conflicting blocks are ever finalized at one height, the
 
 use qtv_bft::block::{Block, Parent};

@@ -1,3 +1,6 @@
+// Copyright 2026 Quantova Inc
+// SPDX-License-Identifier: Apache-2.0 OR MIT
+
 //! Deterministic conformance for leadership neutrality, the proof made executable
 
 use qtv_sampler::sortition::leader_score;

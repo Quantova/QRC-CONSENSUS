@@ -1,3 +1,6 @@
+// Copyright 2026 Quantova Inc
+// SPDX-License-Identifier: Apache-2.0 OR MIT
+
 //! Conformance vectors for the grinding budget of the one time key sortition.
 
 use qtv_sampler::beacon::Beacon;

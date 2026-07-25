@@ -1,3 +1,6 @@
+// Copyright 2026 Quantova Inc
+// SPDX-License-Identifier: Apache-2.0 OR MIT
+
 //! Committee entitlement is the gate. A validator that is not on the committee
 
 use qtv_attest::aggregate::aggregate;

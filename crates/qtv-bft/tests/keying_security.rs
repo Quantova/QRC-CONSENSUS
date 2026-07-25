@@ -1,3 +1,6 @@
+// Copyright 2026 Quantova Inc
+// SPDX-License-Identifier: Apache-2.0 OR MIT
+
 //! The ML-DSA-65 attestation signing key rests on a secret the validator alone
 
 use qtv_bft::attest::Attestation;

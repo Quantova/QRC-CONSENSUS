@@ -1,3 +1,6 @@
+// Copyright 2026 Quantova Inc
+// SPDX-License-Identifier: Apache-2.0 OR MIT
+
 use crate::certificate::{aggregate, Certificate};
 use crate::committee::{rotation_order, sample_committee};
 use crate::hash::combine;

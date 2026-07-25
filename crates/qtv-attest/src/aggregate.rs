@@ -1,3 +1,6 @@
+// Copyright 2026 Quantova Inc
+// SPDX-License-Identifier: Apache-2.0 OR MIT
+
 use qtv_bft::block::{Block, Height};
 
 use qtv_sampler::beacon::Beacon;

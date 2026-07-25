@@ -1,3 +1,6 @@
+// Copyright 2026 Quantova Inc
+// SPDX-License-Identifier: Apache-2.0 OR MIT
+
 pub type ValidatorId = u64;
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
