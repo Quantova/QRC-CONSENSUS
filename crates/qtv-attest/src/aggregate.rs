@@ -10,6 +10,7 @@ use crate::certificate::{Certificate, Envelope};
 use crate::committee::CommitteeCommitment;
 
 pub fn aggregate(
+    chain_id: u64,
     height: Height,
     slot: u64,
     block: Block,
@@ -28,7 +29,7 @@ pub fn aggregate(
             Some(m) => m,
             None => continue,
         };
-        if !att.signature_verifies(&member.attest_pk) {
+        if !att.signature_verifies(chain_id, &member.attest_pk) {
             continue;
         }
         if !att.is_entitled(
@@ -77,11 +78,11 @@ mod tests {
         let block = Block::new(1, [9u8; 32], Parent::Genesis);
         let commitment = committee(&[&a, &b, &c, &d]);
         let atts = vec![
-            a.attest(1, 0, 0, block, &beacon),
-            b.attest(1, 0, 0, block, &beacon),
-            c.attest(1, 0, 0, block, &beacon),
+            a.attest(1, 1, 0, 0, block, &beacon),
+            b.attest(1, 1, 0, 0, block, &beacon),
+            c.attest(1, 1, 0, 0, block, &beacon),
         ];
-        let cert = aggregate(1, 0, block, &commitment, &beacon, &atts, TAU).expect("quorum");
+        let cert = aggregate(1, 1, 0, block, &commitment, &beacon, &atts, TAU).expect("quorum");
         assert_eq!(cert.attesters(), vec![1, 2, 3]);
     }
 
@@ -95,10 +96,10 @@ mod tests {
         let block = Block::new(1, [9u8; 32], Parent::Genesis);
         let commitment = committee(&[&a, &b, &c, &d]);
         let atts = vec![
-            a.attest(1, 0, 0, block, &beacon),
-            b.attest(1, 0, 0, block, &beacon),
+            a.attest(1, 1, 0, 0, block, &beacon),
+            b.attest(1, 1, 0, 0, block, &beacon),
         ];
-        assert!(aggregate(1, 0, block, &commitment, &beacon, &atts, TAU).is_none());
+        assert!(aggregate(1, 1, 0, block, &commitment, &beacon, &atts, TAU).is_none());
     }
 
     #[test]
@@ -111,10 +112,10 @@ mod tests {
         let block = Block::new(1, [9u8; 32], Parent::Genesis);
         let commitment = committee(&[&a, &b, &c, &d]);
         let atts = vec![
-            a.attest(1, 0, 0, block, &beacon),
-            a.attest(1, 0, 0, block, &beacon),
-            b.attest(1, 0, 0, block, &beacon),
+            a.attest(1, 1, 0, 0, block, &beacon),
+            a.attest(1, 1, 0, 0, block, &beacon),
+            b.attest(1, 1, 0, 0, block, &beacon),
         ];
-        assert!(aggregate(1, 0, block, &commitment, &beacon, &atts, TAU).is_none());
+        assert!(aggregate(1, 1, 0, block, &commitment, &beacon, &atts, TAU).is_none());
     }
 }

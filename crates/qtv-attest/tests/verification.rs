@@ -24,13 +24,13 @@ fn an_entitled_supermajority_certificate_verifies() {
     // Three of four entitled members attest, a supermajority.
     let atts: Vec<_> = members[..3]
         .iter()
-        .map(|a| a.attest(1, 0, 0, block, &beacon))
+        .map(|a| a.attest(1, 1, 0, 0, block, &beacon))
         .collect();
 
-    let cert = aggregate(1, 0, block, &commitment, &beacon, &atts, 3).expect("quorum");
+    let cert = aggregate(1, 1, 0, block, &commitment, &beacon, &atts, 3).expect("quorum");
     assert_eq!(cert.attesters(), vec![1, 2, 3]);
-    assert!(cert.verify(&commitment, &beacon, 3).is_verified());
-    assert_eq!(cert.verify(&commitment, &beacon, 3), Verdict::Verified);
+    assert!(cert.verify(1, &commitment, &beacon, 3).is_verified());
+    assert_eq!(cert.verify(1, &commitment, &beacon, 3), Verdict::Verified);
 }
 
 #[test]
@@ -44,18 +44,18 @@ fn a_certificate_missing_the_supermajority_does_not_verify() {
     // Only two of four attest, one short of the quorum of three.
     let atts: Vec<_> = members[..2]
         .iter()
-        .map(|a| a.attest(1, 0, 0, block, &beacon))
+        .map(|a| a.attest(1, 1, 0, 0, block, &beacon))
         .collect();
 
     // Aggregation refuses to form a certificate.
-    assert!(aggregate(1, 0, block, &commitment, &beacon, &atts, 3).is_none());
+    assert!(aggregate(1, 1, 0, block, &commitment, &beacon, &atts, 3).is_none());
 
     // A certificate hand built from the same two attestations is rejected as
     // not a quorum, so it never finalizes the block.
     let envelope = Envelope::new(1, 0, block, &commitment);
     let cert = Certificate::new(envelope, atts);
     assert_eq!(
-        cert.verify(&commitment, &beacon, 3),
+        cert.verify(1, &commitment, &beacon, 3),
         Verdict::Rejected(RejectReason::NotAQuorum)
     );
 }

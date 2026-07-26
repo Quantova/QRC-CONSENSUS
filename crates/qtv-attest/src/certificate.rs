@@ -84,8 +84,8 @@ mod tests {
         let commitment = CommitteeCommitment::from_attesters(0, &[&a, &b]);
         let envelope = Envelope::new(1, 0, block, &commitment);
         let atts = vec![
-            a.attest(1, 0, 0, block, &beacon),
-            b.attest(1, 0, 0, block, &beacon),
+            a.attest(1, 1, 0, 0, block, &beacon),
+            b.attest(1, 1, 0, 0, block, &beacon),
         ];
         let cert = Certificate::new(envelope, atts);
         assert_eq!(cert.attesters(), vec![1, 2]);

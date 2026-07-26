@@ -27,14 +27,14 @@ fn a_certificate_verifies_at_a_slot_beyond_the_default() {
 
     let atts: Vec<_> = members
         .iter()
-        .map(|a| a.attest(1, slot, 0, block, &beacon))
+        .map(|a| a.attest(1, 1, slot, 0, block, &beacon))
         .collect();
 
     // The authentication path is the log of the padded leaf count, twelve here, so
     // the reveal at a slot past the default authenticates through the deeper tree.
     assert_eq!(atts[0].membership.path.siblings.len(), 12);
 
-    let cert = aggregate(1, slot, block, &commitment, &beacon, &atts, 3).expect("quorum forms");
-    assert!(cert.verify(&commitment, &beacon, 3).is_verified());
+    let cert = aggregate(1, 1, slot, block, &commitment, &beacon, &atts, 3).expect("quorum forms");
+    assert!(cert.verify(1, &commitment, &beacon, 3).is_verified());
     assert_eq!(cert.attesters(), vec![1, 2, 3, 4]);
 }

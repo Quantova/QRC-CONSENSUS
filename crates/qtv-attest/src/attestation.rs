@@ -11,8 +11,19 @@ use qtv_sampler::sortition::{verify_selection, Credential};
 
 use crate::params::{ATTEST_CONTEXT, DOMAIN_COMMITTEE};
 
-pub fn attestation_message(height: Height, slot: u64, view: View, block: &Block) -> Vec<u8> {
-    let mut msg = Vec::with_capacity(24 + 33);
+pub fn attestation_message(
+    chain_id: u64,
+    height: Height,
+    slot: u64,
+    view: View,
+    block: &Block,
+) -> Vec<u8> {
+    // The chain id leads the preimage so an attestation, and therefore the certificate it joins, is
+    // bound to the chain it was produced on. A verifier rebuilds the message with its own chain id, so
+    // a certificate valid on one chain does not verify on another even when the validator keys are
+    // shared across instances.
+    let mut msg = Vec::with_capacity(8 + 24 + 33);
+    msg.extend_from_slice(&chain_id.to_le_bytes());
     msg.extend_from_slice(&height.to_le_bytes());
     msg.extend_from_slice(&slot.to_le_bytes());
     msg.extend_from_slice(&view.to_le_bytes());
@@ -34,13 +45,14 @@ pub struct Attestation {
 impl Attestation {
     pub fn create(
         signer: &Validator,
+        chain_id: u64,
         height: Height,
         slot: u64,
         view: View,
         block: Block,
         membership: Credential,
     ) -> Self {
-        let msg = attestation_message(height, slot, view, &block);
+        let msg = attestation_message(chain_id, height, slot, view, &block);
         let sig = signer.sign(&msg, ATTEST_CONTEXT);
         Attestation {
             from: signer.id,
@@ -53,8 +65,8 @@ impl Attestation {
         }
     }
 
-    pub fn signature_verifies(&self, attest_pk: &PublicKey) -> bool {
-        let msg = attestation_message(self.height, self.slot, self.view, &self.block);
+    pub fn signature_verifies(&self, chain_id: u64, attest_pk: &PublicKey) -> bool {
+        let msg = attestation_message(chain_id, self.height, self.slot, self.view, &self.block);
         verify(attest_pk, &msg, &self.sig, ATTEST_CONTEXT)
     }
 
@@ -97,9 +109,9 @@ mod tests {
         let beacon = Beacon::genesis();
         let block = Block::new(1, [5u8; 32], Parent::Genesis);
         let membership = sampler.reveal(0);
-        let att = Attestation::create(&signer, 1, 0, 0, block, membership);
+        let att = Attestation::create(&signer, 1, 1, 0, 0, block, membership);
 
-        assert!(att.signature_verifies(signer.public_key()));
+        assert!(att.signature_verifies(1, signer.public_key()));
         assert!(att.is_entitled(&sampler.root(), &beacon, 100, 100, SATURATING_BUDGET));
     }
 
@@ -109,8 +121,8 @@ mod tests {
         let other = Validator::new(2);
         let block = Block::new(1, [5u8; 32], Parent::Genesis);
         let membership = sampler.reveal(0);
-        let att = Attestation::create(&signer, 1, 0, 0, block, membership);
-        assert!(!att.signature_verifies(other.public_key()));
+        let att = Attestation::create(&signer, 1, 1, 0, 0, block, membership);
+        assert!(!att.signature_verifies(1, other.public_key()));
     }
 
     #[test]
@@ -118,9 +130,9 @@ mod tests {
         let (signer, sampler) = parts(1, 100);
         let block = Block::new(1, [5u8; 32], Parent::Genesis);
         let membership = sampler.reveal(0);
-        let mut att = Attestation::create(&signer, 1, 0, 0, block, membership);
+        let mut att = Attestation::create(&signer, 1, 1, 0, 0, block, membership);
         att.block = Block::new(1, [6u8; 32], Parent::Genesis);
-        assert!(!att.signature_verifies(signer.public_key()));
+        assert!(!att.signature_verifies(1, signer.public_key()));
     }
 
     #[test]
@@ -130,7 +142,27 @@ mod tests {
         let beacon = Beacon::genesis();
         let block = Block::new(1, [5u8; 32], Parent::Genesis);
         let membership = impostor.reveal(0);
-        let att = Attestation::create(&signer, 1, 0, 0, block, membership);
+        let att = Attestation::create(&signer, 1, 1, 0, 0, block, membership);
         assert!(!att.is_entitled(&sampler.root(), &beacon, 100, 100, SATURATING_BUDGET));
+    }
+
+    #[test]
+    fn an_attestation_is_bound_to_its_chain_and_will_not_verify_under_another() {
+        // The chain id is folded into the signed preimage, so an attestation, and the certificate it
+        // joins, is valid only on its own chain, even when validator keys are shared across instances.
+        let (signer, sampler) = parts(1, 100);
+        let block = Block::new(1, [5u8; 32], Parent::Genesis);
+        let membership = sampler.reveal(0);
+        let chain_a = 7u64;
+        let chain_b = 9u64;
+        let att = Attestation::create(&signer, chain_a, 1, 0, 0, block, membership);
+        assert!(
+            att.signature_verifies(chain_a, signer.public_key()),
+            "the attestation verifies on its own chain"
+        );
+        assert!(
+            !att.signature_verifies(chain_b, signer.public_key()),
+            "the same attestation does not verify on another chain"
+        );
     }
 }
