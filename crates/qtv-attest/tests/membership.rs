@@ -23,19 +23,19 @@ fn an_off_committee_signer_is_rejected_even_with_a_valid_signature() {
 
     // An outsider with a genuine key that is not listed in the commitment.
     let outsider = Attester::new(99, 100);
-    let outsider_att = outsider.attest(1, 0, 0, block, &beacon);
+    let outsider_att = outsider.attest(1, 1, 0, 0, block, &beacon);
     assert!(
-        outsider_att.signature_verifies(outsider.attest_public_key()),
+        outsider_att.signature_verifies(1, outsider.attest_public_key()),
         "the outsider signature is valid on its own"
     );
 
     // Aggregation admits the three insiders and silently drops the outsider.
     let mut atts: Vec<_> = members[..3]
         .iter()
-        .map(|a| a.attest(1, 0, 0, block, &beacon))
+        .map(|a| a.attest(1, 1, 0, 0, block, &beacon))
         .collect();
     atts.push(outsider_att.clone());
-    let cert = aggregate(1, 0, block, &commitment, &beacon, &atts, 3).expect("quorum");
+    let cert = aggregate(1, 1, 0, block, &commitment, &beacon, &atts, 3).expect("quorum");
     assert_eq!(cert.attesters(), vec![1, 2, 3]);
 
     // A certificate that carries the outsider is rejected outright, valid
@@ -44,13 +44,13 @@ fn an_off_committee_signer_is_rejected_even_with_a_valid_signature() {
     let tainted = Certificate::new(
         envelope,
         vec![
-            members[0].attest(1, 0, 0, block, &beacon),
-            members[1].attest(1, 0, 0, block, &beacon),
+            members[0].attest(1, 1, 0, 0, block, &beacon),
+            members[1].attest(1, 1, 0, 0, block, &beacon),
             outsider_att,
         ],
     );
     assert_eq!(
-        tainted.verify(&commitment, &beacon, 3),
+        tainted.verify(1, &commitment, &beacon, 3),
         Verdict::Rejected(RejectReason::NotOnCommittee)
     );
 }

@@ -24,7 +24,7 @@ fn quorum_attestations(
 ) -> Vec<qtv_attest::Attestation> {
     members[..3]
         .iter()
-        .map(|a| a.attest(1, 0, 0, block, beacon))
+        .map(|a| a.attest(1, 1, 0, 0, block, beacon))
         .collect()
 }
 
@@ -35,7 +35,7 @@ fn a_forged_signature_is_rejected() {
     atts[0].sig[0] ^= 255;
     let cert = Certificate::new(Envelope::new(1, 0, block, &commitment), atts);
     assert_eq!(
-        cert.verify(&commitment, &beacon, 3),
+        cert.verify(1, &commitment, &beacon, 3),
         Verdict::Rejected(RejectReason::BadSignature)
     );
 }
@@ -48,7 +48,7 @@ fn a_swapped_block_is_rejected_as_wrong_subject() {
     atts[0].block = Block::new(1, [10u8; 32], Parent::Genesis);
     let cert = Certificate::new(Envelope::new(1, 0, block, &commitment), atts);
     assert_eq!(
-        cert.verify(&commitment, &beacon, 3),
+        cert.verify(1, &commitment, &beacon, 3),
         Verdict::Rejected(RejectReason::WrongSubject)
     );
 }
@@ -62,7 +62,7 @@ fn a_mangled_membership_credential_is_rejected_as_not_entitled() {
     atts[0].membership.preimage[0] ^= 1;
     let cert = Certificate::new(Envelope::new(1, 0, block, &commitment), atts);
     assert_eq!(
-        cert.verify(&commitment, &beacon, 3),
+        cert.verify(1, &commitment, &beacon, 3),
         Verdict::Rejected(RejectReason::NotEntitled)
     );
 }
