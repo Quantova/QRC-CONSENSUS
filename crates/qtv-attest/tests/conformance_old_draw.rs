@@ -63,10 +63,10 @@ fn the_consensus_verification_rejects_an_old_mechanism_membership_draw() {
     // Positive control: a quorum carrying genuine one time credentials verifies.
     let mut atts: Vec<_> = members[..3]
         .iter()
-        .map(|a| a.attest(1, 0, 0, block, &beacon))
+        .map(|a| a.attest(1, 1, 0, 0, block, &beacon))
         .collect();
     let good = Certificate::new(Envelope::new(1, 0, block, &commitment), atts.clone());
-    assert_eq!(good.verify(&commitment, &beacon, 3), Verdict::Verified);
+    assert_eq!(good.verify(1, &commitment, &beacon, 3), Verdict::Verified);
 
     // Replace one member's one time credential with an old style draw that has no
     // Merkle path to its registered root. The module lattice signature still
@@ -75,7 +75,7 @@ fn the_consensus_verification_rejects_an_old_mechanism_membership_draw() {
     atts[0].membership = old_style_draw(0);
     let bad = Certificate::new(Envelope::new(1, 0, block, &commitment), atts);
     assert_eq!(
-        bad.verify(&commitment, &beacon, 3),
+        bad.verify(1, &commitment, &beacon, 3),
         Verdict::Rejected(RejectReason::NotEntitled)
     );
 }
@@ -90,16 +90,16 @@ fn aggregation_drops_an_old_mechanism_membership_draw() {
     // Three genuine one time draws are an entitled supermajority and aggregate.
     let genuine: Vec<_> = members[..3]
         .iter()
-        .map(|a| a.attest(1, 0, 0, block, &beacon))
+        .map(|a| a.attest(1, 1, 0, 0, block, &beacon))
         .collect();
-    assert!(aggregate(1, 0, block, &commitment, &beacon, &genuine, 3).is_some());
+    assert!(aggregate(1, 1, 0, block, &commitment, &beacon, &genuine, 3).is_some());
 
     // With one of the three carrying an old style draw, only two entitled signers
     // remain, below the supermajority of three, so no certificate forms: the old
     // draw is dropped rather than counted toward finality.
     let mut atts = genuine;
     atts[0].membership = old_style_draw(0);
-    assert!(aggregate(1, 0, block, &commitment, &beacon, &atts, 3).is_none());
+    assert!(aggregate(1, 1, 0, block, &commitment, &beacon, &atts, 3).is_none());
 }
 
 #[test]

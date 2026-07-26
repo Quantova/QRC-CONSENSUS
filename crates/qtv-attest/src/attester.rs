@@ -113,6 +113,7 @@ impl Attester {
 
     pub fn attest(
         &self,
+        chain_id: u64,
         height: Height,
         slot: u64,
         view: View,
@@ -121,7 +122,7 @@ impl Attester {
     ) -> Attestation {
         let _ = beacon;
         let membership = self.sampler.reveal(slot);
-        Attestation::create(&self.signer, height, slot, view, block, membership)
+        Attestation::create(&self.signer, chain_id, height, slot, view, block, membership)
     }
 }
 
@@ -174,9 +175,9 @@ mod tests {
         let a = Attester::new(1, 100);
         let beacon = Beacon::genesis();
         let block = Block::new(1, [7u8; 32], Parent::Genesis);
-        let att = a.attest(1, 0, 0, block, &beacon);
+        let att = a.attest(1, 1, 0, 0, block, &beacon);
         assert_eq!(att.from, a.id());
-        assert!(att.signature_verifies(a.attest_public_key()));
+        assert!(att.signature_verifies(1, a.attest_public_key()));
         assert!(att.is_entitled(&a.root(), &beacon, a.weight(), a.weight(), 100));
     }
 
@@ -201,9 +202,9 @@ mod tests {
         let beacon = Beacon::genesis();
         let block = Block::new(1, [7u8; 32], Parent::Genesis);
         let slot = 4000;
-        let att = a.attest(1, slot, 0, block, &beacon);
+        let att = a.attest(1, 1, slot, 0, block, &beacon);
         assert_eq!(att.membership.path.siblings.len(), 12);
-        assert!(att.signature_verifies(a.attest_public_key()));
+        assert!(att.signature_verifies(1, a.attest_public_key()));
         assert!(att.is_entitled(&a.root(), &beacon, a.weight(), a.weight(), 100));
     }
 
@@ -236,9 +237,9 @@ mod tests {
         let p = Attester::prover(9);
         let beacon = Beacon::genesis();
         let block = Block::new(1, [7u8; 32], Parent::Genesis);
-        let att = p.attest(1, 0, 0, block, &beacon);
+        let att = p.attest(1, 1, 0, 0, block, &beacon);
         assert_eq!(p.weight(), 0);
-        assert!(att.signature_verifies(p.attest_public_key()));
+        assert!(att.signature_verifies(1, p.attest_public_key()));
         assert!(!att.is_entitled(&p.root(), &beacon, 0, 100, 100));
     }
 }

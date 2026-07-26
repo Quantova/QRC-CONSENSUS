@@ -31,12 +31,19 @@ impl Verdict {
 }
 
 impl Certificate {
-    pub fn verify(&self, commitment: &CommitteeCommitment, beacon: &Beacon, tau: u64) -> Verdict {
-        verify_body(&self.envelope, &self.attestations, commitment, beacon, tau)
+    pub fn verify(
+        &self,
+        chain_id: u64,
+        commitment: &CommitteeCommitment,
+        beacon: &Beacon,
+        tau: u64,
+    ) -> Verdict {
+        verify_body(chain_id, &self.envelope, &self.attestations, commitment, beacon, tau)
     }
 }
 
 fn verify_body(
+    chain_id: u64,
     envelope: &Envelope,
     attestations: &[Attestation],
     commitment: &CommitteeCommitment,
@@ -56,7 +63,7 @@ fn verify_body(
             Some(m) => m,
             None => return Verdict::Rejected(RejectReason::NotOnCommittee),
         };
-        if !att.signature_verifies(&member.attest_pk) {
+        if !att.signature_verifies(chain_id, &member.attest_pk) {
             return Verdict::Rejected(RejectReason::BadSignature);
         }
         if !att.is_entitled(

@@ -49,16 +49,16 @@ fn measure(committee_size: usize) {
 
     let attestations: Vec<Attestation> = attesters
         .iter()
-        .map(|a| a.attest(1, 0, 0, block, &beacon))
+        .map(|a| a.attest(1, 1, 0, 0, block, &beacon))
         .collect();
 
     let t0 = Instant::now();
-    let cert = aggregate(1, 0, block, &commitment, &beacon, &attestations, tau)
+    let cert = aggregate(1, 1, 0, block, &commitment, &beacon, &attestations, tau)
         .expect("an entitled committee aggregates");
     let aggregate_ms = t0.elapsed().as_secs_f64() * 1e3;
 
     let t1 = Instant::now();
-    let verdict = cert.verify(&commitment, &beacon, tau);
+    let verdict = cert.verify(1, &commitment, &beacon, tau);
     let verify_ms = t1.elapsed().as_secs_f64() * 1e3;
     assert!(verdict.is_verified(), "the certificate must verify before a number is trusted");
 
