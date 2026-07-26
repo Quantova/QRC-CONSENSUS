@@ -29,6 +29,7 @@ impl Beacon {
         &self.seed
     }
 
+    /// Chain the beacon from a certificate digest. This is the earlier digest chained
     pub fn advance(&self, cert_digest: &[u8; SEED_BYTES], height: u64) -> Beacon {
         let mut input = [0u8; SEED_BYTES + SEED_BYTES + 8];
         input[..SEED_BYTES].copy_from_slice(&self.seed);
