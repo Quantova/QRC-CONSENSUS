@@ -1,8 +1,6 @@
 # QRC-CONSENSUS
 
-Quantova is a sovereign post quantum Layer 1, built from scratch, sharing no code, no wire format, and no trust assumption with any other chain. It is post quantum end to end, not a classical chain with a post quantum signature bolted on. Every layer is its own, and every layer stands on NIST standardized schemes with no classical escape hatch anywhere.
-
-This repository is QORUS, Quantova's consensus. It is a committee based byzantine fault tolerant protocol that finalizes one block per height with a supermajority of post quantum attestations. Its committees are drawn by a grinding resistant, stake weighted, one time sortition, and its finality certificate is a set of ML-DSA signatures a light client can check from public inputs alone. The one cryptographic dependency is Q-Crypto.
+QRC-CONSENSUS is QORUS, the consensus of Quantova, a sovereign post quantum Layer 1 built from scratch with no classical escape hatch anywhere. It is a committee based byzantine fault tolerant protocol that finalizes one block per height with a supermajority of post quantum attestations. Its committees are drawn by a grinding resistant, stake weighted, one time sortition, and its finality certificate is a set of ML-DSA signatures a light client can check from public inputs alone. The one cryptographic dependency is Q-Crypto.
 
 ## What it is
 
