@@ -47,7 +47,10 @@ impl CommitteeCommitment {
     /// Build the committee commitment from the public member keys, each a validator's
     pub fn from_member_keys(slot: u64, mut members: Vec<MemberKey>, budget: u64) -> Self {
         members.sort_by_key(|m| m.id);
-        let total_weight = members.iter().map(|m| m.weight).sum();
+        let total_weight = members
+            .iter()
+            .map(|m| m.weight)
+            .fold(0u64, u64::saturating_add);
         CommitteeCommitment {
             slot,
             total_weight,

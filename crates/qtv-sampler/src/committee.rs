@@ -127,7 +127,7 @@ impl CommitteeView {
             .iter()
             .map(|r| r.weight)
             .filter(|&w| w >= self.floor)
-            .sum()
+            .fold(0u64, u64::saturating_add)
     }
 
     pub fn weights(&self) -> Vec<u64> {

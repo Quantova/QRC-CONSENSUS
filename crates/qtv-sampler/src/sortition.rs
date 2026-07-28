@@ -76,7 +76,7 @@ pub fn selection_probability(weight: u64, total: u64, budget: u64) -> f64 {
 }
 
 pub fn expected_committee_size(weights: &[u64], budget: u64) -> f64 {
-    let total: u64 = weights.iter().sum();
+    let total: u64 = weights.iter().copied().fold(0u64, u64::saturating_add);
     weights
         .iter()
         .map(|&w| selection_probability(w, total, budget))
