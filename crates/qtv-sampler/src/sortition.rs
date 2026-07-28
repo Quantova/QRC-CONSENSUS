@@ -84,7 +84,17 @@ pub fn expected_committee_size(weights: &[u64], budget: u64) -> f64 {
 }
 
 pub fn expected_committee(weights: &[u64], budget: u64) -> u64 {
-    expected_committee_size(weights, budget).round() as u64
+    // Integer math so the finality threshold is identical on every node, never f64-dependent.
+    let total: u128 = weights.iter().map(|&w| w as u128).fold(0u128, u128::saturating_add);
+    if total == 0 {
+        return 0;
+    }
+    let budget = budget as u128;
+    let scaled: u128 = weights
+        .iter()
+        .map(|&w| budget.saturating_mul(w as u128).min(total))
+        .fold(0u128, u128::saturating_add);
+    ((scaled + total / 2) / total) as u64
 }
 
 fn output_unit_interval(output: &[u8; OUTPUT_BYTES]) -> f64 {
@@ -229,6 +239,19 @@ mod tests {
         let weights = [1u64, 1, 1];
         let size = expected_committee_size(&weights, 10);
         assert!((size - 3.0).abs() < 1e-9);
+    }
+
+    #[test]
+    fn expected_committee_is_deterministic_integer_math() {
+        // Unsaturated: a thousand equal validators at half budget expect the budget itself.
+        assert_eq!(expected_committee(&vec![1_000u64; 1_000], 500), 500);
+        // Saturated: budget past the set draws the whole set, never more.
+        assert_eq!(expected_committee(&[1, 1, 1], 10), 3);
+        // Five equal validators at budget two is exactly two.
+        assert_eq!(expected_committee(&[100, 100, 100, 100, 100], 2), 2);
+        // An empty or zero weight set draws nothing.
+        assert_eq!(expected_committee(&[], 5), 0);
+        assert_eq!(expected_committee(&[0, 0], 5), 0);
     }
 
     fn output_with_prefix(prefix: u64) -> [u8; OUTPUT_BYTES] {
