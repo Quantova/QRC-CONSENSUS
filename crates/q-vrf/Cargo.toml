@@ -1,0 +1,16 @@
+# Copyright 2026 Quantova Inc
+# SPDX-License-Identifier: Apache-2.0 OR MIT
+
+[package]
+name = "q-vrf"
+version = "0.1.0"
+edition = "2021"
+license = "Apache-2.0 OR MIT"
+publish = false
+
+[lib]
+name = "q_vrf"
+
+[dependencies]
+qtv-sampler = { path = "../qtv-sampler" }
+qtv-crypto = { git = "https://github.com/Quantova/Q-Crypto.git", rev = "21e28f1ffd1ca46a7144136c483618b18cd29bae" }
