@@ -18,6 +18,7 @@ name = "qtv_sampler"
 test-fixtures = []
 
 [dependencies]
+q-vrf = { path = "../q-vrf" }
 qtv-crypto = { git = "https://github.com/Quantova/Q-Crypto.git", rev = "33c7e9395ad23f07019909470d319211213e904f" }
 
 [dev-dependencies]

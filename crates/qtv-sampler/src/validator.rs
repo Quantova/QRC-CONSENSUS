@@ -3,7 +3,9 @@
 
 use qtv_crypto::sha3::shake256;
 
-use crate::onetime::{OneTimeTree, Root};
+use q_vrf::{keygen, SecretKey};
+
+use crate::onetime::Root;
 use crate::sortition::Credential;
 use crate::stake::Stake;
 
@@ -47,7 +49,7 @@ pub struct SamplerValidator {
     stake: Stake,
     seed: [u8; 32],
     epoch: u64,
-    tree: OneTimeTree,
+    key: SecretKey,
 }
 
 impl Clone for SamplerValidator {
@@ -59,10 +61,11 @@ impl Clone for SamplerValidator {
             stake: self.stake,
             seed: self.seed,
             epoch: self.epoch,
-            tree: OneTimeTree::new(
+            key: keygen(
                 crate::epoch::epoch_tree_seed(&self.seed, self.epoch),
-                self.tree.slots(),
-            ),
+                self.key.slots(),
+            )
+            .0,
         }
     }
 }
@@ -86,7 +89,7 @@ impl SamplerValidator {
             stake: Stake::native(stake),
             seed,
             epoch: 0,
-            tree: OneTimeTree::new(seed, slots),
+            key: keygen(seed, slots).0,
         }
     }
 
@@ -102,10 +105,11 @@ impl SamplerValidator {
             stake: self.stake,
             seed: self.seed,
             epoch,
-            tree: OneTimeTree::new(
+            key: keygen(
                 crate::epoch::epoch_tree_seed(&self.seed, epoch),
-                self.tree.slots(),
-            ),
+                self.key.slots(),
+            )
+            .0,
         }
     }
 
@@ -122,11 +126,11 @@ impl SamplerValidator {
     }
 
     pub fn root(&self) -> Root {
-        self.tree.root()
+        self.key.public_key().root()
     }
 
     pub fn slots(&self) -> u64 {
-        self.tree.slots()
+        self.key.slots()
     }
 
     pub fn stake(&self) -> Stake {
@@ -149,18 +153,20 @@ impl SamplerValidator {
     }
 
     pub fn reveal(&self, slot: u64) -> Credential {
+        let proof = self.key.prove(slot);
         Credential {
             position: slot,
-            preimage: self.tree.preimage(slot),
-            path: self.tree.path(slot),
+            preimage: proof.preimage,
+            path: proof.path,
         }
     }
 
     pub fn reveal_out_of_position(&self, leaf_slot: u64, claim_slot: u64) -> Credential {
+        let proof = self.key.prove(leaf_slot);
         Credential {
             position: claim_slot,
-            preimage: self.tree.preimage(leaf_slot),
-            path: self.tree.path(leaf_slot),
+            preimage: proof.preimage,
+            path: proof.path,
         }
     }
 }
