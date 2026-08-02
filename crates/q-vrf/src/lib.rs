@@ -23,7 +23,10 @@
 //! not be presented as one.
 
 use qtv_crypto::sha3::sha3_256;
-use qtv_sampler::onetime::{MerklePath, OneTimeTree, Root, NODE_BYTES, PREIMAGE_BYTES};
+
+pub mod onetime;
+
+use crate::onetime::{MerklePath, OneTimeTree, Root, NODE_BYTES, PREIMAGE_BYTES};
 
 /// Length in bytes of a VRF output.
 pub const OUTPUT_BYTES: usize = 32;
@@ -70,8 +73,12 @@ impl PublicKey {
         NODE_BYTES + 8
     }
 
-    fn root(&self) -> &Root {
-        &self.root
+    pub fn root(&self) -> Root {
+        self.root
+    }
+
+    pub fn opens(&self, position: u64, preimage: &[u8; PREIMAGE_BYTES], path: &MerklePath) -> bool {
+        self.root.verify_membership(position, preimage, path)
     }
 }
 

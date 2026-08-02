@@ -3,6 +3,8 @@
 
 use qtv_crypto::sha3::shake256;
 
+use q_vrf::PublicKey;
+
 use crate::beacon::{Beacon, SEED_BYTES};
 use crate::onetime::{MerklePath, Root, PREIMAGE_BYTES};
 
@@ -182,7 +184,11 @@ impl Credential {
 
 pub fn verify_membership(root: &Root, slot: u64, credential: &Credential) -> bool {
     credential.position == slot
-        && root.verify_membership(credential.position, &credential.preimage, &credential.path)
+        && PublicKey::from_root(*root).opens(
+            credential.position,
+            &credential.preimage,
+            &credential.path,
+        )
 }
 
 #[allow(clippy::too_many_arguments)]

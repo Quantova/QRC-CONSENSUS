@@ -5,8 +5,8 @@
 //! pseudorandomness, verifiability and soundness, and the second preimage reduction
 //! to SHA3. Each property is one passing test.
 
+use q_vrf::onetime::{leaf_hash, node_hash, MerklePath, PREIMAGE_BYTES};
 use q_vrf::{keygen, output_from_preimage, verify, Output, Proof};
-use qtv_sampler::onetime::{leaf_hash, node_hash, MerklePath, PREIMAGE_BYTES};
 
 fn count_ones(bytes: &[u8]) -> u64 {
     bytes.iter().map(|b| b.count_ones() as u64).sum()
