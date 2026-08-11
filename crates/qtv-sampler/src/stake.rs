@@ -47,7 +47,7 @@ impl Stake {
 }
 
 pub fn total_weight(stakes: &[Stake]) -> u64 {
-    stakes.iter().map(Stake::weight).sum()
+    stakes.iter().map(Stake::weight).fold(0u64, u64::saturating_add)
 }
 
 #[cfg(test)]

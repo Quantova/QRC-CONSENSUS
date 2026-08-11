@@ -27,9 +27,10 @@ fn measure(committee_size: usize) {
     let beacon = Beacon::genesis();
     let block = Block::new(1, [7u8; 32], Parent::Genesis);
     let weights = vec![STAKE; committee_size];
-    let tau = qtv_attest::params::finality_threshold(qtv_attest::params::expected_committee(
-        &weights, budget,
-    ));
+    let tau = qtv_attest::params::finality_threshold_for_draw(
+        qtv_attest::params::expected_committee(&weights, budget),
+        commitment.len() as u64,
+    );
 
     let attestations: Vec<Attestation> = attesters
         .iter()

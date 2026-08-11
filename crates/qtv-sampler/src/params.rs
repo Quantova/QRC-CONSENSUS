@@ -18,6 +18,10 @@ pub fn finality_threshold(expected_committee: u64) -> u64 {
     expected_committee * honest_num / ADVERSARY_STAKE_DEN + 1
 }
 
+pub fn finality_threshold_for_draw(expected_committee: u64, realized_committee: u64) -> u64 {
+    finality_threshold(expected_committee.max(realized_committee))
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

@@ -13,6 +13,8 @@ use crate::params::COMMITTEE_BUDGET;
 
 pub const MAX_ATTEST_VERIFICATIONS_PER_ROUND: u64 = 4 * COMMITTEE_BUDGET;
 
+pub const MAX_ATTEMPT_VERIFICATIONS_PER_MEMBER: u64 = 4;
+
 pub fn aggregate(
     chain_id: u64,
     height: Height,
@@ -50,6 +52,7 @@ fn aggregate_metered(
 
     let mut admitted: Vec<Attestation> = Vec::new();
     let mut seen: Vec<ValidatorId> = Vec::new();
+    let mut attempts: Vec<(ValidatorId, u64)> = Vec::new();
     let mut verifications: u64 = 0;
 
     for att in attestations {
@@ -63,9 +66,21 @@ fn aggregate_metered(
         if seen.contains(&att.from) {
             continue;
         }
+        let used = match attempts.iter().position(|(id, _)| *id == att.from) {
+            Some(pos) => &mut attempts[pos],
+            None => {
+                attempts.push((att.from, 0));
+                let last = attempts.len() - 1;
+                &mut attempts[last]
+            }
+        };
+        if used.1 >= MAX_ATTEMPT_VERIFICATIONS_PER_MEMBER {
+            continue;
+        }
         if verifications >= cap {
             break;
         }
+        used.1 += 1;
         verifications += 1;
         if !att.signature_verifies(chain_id, &member.attest_pk) {
             continue;
@@ -83,7 +98,8 @@ fn aggregate_metered(
         admitted.push(att.clone());
     }
 
-    let cert = if admitted.len() as u64 >= tau {
+    let effective_tau = tau.max(qtv_sampler::params::finality_threshold(commitment.len() as u64));
+    let cert = if admitted.len() as u64 >= effective_tau {
         let envelope = Envelope::new(height, slot, block, commitment);
         Some(Certificate::new(envelope, admitted))
     } else {
@@ -326,7 +342,7 @@ mod tests {
     }
 
     #[test]
-    fn a_same_id_forge_flood_is_bounded_by_the_cap() {
+    fn a_same_id_forge_flood_is_bounded_per_member() {
         let a = Attester::new(1, 100);
         let b = Attester::new(2, 100);
         let c = Attester::new(3, 100);
@@ -343,10 +359,9 @@ mod tests {
         let (cert, verifications) =
             aggregate_metered(1, 1, 0, block, &commitment, &beacon, &atts, TAU);
 
-        let cap = MAX_ATTEST_VERIFICATIONS_PER_ROUND.max(commitment.len() as u64);
         assert_eq!(
-            verifications, cap,
-            "the forge flood re-verifies only up to the cap, not once per copy"
+            verifications, MAX_ATTEMPT_VERIFICATIONS_PER_MEMBER,
+            "one member id's forge flood is bounded to its per-member attempt budget, not the whole round"
         );
         assert!(
             verifications < flood_size,
@@ -356,5 +371,71 @@ mod tests {
             cert.is_none(),
             "a flood of forgeries forms no certificate"
         );
+    }
+
+    #[test]
+    fn a_same_id_forge_flood_does_not_starve_other_members() {
+        let a = Attester::new(1, 100);
+        let b = Attester::new(2, 100);
+        let c = Attester::new(3, 100);
+        let d = Attester::new(4, 100);
+        let beacon = Beacon::genesis();
+        let block = Block::new(1, [9u8; 32], Parent::Genesis);
+        let commitment = committee(&[&a, &b, &c, &d]);
+
+        let impostor = Attester::from_secret(1, &[7u8; 32], 100);
+        let forged = impostor.attest(1, 1, 0, 0, block, &beacon);
+        let flood_size = MAX_ATTEST_VERIFICATIONS_PER_ROUND + 500;
+        let mut atts: Vec<Attestation> = (0..flood_size).map(|_| forged.clone()).collect();
+        atts.push(b.attest(1, 1, 0, 0, block, &beacon));
+        atts.push(c.attest(1, 1, 0, 0, block, &beacon));
+        atts.push(d.attest(1, 1, 0, 0, block, &beacon));
+
+        let cert = aggregate(1, 1, 0, block, &commitment, &beacon, &atts, TAU)
+            .expect("the genuine members finalize despite a same-id forge flood");
+        assert_eq!(
+            cert.attesters(),
+            vec![2, 3, 4],
+            "a flood front-running member 1 does not consume the budget owed to members 2, 3 and 4"
+        );
+    }
+
+    #[test]
+    fn verify_rejects_a_tau_below_the_realized_committee_floor() {
+        let a = Attester::new(1, 100);
+        let b = Attester::new(2, 100);
+        let c = Attester::new(3, 100);
+        let d = Attester::new(4, 100);
+        let beacon = Beacon::genesis();
+        let block = Block::new(1, [9u8; 32], Parent::Genesis);
+        let commitment = committee(&[&a, &b, &c, &d]);
+
+        let envelope = Envelope::new(1, 0, block, &commitment);
+        let two_signers = vec![
+            a.attest(1, 1, 0, 0, block, &beacon),
+            b.attest(1, 1, 0, 0, block, &beacon),
+        ];
+        let thin = Certificate::new(envelope, two_signers);
+        assert!(
+            !thin.verify(1, &commitment, &beacon, 2).is_verified(),
+            "two of a realized committee of four cannot finalize even when the caller passes tau = 2"
+        );
+
+        let full = aggregate(
+            1,
+            1,
+            0,
+            block,
+            &commitment,
+            &beacon,
+            &[
+                a.attest(1, 1, 0, 0, block, &beacon),
+                b.attest(1, 1, 0, 0, block, &beacon),
+                c.attest(1, 1, 0, 0, block, &beacon),
+            ],
+            TAU,
+        )
+        .expect("three signers meet the realized-draw floor");
+        assert!(full.verify(1, &commitment, &beacon, TAU).is_verified());
     }
 }

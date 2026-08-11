@@ -344,6 +344,13 @@ pub fn verify_attested(
     if got != expected {
         return false;
     }
+    for i in 0..cert.openings.len() {
+        for j in (i + 1)..cert.openings.len() {
+            if cert.openings[i].public_key == cert.openings[j].public_key {
+                return false;
+            }
+        }
+    }
     cert.openings.iter().all(|opening| {
         let (root, stake) = opening.fold_to_root();
         root == cert.root

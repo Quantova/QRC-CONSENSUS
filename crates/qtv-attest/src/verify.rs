@@ -80,7 +80,8 @@ fn verify_body(
         }
         seen.push(att.from);
     }
-    if seen.len() as u64 >= tau {
+    let effective_tau = tau.max(qtv_sampler::params::finality_threshold(commitment.len() as u64));
+    if seen.len() as u64 >= effective_tau {
         Verdict::Verified
     } else {
         Verdict::Rejected(RejectReason::NotAQuorum)
