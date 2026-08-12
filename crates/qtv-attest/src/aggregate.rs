@@ -409,6 +409,39 @@ mod tests {
     }
 
     #[test]
+    fn a_members_first_seen_vote_is_admitted_under_any_flood() {
+        let a = Attester::new(1, 100);
+        let b = Attester::new(2, 100);
+        let c = Attester::new(3, 100);
+        let d = Attester::new(4, 100);
+        let beacon = Beacon::genesis();
+        let block = Block::new(1, [9u8; 32], Parent::Genesis);
+        let commitment = committee(&[&a, &b, &c, &d]);
+
+        let mut atts = vec![
+            a.attest(1, 1, 0, 0, block, &beacon),
+            b.attest(1, 1, 0, 0, block, &beacon),
+            c.attest(1, 1, 0, 0, block, &beacon),
+        ];
+        let i1 = Attester::from_secret(1, &[7u8; 32], 100);
+        let i2 = Attester::from_secret(2, &[8u8; 32], 100);
+        let i3 = Attester::from_secret(3, &[9u8; 32], 100);
+        for _ in 0..3_000 {
+            atts.push(i1.attest(1, 1, 0, 0, block, &beacon));
+            atts.push(i2.attest(1, 1, 0, 0, block, &beacon));
+            atts.push(i3.attest(1, 1, 0, 0, block, &beacon));
+        }
+
+        let cert = aggregate(1, 1, 0, block, &commitment, &beacon, &atts, TAU)
+            .expect("a genuine vote seen first for its id finalizes whatever trails it");
+        assert_eq!(
+            cert.attesters(),
+            vec![1, 2, 3],
+            "the first round verifies one candidate per member before the cap can bind, so a vote seen first is never evicted"
+        );
+    }
+
+    #[test]
     fn verify_rejects_a_tau_below_the_realized_committee_floor() {
         let a = Attester::new(1, 100);
         let b = Attester::new(2, 100);
