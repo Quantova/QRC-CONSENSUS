@@ -13,8 +13,6 @@ use crate::params::COMMITTEE_BUDGET;
 
 pub const MAX_ATTEST_VERIFICATIONS_PER_ROUND: u64 = 4 * COMMITTEE_BUDGET;
 
-pub const MAX_ATTEMPT_VERIFICATIONS_PER_MEMBER: u64 = 4;
-
 pub fn aggregate(
     chain_id: u64,
     height: Height,
@@ -50,52 +48,61 @@ fn aggregate_metered(
 ) -> (Option<Certificate>, u64) {
     let cap = MAX_ATTEST_VERIFICATIONS_PER_ROUND.max(commitment.len() as u64);
 
-    let mut admitted: Vec<Attestation> = Vec::new();
-    let mut seen: Vec<ValidatorId> = Vec::new();
-    let mut attempts: Vec<(ValidatorId, u64)> = Vec::new();
-    let mut verifications: u64 = 0;
-
+    let mut groups: Vec<(ValidatorId, Vec<&Attestation>)> = Vec::new();
     for att in attestations {
         if att.height != height || att.slot != slot || att.block != block {
             continue;
         }
-        let member = match commitment.member(att.from) {
-            Some(m) => m,
-            None => continue,
-        };
-        if seen.contains(&att.from) {
+        if commitment.member(att.from).is_none() {
             continue;
         }
-        let used = match attempts.iter().position(|(id, _)| *id == att.from) {
-            Some(pos) => &mut attempts[pos],
-            None => {
-                attempts.push((att.from, 0));
-                let last = attempts.len() - 1;
-                &mut attempts[last]
+        match groups.iter_mut().find(|(id, _)| *id == att.from) {
+            Some((_, bucket)) => bucket.push(att),
+            None => groups.push((att.from, vec![att])),
+        }
+    }
+
+    let mut admitted: Vec<Attestation> = Vec::new();
+    let mut seen: Vec<ValidatorId> = Vec::new();
+    let mut verifications: u64 = 0;
+
+    let mut round = 0usize;
+    let mut progressed = true;
+    while progressed && verifications < cap {
+        progressed = false;
+        for (id, bucket) in groups.iter() {
+            if seen.contains(id) {
+                continue;
             }
-        };
-        if used.1 >= MAX_ATTEMPT_VERIFICATIONS_PER_MEMBER {
-            continue;
+            let att = match bucket.get(round) {
+                Some(a) => *a,
+                None => continue,
+            };
+            progressed = true;
+            if verifications >= cap {
+                break;
+            }
+            verifications += 1;
+            let member = match commitment.member(*id) {
+                Some(m) => m,
+                None => continue,
+            };
+            if !att.signature_verifies(chain_id, &member.attest_pk) {
+                continue;
+            }
+            if !att.is_entitled(
+                &member.root,
+                beacon,
+                member.weight,
+                commitment.total_weight,
+                commitment.budget,
+            ) {
+                continue;
+            }
+            seen.push(*id);
+            admitted.push(att.clone());
         }
-        if verifications >= cap {
-            break;
-        }
-        used.1 += 1;
-        verifications += 1;
-        if !att.signature_verifies(chain_id, &member.attest_pk) {
-            continue;
-        }
-        if !att.is_entitled(
-            &member.root,
-            beacon,
-            member.weight,
-            commitment.total_weight,
-            commitment.budget,
-        ) {
-            continue;
-        }
-        seen.push(att.from);
-        admitted.push(att.clone());
+        round += 1;
     }
 
     let effective_tau = tau.max(qtv_sampler::params::finality_threshold(commitment.len() as u64));
@@ -316,33 +323,34 @@ mod tests {
         let impostor = Attester::from_secret(1, &[7u8; 32], 100);
         let forged = impostor.attest(1, 1, 0, 0, block, &beacon);
 
-        let atts = vec![
-            forged,
-            a.attest(1, 1, 0, 0, block, &beacon),
-            b.attest(1, 1, 0, 0, block, &beacon),
-            c.attest(1, 1, 0, 0, block, &beacon),
-        ];
+        let forgeries = 64u64;
+        let mut atts: Vec<Attestation> = (0..forgeries).map(|_| forged.clone()).collect();
+        atts.push(a.attest(1, 1, 0, 0, block, &beacon));
+        atts.push(b.attest(1, 1, 0, 0, block, &beacon));
+        atts.push(c.attest(1, 1, 0, 0, block, &beacon));
+
         let (cert, verifications) =
             aggregate_metered(1, 1, 0, block, &commitment, &beacon, &atts, TAU);
 
-        let cert = cert.expect("the honest quorum finalizes despite the forged front-runner");
+        let cert = cert.expect("the honest quorum finalizes despite the forged front-runners");
         assert_eq!(
             cert.attesters(),
             vec![1, 2, 3],
-            "member 1's genuine vote is not censored by the forgery"
+            "member 1's genuine vote is not censored however many forgeries precede it"
         );
         assert!(
             cert.verify(1, &commitment, &beacon, TAU).is_verified(),
             "the certificate passes wire level verification"
         );
         assert_eq!(
-            verifications, 4,
-            "the forgery does not consume the genuine signer's verification"
+            verifications,
+            forgeries + 3,
+            "the forgeries are the only extra work and none evicts the genuine signers"
         );
     }
 
     #[test]
-    fn a_same_id_forge_flood_is_bounded_per_member() {
+    fn a_same_id_forge_flood_is_bounded_by_the_round_cap() {
         let a = Attester::new(1, 100);
         let b = Attester::new(2, 100);
         let c = Attester::new(3, 100);
@@ -359,9 +367,9 @@ mod tests {
         let (cert, verifications) =
             aggregate_metered(1, 1, 0, block, &commitment, &beacon, &atts, TAU);
 
-        assert_eq!(
-            verifications, MAX_ATTEMPT_VERIFICATIONS_PER_MEMBER,
-            "one member id's forge flood is bounded to its per-member attempt budget, not the whole round"
+        assert!(
+            verifications <= MAX_ATTEST_VERIFICATIONS_PER_ROUND,
+            "the forge flood is bounded by the round cap, not the size of the flood"
         );
         assert!(
             verifications < flood_size,
