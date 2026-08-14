@@ -64,8 +64,11 @@ impl PublicKey {
     /// Depth of the authentication path, that is the base two logarithm of the
     /// padded leaf count.
     pub fn depth(&self) -> usize {
-        let padded = (self.root.slots as usize).max(1).next_power_of_two();
-        padded.trailing_zeros() as usize
+        (self.root.slots as usize)
+            .max(1)
+            .checked_next_power_of_two()
+            .map(|padded| padded.trailing_zeros() as usize)
+            .unwrap_or(0)
     }
 
     /// Serialized size of the public key: the root digest plus the slot count.

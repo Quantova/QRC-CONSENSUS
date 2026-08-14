@@ -31,7 +31,13 @@ impl Root {
         if position >= self.slots {
             return false;
         }
-        if path.siblings.len() != tree_depth(self.slots) {
+        let depth = match tree_depth(self.slots) {
+            Some(depth) => depth,
+            // A slot count past 2^63 cannot form a padded power of two tree. Reject the root
+            // rather than overflow the depth computation and halt the verifier.
+            None => return false,
+        };
+        if path.siblings.len() != depth {
             return false;
         }
         let leaf = leaf_hash(preimage);
@@ -72,12 +78,12 @@ pub fn node_hash(left: &[u8; NODE_BYTES], right: &[u8; NODE_BYTES]) -> [u8; NODE
     sha3_256(&buf)
 }
 
-fn padded_leaves(slots: u64) -> usize {
-    (slots as usize).max(1).next_power_of_two()
+fn padded_leaves(slots: u64) -> Option<usize> {
+    (slots as usize).max(1).checked_next_power_of_two()
 }
 
-fn tree_depth(slots: u64) -> usize {
-    padded_leaves(slots).trailing_zeros() as usize
+fn tree_depth(slots: u64) -> Option<usize> {
+    Some(padded_leaves(slots)?.trailing_zeros() as usize)
 }
 
 fn root_from_path(
@@ -106,7 +112,7 @@ pub struct OneTimeTree {
 impl OneTimeTree {
     pub fn new(seed: [u8; 32], slots: u64) -> Self {
         assert!(slots >= 1, "a one time tree serves at least one slot");
-        let padded = padded_leaves(slots);
+        let padded = padded_leaves(slots).expect("a one time tree serves a representable slot count");
         let padding = leaf_hash(&PADDING_PREIMAGE);
         let mut leaves = Vec::with_capacity(padded);
         for position in 0..padded as u64 {
@@ -217,6 +223,22 @@ mod tests {
         let path = t.path(0);
         assert!(root.verify_membership(0, &preimage, &path));
         assert!(!root.verify_membership(3, &preimage, &path));
+    }
+
+    #[test]
+    fn a_slot_count_past_the_power_of_two_ceiling_is_rejected_not_a_panic() {
+        // A committee member can sign an epoch root carrying slots = u64::MAX. Verifying any
+        // membership against it must fail closed, not overflow the depth computation and halt
+        // every verifier on the unguarded apply thread.
+        let root = Root {
+            digest: [0u8; NODE_BYTES],
+            slots: u64::MAX,
+        };
+        let preimage = [0u8; PREIMAGE_BYTES];
+        let path = MerklePath {
+            siblings: Vec::new(),
+        };
+        assert!(!root.verify_membership(0, &preimage, &path));
     }
 
     #[test]
