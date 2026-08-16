@@ -4,6 +4,7 @@
 use qtv_crypto::sha3::shake256;
 
 use qtv_bft::block::{Block, Height};
+use qtv_sampler::committee::PublishedReveal;
 
 use crate::attestation::Attestation;
 use crate::attester::ValidatorId;
@@ -32,6 +33,7 @@ impl Envelope {
 pub struct Certificate {
     pub envelope: Envelope,
     pub attestations: Vec<Attestation>,
+    pub committee_reveals: Vec<PublishedReveal>,
 }
 
 impl Certificate {
@@ -40,7 +42,14 @@ impl Certificate {
         Certificate {
             envelope,
             attestations,
+            committee_reveals: Vec::new(),
         }
+    }
+
+    pub fn with_committee_reveals(mut self, mut reveals: Vec<PublishedReveal>) -> Self {
+        reveals.sort_by_key(|r| r.id);
+        self.committee_reveals = reveals;
+        self
     }
 
     pub fn attesters(&self) -> Vec<ValidatorId> {
