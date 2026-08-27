@@ -27,7 +27,7 @@ fn a_certificate_verifies_at_a_slot_beyond_the_default() {
 
     let atts: Vec<_> = members
         .iter()
-        .map(|a| a.attest(1, 1, slot, 0, block, &beacon))
+        .map(|a| a.attest(1, 1, slot, 0, commitment.digest(), block, &beacon))
         .collect();
 
     // The authentication path is the log of the padded leaf count, twelve here, so

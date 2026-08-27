@@ -24,7 +24,7 @@ fn an_entitled_supermajority_certificate_verifies() {
     // Three of four entitled members attest, a supermajority.
     let atts: Vec<_> = members[..3]
         .iter()
-        .map(|a| a.attest(1, 1, 0, 0, block, &beacon))
+        .map(|a| a.attest(1, 1, 0, 0, commitment.digest(), block, &beacon))
         .collect();
 
     let cert = aggregate(1, 1, 0, block, &commitment, &beacon, &atts, 3).expect("quorum");
@@ -44,7 +44,7 @@ fn a_certificate_missing_the_supermajority_does_not_verify() {
     // Only two of four attest, one short of the quorum of three.
     let atts: Vec<_> = members[..2]
         .iter()
-        .map(|a| a.attest(1, 1, 0, 0, block, &beacon))
+        .map(|a| a.attest(1, 1, 0, 0, commitment.digest(), block, &beacon))
         .collect();
 
     // Aggregation refuses to form a certificate.

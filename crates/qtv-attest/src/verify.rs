@@ -50,7 +50,8 @@ fn verify_body(
     beacon: &Beacon,
     tau: u64,
 ) -> Verdict {
-    if envelope.committee != commitment.digest() {
+    let committee_digest = commitment.digest();
+    if envelope.committee != committee_digest {
         return Verdict::Rejected(RejectReason::CommitmentMismatch);
     }
     let mut seen: Vec<u64> = Vec::new();
@@ -58,6 +59,9 @@ fn verify_body(
         if att.height != envelope.height || att.slot != envelope.slot || att.block != envelope.block
         {
             return Verdict::Rejected(RejectReason::WrongSubject);
+        }
+        if att.committee != committee_digest {
+            return Verdict::Rejected(RejectReason::CommitmentMismatch);
         }
         let member = match commitment.member(att.from) {
             Some(m) => m,

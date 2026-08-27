@@ -47,10 +47,14 @@ fn aggregate_metered(
     tau: u64,
 ) -> (Option<Certificate>, u64) {
     let cap = MAX_ATTEST_VERIFICATIONS_PER_ROUND.max(commitment.len() as u64);
+    let committee_digest = commitment.digest();
 
     let mut groups: Vec<(ValidatorId, Vec<&Attestation>)> = Vec::new();
     for att in attestations {
         if att.height != height || att.slot != slot || att.block != block {
+            continue;
+        }
+        if att.committee != committee_digest {
             continue;
         }
         if commitment.member(att.from).is_none() {
@@ -138,9 +142,9 @@ mod tests {
         let block = Block::new(1, [9u8; 32], Parent::Genesis);
         let commitment = committee(&[&a, &b, &c, &d]);
         let atts = vec![
-            a.attest(1, 1, 0, 0, block, &beacon),
-            b.attest(1, 1, 0, 0, block, &beacon),
-            c.attest(1, 1, 0, 0, block, &beacon),
+            a.attest(1, 1, 0, 0, commitment.digest(), block, &beacon),
+            b.attest(1, 1, 0, 0, commitment.digest(), block, &beacon),
+            c.attest(1, 1, 0, 0, commitment.digest(), block, &beacon),
         ];
         let cert = aggregate(1, 1, 0, block, &commitment, &beacon, &atts, TAU).expect("quorum");
         assert_eq!(cert.attesters(), vec![1, 2, 3]);
@@ -156,8 +160,8 @@ mod tests {
         let block = Block::new(1, [9u8; 32], Parent::Genesis);
         let commitment = committee(&[&a, &b, &c, &d]);
         let atts = vec![
-            a.attest(1, 1, 0, 0, block, &beacon),
-            b.attest(1, 1, 0, 0, block, &beacon),
+            a.attest(1, 1, 0, 0, commitment.digest(), block, &beacon),
+            b.attest(1, 1, 0, 0, commitment.digest(), block, &beacon),
         ];
         assert!(aggregate(1, 1, 0, block, &commitment, &beacon, &atts, TAU).is_none());
     }
@@ -172,9 +176,9 @@ mod tests {
         let block = Block::new(1, [9u8; 32], Parent::Genesis);
         let commitment = committee(&[&a, &b, &c, &d]);
         let atts = vec![
-            a.attest(1, 1, 0, 0, block, &beacon),
-            a.attest(1, 1, 0, 0, block, &beacon),
-            b.attest(1, 1, 0, 0, block, &beacon),
+            a.attest(1, 1, 0, 0, commitment.digest(), block, &beacon),
+            a.attest(1, 1, 0, 0, commitment.digest(), block, &beacon),
+            b.attest(1, 1, 0, 0, commitment.digest(), block, &beacon),
         ];
         assert!(aggregate(1, 1, 0, block, &commitment, &beacon, &atts, TAU).is_none());
     }
@@ -193,12 +197,12 @@ mod tests {
 
         let mut atts: Vec<Attestation> = Vec::new();
         for _ in 0..2_000 {
-            atts.push(a.attest(1, 1, 0, 0, block, &beacon));
-            atts.push(b.attest(1, 1, 0, 0, block, &beacon));
-            atts.push(c.attest(1, 1, 0, 0, block, &beacon));
-            atts.push(d.attest(1, 1, 0, 0, block, &beacon));
-            atts.push(outsider_one.attest(1, 1, 0, 0, block, &beacon));
-            atts.push(outsider_two.attest(1, 1, 0, 0, block, &beacon));
+            atts.push(a.attest(1, 1, 0, 0, commitment.digest(), block, &beacon));
+            atts.push(b.attest(1, 1, 0, 0, commitment.digest(), block, &beacon));
+            atts.push(c.attest(1, 1, 0, 0, commitment.digest(), block, &beacon));
+            atts.push(d.attest(1, 1, 0, 0, commitment.digest(), block, &beacon));
+            atts.push(outsider_one.attest(1, 1, 0, 0, commitment.digest(), block, &beacon));
+            atts.push(outsider_two.attest(1, 1, 0, 0, commitment.digest(), block, &beacon));
         }
         let flood = atts.len() as u64;
         assert_eq!(flood, 12_000, "the flood is far larger than the committee");
@@ -229,13 +233,13 @@ mod tests {
         let block = Block::new(1, [9u8; 32], Parent::Genesis);
         let commitment = committee(&[&a, &b, &c, &d]);
         let atts = vec![
-            a.attest(1, 1, 0, 0, block, &beacon),
-            a.attest(1, 1, 0, 0, block, &beacon),
-            a.attest(1, 1, 0, 0, block, &beacon),
-            a.attest(1, 1, 0, 0, block, &beacon),
-            a.attest(1, 1, 0, 0, block, &beacon),
-            b.attest(1, 1, 0, 0, block, &beacon),
-            c.attest(1, 1, 0, 0, block, &beacon),
+            a.attest(1, 1, 0, 0, commitment.digest(), block, &beacon),
+            a.attest(1, 1, 0, 0, commitment.digest(), block, &beacon),
+            a.attest(1, 1, 0, 0, commitment.digest(), block, &beacon),
+            a.attest(1, 1, 0, 0, commitment.digest(), block, &beacon),
+            a.attest(1, 1, 0, 0, commitment.digest(), block, &beacon),
+            b.attest(1, 1, 0, 0, commitment.digest(), block, &beacon),
+            c.attest(1, 1, 0, 0, commitment.digest(), block, &beacon),
         ];
         let (cert, verifications) =
             aggregate_metered(1, 1, 0, block, &commitment, &beacon, &atts, TAU);
@@ -257,9 +261,9 @@ mod tests {
         let block = Block::new(1, [9u8; 32], Parent::Genesis);
         let commitment = committee(&[&a, &b, &c, &d]);
         let atts = vec![
-            a.attest(1, 1, 0, 0, block, &beacon),
-            b.attest(1, 1, 0, 0, block, &beacon),
-            c.attest(1, 1, 0, 0, block, &beacon),
+            a.attest(1, 1, 0, 0, commitment.digest(), block, &beacon),
+            b.attest(1, 1, 0, 0, commitment.digest(), block, &beacon),
+            c.attest(1, 1, 0, 0, commitment.digest(), block, &beacon),
         ];
         let (cert, verifications) =
             aggregate_metered(1, 1, 0, block, &commitment, &beacon, &atts, TAU);
@@ -288,12 +292,12 @@ mod tests {
             a.attest_public_key(),
             "the impostor holds a different key under member 1's id"
         );
-        let forged = impostor.attest(1, 1, 0, 0, block, &beacon);
+        let forged = impostor.attest(1, 1, 0, 0, commitment.digest(), block, &beacon);
 
         let atts_forged = vec![
             forged.clone(),
-            b.attest(1, 1, 0, 0, block, &beacon),
-            c.attest(1, 1, 0, 0, block, &beacon),
+            b.attest(1, 1, 0, 0, commitment.digest(), block, &beacon),
+            c.attest(1, 1, 0, 0, commitment.digest(), block, &beacon),
         ];
         assert!(
             aggregate(1, 1, 0, block, &commitment, &beacon, &atts_forged, TAU).is_none(),
@@ -301,9 +305,9 @@ mod tests {
         );
 
         let atts_genuine = vec![
-            a.attest(1, 1, 0, 0, block, &beacon),
-            b.attest(1, 1, 0, 0, block, &beacon),
-            c.attest(1, 1, 0, 0, block, &beacon),
+            a.attest(1, 1, 0, 0, commitment.digest(), block, &beacon),
+            b.attest(1, 1, 0, 0, commitment.digest(), block, &beacon),
+            c.attest(1, 1, 0, 0, commitment.digest(), block, &beacon),
         ];
         let cert = aggregate(1, 1, 0, block, &commitment, &beacon, &atts_genuine, TAU)
             .expect("the genuine signer completes the quorum");
@@ -321,13 +325,13 @@ mod tests {
         let commitment = committee(&[&a, &b, &c, &d]);
 
         let impostor = Attester::from_secret(1, &[7u8; 32], 100);
-        let forged = impostor.attest(1, 1, 0, 0, block, &beacon);
+        let forged = impostor.attest(1, 1, 0, 0, commitment.digest(), block, &beacon);
 
         let forgeries = 64u64;
         let mut atts: Vec<Attestation> = (0..forgeries).map(|_| forged.clone()).collect();
-        atts.push(a.attest(1, 1, 0, 0, block, &beacon));
-        atts.push(b.attest(1, 1, 0, 0, block, &beacon));
-        atts.push(c.attest(1, 1, 0, 0, block, &beacon));
+        atts.push(a.attest(1, 1, 0, 0, commitment.digest(), block, &beacon));
+        atts.push(b.attest(1, 1, 0, 0, commitment.digest(), block, &beacon));
+        atts.push(c.attest(1, 1, 0, 0, commitment.digest(), block, &beacon));
 
         let (cert, verifications) =
             aggregate_metered(1, 1, 0, block, &commitment, &beacon, &atts, TAU);
@@ -360,7 +364,7 @@ mod tests {
         let commitment = committee(&[&a, &b, &c, &d]);
 
         let impostor = Attester::from_secret(1, &[7u8; 32], 100);
-        let forged = impostor.attest(1, 1, 0, 0, block, &beacon);
+        let forged = impostor.attest(1, 1, 0, 0, commitment.digest(), block, &beacon);
         let flood_size = MAX_ATTEST_VERIFICATIONS_PER_ROUND + 500;
         let atts: Vec<Attestation> = (0..flood_size).map(|_| forged.clone()).collect();
 
@@ -392,12 +396,12 @@ mod tests {
         let commitment = committee(&[&a, &b, &c, &d]);
 
         let impostor = Attester::from_secret(1, &[7u8; 32], 100);
-        let forged = impostor.attest(1, 1, 0, 0, block, &beacon);
+        let forged = impostor.attest(1, 1, 0, 0, commitment.digest(), block, &beacon);
         let flood_size = MAX_ATTEST_VERIFICATIONS_PER_ROUND + 500;
         let mut atts: Vec<Attestation> = (0..flood_size).map(|_| forged.clone()).collect();
-        atts.push(b.attest(1, 1, 0, 0, block, &beacon));
-        atts.push(c.attest(1, 1, 0, 0, block, &beacon));
-        atts.push(d.attest(1, 1, 0, 0, block, &beacon));
+        atts.push(b.attest(1, 1, 0, 0, commitment.digest(), block, &beacon));
+        atts.push(c.attest(1, 1, 0, 0, commitment.digest(), block, &beacon));
+        atts.push(d.attest(1, 1, 0, 0, commitment.digest(), block, &beacon));
 
         let cert = aggregate(1, 1, 0, block, &commitment, &beacon, &atts, TAU)
             .expect("the genuine members finalize despite a same-id forge flood");
@@ -405,6 +409,29 @@ mod tests {
             cert.attesters(),
             vec![2, 3, 4],
             "a flood front-running member 1 does not consume the budget owed to members 2, 3 and 4"
+        );
+    }
+
+    #[test]
+    fn genuine_attestations_cannot_be_rebased_onto_a_forged_smaller_committee() {
+        let members: Vec<Attester> = (1..=7).map(|id| Attester::new(id, 100)).collect();
+        let refs: Vec<&Attester> = members.iter().collect();
+        let beacon = Beacon::genesis();
+        let block = Block::new(1, [9u8; 32], Parent::Genesis);
+        let real = committee(&refs);
+        let three: Vec<Attestation> = members[..3]
+            .iter()
+            .map(|a| a.attest(1, 1, 0, 0, real.digest(), block, &beacon))
+            .collect();
+        assert!(
+            aggregate(1, 1, 0, block, &real, &beacon, &three, TAU).is_none(),
+            "three of a seven member committee is below the realized floor"
+        );
+        let forged_refs: Vec<&Attester> = members[..3].iter().collect();
+        let forged = committee(&forged_refs);
+        assert!(
+            aggregate(1, 1, 0, block, &forged, &beacon, &three, TAU).is_none(),
+            "attestations bound to the real committee do not verify re based onto a forged smaller committee"
         );
     }
 
@@ -419,17 +446,17 @@ mod tests {
         let commitment = committee(&[&a, &b, &c, &d]);
 
         let mut atts = vec![
-            a.attest(1, 1, 0, 0, block, &beacon),
-            b.attest(1, 1, 0, 0, block, &beacon),
-            c.attest(1, 1, 0, 0, block, &beacon),
+            a.attest(1, 1, 0, 0, commitment.digest(), block, &beacon),
+            b.attest(1, 1, 0, 0, commitment.digest(), block, &beacon),
+            c.attest(1, 1, 0, 0, commitment.digest(), block, &beacon),
         ];
         let i1 = Attester::from_secret(1, &[7u8; 32], 100);
         let i2 = Attester::from_secret(2, &[8u8; 32], 100);
         let i3 = Attester::from_secret(3, &[9u8; 32], 100);
         for _ in 0..3_000 {
-            atts.push(i1.attest(1, 1, 0, 0, block, &beacon));
-            atts.push(i2.attest(1, 1, 0, 0, block, &beacon));
-            atts.push(i3.attest(1, 1, 0, 0, block, &beacon));
+            atts.push(i1.attest(1, 1, 0, 0, commitment.digest(), block, &beacon));
+            atts.push(i2.attest(1, 1, 0, 0, commitment.digest(), block, &beacon));
+            atts.push(i3.attest(1, 1, 0, 0, commitment.digest(), block, &beacon));
         }
 
         let cert = aggregate(1, 1, 0, block, &commitment, &beacon, &atts, TAU)
@@ -453,8 +480,8 @@ mod tests {
 
         let envelope = Envelope::new(1, 0, block, &commitment);
         let two_signers = vec![
-            a.attest(1, 1, 0, 0, block, &beacon),
-            b.attest(1, 1, 0, 0, block, &beacon),
+            a.attest(1, 1, 0, 0, commitment.digest(), block, &beacon),
+            b.attest(1, 1, 0, 0, commitment.digest(), block, &beacon),
         ];
         let thin = Certificate::new(envelope, two_signers);
         assert!(
@@ -470,9 +497,9 @@ mod tests {
             &commitment,
             &beacon,
             &[
-                a.attest(1, 1, 0, 0, block, &beacon),
-                b.attest(1, 1, 0, 0, block, &beacon),
-                c.attest(1, 1, 0, 0, block, &beacon),
+                a.attest(1, 1, 0, 0, commitment.digest(), block, &beacon),
+                b.attest(1, 1, 0, 0, commitment.digest(), block, &beacon),
+                c.attest(1, 1, 0, 0, commitment.digest(), block, &beacon),
             ],
             TAU,
         )

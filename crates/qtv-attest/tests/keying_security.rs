@@ -40,10 +40,10 @@ fn a_party_with_only_the_public_key_cannot_forge_an_attestation() {
     let victim = Attester::from_secret(1, &[0xa1u8; 32], STAKE);
     let impostor = Attester::from_secret(1, &[0xb2u8; 32], STAKE);
 
-    let victim_att = victim.attest(1, 1, 0, 0, block, &beacon);
+    let victim_att = victim.attest(1, 1, 0, 0, [0u8; 32], block, &beacon);
     assert!(victim_att.signature_verifies(1, victim.attest_public_key()));
 
-    let forged = impostor.attest(1, 1, 0, 0, block, &beacon);
+    let forged = impostor.attest(1, 1, 0, 0, [0u8; 32], block, &beacon);
     assert!(
         !forged.signature_verifies(1, victim.attest_public_key()),
         "a party holding only the victim public key forged an attestation under it"
@@ -75,7 +75,7 @@ fn an_impostor_certificate_under_the_victim_commitment_is_rejected() {
     let impostors: Vec<Attester> = (1..=4)
         .map(|id| Attester::from_secret(id, &[0xf0u8 + id as u8; 32], STAKE))
         .collect();
-    let forged: Vec<_> = impostors[..3].iter().map(|a| a.attest(1, 1, 0, 0, block, &beacon)).collect();
+    let forged: Vec<_> = impostors[..3].iter().map(|a| a.attest(1, 1, 0, 0, commitment.digest(), block, &beacon)).collect();
 
     // No certificate forms: none of the forged attestations is admitted under the
     // victims' commitment, so an entitled supermajority never assembles.
@@ -94,7 +94,7 @@ fn two_independent_secrets_yield_independent_validators() {
     assert_ne!(a.root(), b.root());
 
     // Neither validator's attestation verifies under the other's key.
-    let att_a = a.attest(1, 1, 0, 0, block, &beacon);
+    let att_a = a.attest(1, 1, 0, 0, [0u8; 32], block, &beacon);
     assert!(att_a.signature_verifies(1, a.attest_public_key()));
     assert!(!att_a.signature_verifies(1, b.attest_public_key()));
 }
@@ -115,7 +115,7 @@ fn the_draw_and_finality_still_finalize_with_real_keys() {
     let commitment = CommitteeCommitment::from_attesters_with_budget(0, &refs, SATURATING_BUDGET);
 
     // A genuine supermajority of honest attesters, each holding its own secret.
-    let atts: Vec<_> = members[..3].iter().map(|a| a.attest(1, 1, 0, 0, block, &beacon)).collect();
+    let atts: Vec<_> = members[..3].iter().map(|a| a.attest(1, 1, 0, 0, commitment.digest(), block, &beacon)).collect();
     let cert = aggregate(1, 1, 0, block, &commitment, &beacon, &atts, 3).expect("an honest quorum finalizes");
     assert_eq!(cert.verify(1, &commitment, &beacon, 3), Verdict::Verified);
     assert_eq!(cert.attesters(), vec![1, 2, 3]);

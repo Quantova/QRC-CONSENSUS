@@ -46,7 +46,7 @@ fn the_consensus_verification_rejects_an_old_mechanism_membership_draw() {
     // Positive control: a quorum carrying genuine one time credentials verifies.
     let mut atts: Vec<_> = members[..3]
         .iter()
-        .map(|a| a.attest(1, 1, 0, 0, block, &beacon))
+        .map(|a| a.attest(1, 1, 0, 0, commitment.digest(), block, &beacon))
         .collect();
     let good = Certificate::new(Envelope::new(1, 0, block, &commitment), atts.clone());
     assert_eq!(good.verify(1, &commitment, &beacon, 3), Verdict::Verified);
@@ -73,7 +73,7 @@ fn aggregation_drops_an_old_mechanism_membership_draw() {
     // Three genuine one time draws are an entitled supermajority and aggregate.
     let genuine: Vec<_> = members[..3]
         .iter()
-        .map(|a| a.attest(1, 1, 0, 0, block, &beacon))
+        .map(|a| a.attest(1, 1, 0, 0, commitment.digest(), block, &beacon))
         .collect();
     assert!(aggregate(1, 1, 0, block, &commitment, &beacon, &genuine, 3).is_some());
 
