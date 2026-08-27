@@ -235,6 +235,18 @@ pub fn attested_leaf(public_key: &PublicKey, stake: u64) -> [u8; 32] {
     sha3_256(&buf)
 }
 
+/// The fold root a verifier must expect for a given committee, computed from the members'
+/// public keys and their bonded stake. A certificate whose root differs was folded over a
+/// different set of keys and never carried the authorised committee, so binding this root is
+/// what stops a forger from folding its own keys to a matching stake total.
+pub fn attested_committee_root(committee: &[(PublicKey, u64)]) -> [u8; 32] {
+    let leaves: Vec<([u8; 32], u64)> = committee
+        .iter()
+        .map(|(pk, stake)| (attested_leaf(pk, *stake), *stake))
+        .collect();
+    fold_root(&leaves).0
+}
+
 #[derive(Clone)]
 pub struct AttestedOpening {
     pub index: usize,
@@ -323,12 +335,16 @@ pub fn build_attested(
 /// Verify a signature carrying fold certificate. Beyond the stake totals, the quorum,
 pub fn verify_attested(
     cert: &AttestedFoldCertificate,
+    committee_root: &[u8; 32],
     committee_total: u64,
     attester_count: usize,
     k: usize,
     message: &[u8],
     context: &[u8],
 ) -> bool {
+    if cert.root != *committee_root {
+        return false;
+    }
     if cert.total_stake != committee_total {
         return false;
     }
@@ -582,9 +598,10 @@ mod tests {
         let block = Block::new(height, [9u8; 32], Parent::Genesis);
         let (members, subject, context) = signed_committee(n, block, height, slot);
         let full: u64 = members.iter().map(|(_, s, _)| s).sum();
+        let croot = attested_committee_root(&members.iter().map(|(pk, s, _)| (*pk, *s)).collect::<Vec<_>>());
 
         let cert = build_attested(&members, full, k);
-        assert!(verify_attested(&cert, full, n, k, &subject, context));
+        assert!(verify_attested(&cert, &croot, full, n, k, &subject, context));
 
         let leaves: Vec<([u8; 32], u64)> = members
             .iter()
@@ -594,7 +611,7 @@ mod tests {
 
         let mut forged = cert.clone();
         forged.openings[0].signature[0] ^= 1;
-        assert!(!verify_attested(&forged, full, n, k, &subject, context));
+        assert!(!verify_attested(&forged, &croot, full, n, k, &subject, context));
     }
 
     #[test]
@@ -603,19 +620,43 @@ mod tests {
         let block = Block::new(height, [9u8; 32], Parent::Genesis);
         let (members, subject, context) = signed_committee(n, block, height, slot);
         let full: u64 = members.iter().map(|(_, s, _)| s).sum();
+        let croot = attested_committee_root(&members.iter().map(|(pk, s, _)| (*pk, *s)).collect::<Vec<_>>());
         let cert = build_attested(&members, full, k);
-        assert!(verify_attested(&cert, full, n, k, &subject, context));
+        assert!(verify_attested(&cert, &croot, full, n, k, &subject, context));
 
         let mut swapped_sig = cert.clone();
         swapped_sig.openings[0].signature = cert.openings[1].signature;
-        assert!(!verify_attested(&swapped_sig, full, n, k, &subject, context));
+        assert!(!verify_attested(&swapped_sig, &croot, full, n, k, &subject, context));
 
         let mut swapped_key = cert.clone();
         swapped_key.openings[0].public_key = cert.openings[1].public_key;
-        assert!(!verify_attested(&swapped_key, full, n, k, &subject, context));
+        assert!(!verify_attested(&swapped_key, &croot, full, n, k, &subject, context));
 
         let other = Block::new(height, [10u8; 32], Parent::Genesis);
         let wrong = crate::attestation::attestation_message(1, height, slot, 0, &[0u8; 32], &other);
-        assert!(!verify_attested(&cert, full, n, k, &wrong, context));
+        assert!(!verify_attested(&cert, &croot, full, n, k, &wrong, context));
+    }
+
+    #[test]
+    fn a_certificate_folded_over_a_forged_committee_is_rejected_by_the_committee_root() {
+        let (n, k, height, slot) = (16usize, 5usize, 1u64, 0u64);
+        let block = Block::new(height, [9u8; 32], Parent::Genesis);
+        let (members, subject, context) = signed_committee(n, block, height, slot);
+        let full: u64 = members.iter().map(|(_, s, _)| s).sum();
+        let croot = attested_committee_root(&members.iter().map(|(pk, s, _)| (*pk, *s)).collect::<Vec<_>>());
+
+        // An attacker folds its own keys to the same stake total and signs the same subject.
+        let forgers: Vec<(PublicKey, u64, Signature)> = (100..100 + n as u64)
+            .map(|id| {
+                let a = Attester::new(id, 100);
+                let att = a.attest(1, height, slot, 0, [0u8; 32], block, &Beacon::genesis());
+                (*a.attest_public_key(), a.weight(), att.sig)
+            })
+            .collect();
+        let forged = build_attested(&forgers, full, k);
+
+        // Every internal check passes, so only the committee root binding refuses it.
+        assert!(verify_attested(&forged, &forged.root, full, n, k, &subject, context));
+        assert!(!verify_attested(&forged, &croot, full, n, k, &subject, context));
     }
 }
