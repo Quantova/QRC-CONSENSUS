@@ -235,10 +235,6 @@ pub fn attested_leaf(public_key: &PublicKey, stake: u64) -> [u8; 32] {
     sha3_256(&buf)
 }
 
-/// The fold root a verifier must expect for a given committee, computed from the members'
-/// public keys and their bonded stake. A certificate whose root differs was folded over a
-/// different set of keys and never carried the authorised committee, so binding this root is
-/// what stops a forger from folding its own keys to a matching stake total.
 pub fn attested_committee_root(committee: &[(PublicKey, u64)]) -> [u8; 32] {
     let leaves: Vec<([u8; 32], u64)> = committee
         .iter()
@@ -645,7 +641,6 @@ mod tests {
         let full: u64 = members.iter().map(|(_, s, _)| s).sum();
         let croot = attested_committee_root(&members.iter().map(|(pk, s, _)| (*pk, *s)).collect::<Vec<_>>());
 
-        // An attacker folds its own keys to the same stake total and signs the same subject.
         let forgers: Vec<(PublicKey, u64, Signature)> = (100..100 + n as u64)
             .map(|id| {
                 let a = Attester::new(id, 100);
@@ -655,7 +650,6 @@ mod tests {
             .collect();
         let forged = build_attested(&forgers, full, k);
 
-        // Every internal check passes, so only the committee root binding refuses it.
         assert!(verify_attested(&forged, &forged.root, full, n, k, &subject, context));
         assert!(!verify_attested(&forged, &croot, full, n, k, &subject, context));
     }

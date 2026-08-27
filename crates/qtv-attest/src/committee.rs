@@ -59,9 +59,6 @@ impl CommitteeCommitment {
         }
     }
 
-    /// Override the sortition denominator with the registered validator weight the committee
-    /// was drawn against, so an entitlement check verifies a credential against the same total
-    /// the selection used rather than the smaller sum of the drawn members alone.
     pub fn with_total_weight(mut self, total_weight: u64) -> Self {
         self.total_weight = total_weight;
         self
