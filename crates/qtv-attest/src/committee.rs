@@ -59,6 +59,14 @@ impl CommitteeCommitment {
         }
     }
 
+    /// Override the sortition denominator with the registered validator weight the committee
+    /// was drawn against, so an entitlement check verifies a credential against the same total
+    /// the selection used rather than the smaller sum of the drawn members alone.
+    pub fn with_total_weight(mut self, total_weight: u64) -> Self {
+        self.total_weight = total_weight;
+        self
+    }
+
     pub fn len(&self) -> usize {
         self.members.len()
     }
@@ -111,6 +119,21 @@ mod tests {
         );
         assert_eq!(commitment.total_weight, 300);
         assert_eq!(commitment.len(), 3);
+    }
+
+    #[test]
+    fn the_registered_total_overrides_the_drawn_member_sum_and_rebinds_the_digest() {
+        let a = Attester::new(1, 100);
+        let b = Attester::new(2, 100);
+        let drawn = CommitteeCommitment::from_attesters(0, &[&a, &b]);
+        assert_eq!(drawn.total_weight, 200);
+        let registered = drawn.clone().with_total_weight(1_000);
+        assert_eq!(registered.total_weight, 1_000);
+        assert_ne!(
+            drawn.digest(),
+            registered.digest(),
+            "the sortition denominator is bound into the committee digest"
+        );
     }
 
     #[test]
