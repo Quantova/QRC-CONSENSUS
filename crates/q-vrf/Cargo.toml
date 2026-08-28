@@ -12,4 +12,4 @@ publish = false
 name = "q_vrf"
 
 [dependencies]
-qtv-crypto = { git = "https://github.com/Quantova/Q-Crypto.git", rev = "33c7e9395ad23f07019909470d319211213e904f" }
+qtv-crypto = { git = "https://github.com/Quantova/Q-Crypto.git", tag = "v0.3.1" }
