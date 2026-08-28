@@ -18,7 +18,7 @@ name = "qtv_bft"
 test-fixtures = []
 
 [dependencies]
-qtv-crypto = { git = "https://github.com/Quantova/Q-Crypto.git", tag = "v0.3.1" }
+qtv-crypto = { git = "https://github.com/Quantova/Q-Crypto.git", rev = "4d73a36c112b91a6a25a6a876f54cdccb729c7de" }
 
 [dev-dependencies]
 qtv-bft = { path = ".", features = ["test-fixtures"] }
