@@ -1,23 +1,16 @@
 // Copyright 2026 Quantova Inc
 // SPDX-License-Identifier: Apache-2.0 OR MIT
 
-//! Finality certificate cost against committee size.
-
 use std::time::Instant;
 
 use qtv_attest::aggregate::aggregate;
 use qtv_attest::{Attestation, Attester, Beacon, Block, CommitteeCommitment, Parent};
 
-/// Every committee member equally staked, above the two thousand floor.
 const STAKE: u64 = 5_000;
-/// The bounded committee sizes to sweep. The last is the protocol budget, the worst case.
 const SIZES: &[usize] = &[64, 128, 256, 500];
-/// One module lattice signature is 3309 bytes, the dominant term in a certificate's size.
 const SIG_BYTES: usize = 3_309;
 
 fn measure(committee_size: usize) {
-    // A saturating budget so every member is entitled and the whole committee attests, the worst case
-    // for certificate cost.
     let budget = committee_size as u64;
     let attesters: Vec<Attester> = (0..committee_size)
         .map(|i| Attester::new(i as u64 + 1, STAKE))

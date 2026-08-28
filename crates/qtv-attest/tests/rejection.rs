@@ -1,8 +1,6 @@
 // Copyright 2026 Quantova Inc
 // SPDX-License-Identifier: Apache-2.0 OR MIT
 
-//! A forged or tampered attestation carried in a certificate is rejected. A
-
 use qtv_attest::verify::RejectReason;
 use qtv_attest::{
     Attester, Beacon, Block, Certificate, CommitteeCommitment, Envelope, Parent, Verdict,
@@ -45,7 +43,6 @@ fn a_forged_signature_is_rejected() {
 fn a_swapped_block_is_rejected_as_wrong_subject() {
     let (members, beacon, block, commitment) = setup();
     let mut atts = quorum_attestations(&members, &beacon, block, commitment.digest());
-    // The envelope commits to `block`; this attestation now names another block.
     atts[0].block = Block::new(1, [10u8; 32], Parent::Genesis);
     let cert = Certificate::new(Envelope::new(1, 0, block, &commitment), atts);
     assert_eq!(
@@ -58,8 +55,6 @@ fn a_swapped_block_is_rejected_as_wrong_subject() {
 fn a_mangled_membership_credential_is_rejected_as_not_entitled() {
     let (members, beacon, block, commitment) = setup();
     let mut atts = quorum_attestations(&members, &beacon, block, commitment.digest());
-    // The signature stays valid, but the mangled preimage no longer authenticates
-    // to the member's registered root, so entitlement no longer verifies.
     atts[0].membership.preimage[0] ^= 1;
     let cert = Certificate::new(Envelope::new(1, 0, block, &commitment), atts);
     assert_eq!(

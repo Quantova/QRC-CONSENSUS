@@ -276,7 +276,6 @@ impl Machine {
         true
     }
 
-    /// Feed one attestation to the runtime detector as it is admitted. When it completes
     fn detect_and_slash(&mut self, attestation: &Attestation) {
         if let Some(evidence) = self.detector.observe(attestation) {
             if let Some(slash) = slash_from_evidence(&evidence, &self.set) {

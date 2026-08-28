@@ -26,7 +26,6 @@ impl EquivocationEvidence {
         self.first.height
     }
 
-    /// Well formed evidence is a genuine equivocation, the two attestations sharing a
     pub fn is_valid(&self, public_key: &PublicKey) -> bool {
         is_equivocation(&self.first, &self.second)
             && self.first.verify(public_key)
@@ -46,7 +45,6 @@ pub struct Slash {
     pub penalty: Penalty,
 }
 
-/// Turn proven evidence into the attributable slash. The signatures are checked against
 pub fn slash_from_evidence(evidence: &EquivocationEvidence, set: &ValidatorSet) -> Option<Slash> {
     let public_key = set.public_key(evidence.offender())?;
     if !evidence.is_valid(public_key) {
@@ -59,7 +57,6 @@ pub fn slash_from_evidence(evidence: &EquivocationEvidence, set: &ValidatorSet) 
     })
 }
 
-/// A streaming detector. It remembers the first attestation each validator makes at each
 #[derive(Clone, Debug, Default)]
 pub struct EquivocationDetector {
     seen: BTreeMap<(ValidatorId, Height), Attestation>,
@@ -86,7 +83,6 @@ impl EquivocationDetector {
     }
 }
 
-/// The record of applied slashes: which validators are banned and how much bond was
 #[derive(Clone, Debug, Default, PartialEq, Eq)]
 pub struct SlashLedger {
     slashes: Vec<Slash>,

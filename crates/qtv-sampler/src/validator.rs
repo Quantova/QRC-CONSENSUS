@@ -25,13 +25,8 @@ pub enum Fault {
     Offline,
 }
 
-// Domain tag under which a validator's secret is expanded into the seed of its one
-// time sortition tree. It is distinct from the signing key domain in qtv-bft, so
-// the one secret a validator holds yields two independent derived seeds and neither
-// derived seed reveals the other or the secret.
 const SORTITION_TREE_DOMAIN: &[u8] = b"QORUS/validator-keying/v1/sortition-tree";
 
-/// Expand a validator's 32 byte secret into the seed of its one time sortition
 pub fn sortition_tree_seed(secret: &[u8; 32]) -> [u8; 32] {
     const D: usize = SORTITION_TREE_DOMAIN.len();
     let mut buf = [0u8; D + 32];
@@ -171,16 +166,9 @@ impl SamplerValidator {
     }
 }
 
-// Test and simulation fixtures. These construct a validator from a deterministic,
-// per id seed so the test suite and the local devnet simulation are reproducible.
-// They are compiled only under `cfg(test)` or the `test-fixtures` feature and are
-// never part of a node binary: a production validator is always built from a real
-// secret through `from_secret`, so no key material is ever derived from the public
-// id on any running path.
 #[cfg(any(test, feature = "test-fixtures"))]
 const FIXTURE_SECRET_DOMAIN: &[u8] = b"QORUS/TEST-ONLY/insecure-fixture-secret/v1";
 
-/// A deterministic, per id secret for tests and the devnet simulation only. This is
 #[cfg(any(test, feature = "test-fixtures"))]
 pub fn fixture_secret(id: ValidatorId) -> [u8; 32] {
     const D: usize = FIXTURE_SECRET_DOMAIN.len();

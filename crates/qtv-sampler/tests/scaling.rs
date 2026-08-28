@@ -1,8 +1,6 @@
 // Copyright 2026 Quantova Inc
 // SPDX-License-Identifier: Apache-2.0 OR MIT
 
-//! Finality cost does not grow as validators join. The committee that finalises a block is a
-
 use qtv_sampler::beacon::Beacon;
 use qtv_sampler::committee::Registry;
 use qtv_sampler::params::{
@@ -11,14 +9,10 @@ use qtv_sampler::params::{
 use qtv_sampler::sortition::{expected_committee, expected_committee_size};
 use qtv_sampler::validator::SamplerValidator;
 
-/// Every validator equally staked, above the two thousand floor.
 const STAKE: u64 = 5_000;
 
 #[test]
 fn the_committee_stays_bounded_by_the_budget_as_the_set_grows_a_thousandfold() {
-    // The validator set grows by three orders of magnitude, from the budget to a thousand times it.
-    // The expected committee size, the number of members a certificate must carry, stays pinned at
-    // the budget the whole way, so the finality work does not grow with the set.
     let budget = COMMITTEE_BUDGET;
     for multiple in [1u64, 2, 10, 100, 1000] {
         let n = (budget * multiple) as usize;
@@ -37,8 +31,6 @@ fn the_committee_stays_bounded_by_the_budget_as_the_set_grows_a_thousandfold() {
 
 #[test]
 fn a_thousandfold_larger_set_finalises_with_the_same_size_committee() {
-    // Concretely: half a million validators finalise with the same size committee as five hundred, so
-    // the certificate, its verification cost, and its bandwidth are identical at both scales.
     let budget = COMMITTEE_BUDGET;
     let five_hundred = expected_committee_size(&vec![STAKE; budget as usize], budget);
     let half_a_million = expected_committee_size(&vec![STAKE; (budget * 1000) as usize], budget);
@@ -68,10 +60,6 @@ fn the_threshold_is_a_two_thirds_supermajority_the_adversary_cannot_span() {
 
 #[test]
 fn a_real_sortition_draw_stays_bounded_far_below_a_large_set() {
-    // The analytic bound is one thing; confirm the actual sortition draw is bounded too. Draw a real
-    // committee from a large set and check it sits near the budget and far below the set. One slot
-    // trees keep the set cheap to build, the tree is the membership proof and does not affect the
-    // stake weighted draw.
     let budget = 200u64;
     let n = 10_000usize;
     let validators: Vec<SamplerValidator> = (0..n)

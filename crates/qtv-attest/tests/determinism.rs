@@ -1,8 +1,6 @@
 // Copyright 2026 Quantova Inc
 // SPDX-License-Identifier: Apache-2.0 OR MIT
 
-//! Determinism. The same attestations aggregate into the same certificate, and
-
 use qtv_attest::aggregate::aggregate;
 use qtv_attest::{Attester, Beacon, Block, CommitteeCommitment, Parent};
 
@@ -24,7 +22,6 @@ fn the_same_attestations_produce_the_same_certificate() {
         .collect();
     let cert_a = aggregate(1, 1, 0, block, &commitment_a, &beacon, &atts_a, 3).expect("quorum");
 
-    // A wholly fresh construction of the same committee and attestations.
     let second = committee_of_four();
     let second_refs: Vec<&Attester> = second.iter().collect();
     let commitment_b = CommitteeCommitment::from_attesters(0, &second_refs);

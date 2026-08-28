@@ -86,7 +86,6 @@ pub fn expected_committee_size(weights: &[u64], budget: u64) -> f64 {
 }
 
 pub fn expected_committee(weights: &[u64], budget: u64) -> u64 {
-    // Integer math so the finality threshold is identical on every node, never f64-dependent.
     let total: u128 = weights.iter().map(|&w| w as u128).fold(0u128, u128::saturating_add);
     if total == 0 {
         return 0;
@@ -119,7 +118,6 @@ pub fn leader_score(output: &[u8; OUTPUT_BYTES], weight: u64) -> f64 {
 
 pub const LEADER_SCORE_FRAC_BITS: u32 = 48;
 
-/// A fixed point rendering of minus the base two logarithm of the sortition output
 pub fn leader_neg_log2(output: &[u8; OUTPUT_BYTES]) -> u128 {
     let frac = LEADER_SCORE_FRAC_BITS;
     let v = output_value(output) as u128 + 1;
@@ -140,7 +138,6 @@ pub fn leader_neg_log2(output: &[u8; OUTPUT_BYTES]) -> u128 {
     (64u128 << frac) - log2
 }
 
-/// Whether the candidate is a strictly better leader than the current best: a lower
 pub fn leader_prefers(
     cand_neg_log2: u128,
     cand_weight: u64,
@@ -249,13 +246,9 @@ mod tests {
 
     #[test]
     fn expected_committee_is_deterministic_integer_math() {
-        // Unsaturated: a thousand equal validators at half budget expect the budget itself.
         assert_eq!(expected_committee(&vec![1_000u64; 1_000], 500), 500);
-        // Saturated: budget past the set draws the whole set, never more.
         assert_eq!(expected_committee(&[1, 1, 1], 10), 3);
-        // Five equal validators at budget two is exactly two.
         assert_eq!(expected_committee(&[100, 100, 100, 100, 100], 2), 2);
-        // An empty or zero weight set draws nothing.
         assert_eq!(expected_committee(&[], 5), 0);
         assert_eq!(expected_committee(&[0, 0], 5), 0);
     }

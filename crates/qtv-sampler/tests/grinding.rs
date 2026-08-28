@@ -1,21 +1,14 @@
 // Copyright 2026 Quantova Inc
 // SPDX-License-Identifier: Apache-2.0 OR MIT
 
-//! The acceptance bar for the one time key sortition: the grinding budget is
-
 use qtv_sampler::beacon::Beacon;
 use qtv_sampler::onetime::derive_preimage;
 use qtv_sampler::params::{DOMAIN_COMMITTEE, DOMAIN_LEADER};
 use qtv_sampler::sortition::{leader_score, verify_membership, verify_selection, Credential};
 use qtv_sampler::validator::SamplerValidator;
 
-// A budget that saturates a single account's stake share, so a genuinely revealed
-// draw always clears the threshold. This isolates the membership binding from the
-// stake weighting.
 const SATURATING_BUDGET: u64 = 100;
 
-// How wide the adversary is allowed to search. A budget of one means that however
-// wide the search grows, exactly one candidate for a slot ever authenticates.
 const SEARCH: u64 = 8192;
 
 #[test]
@@ -29,7 +22,6 @@ fn the_grinding_budget_is_exactly_one_valid_draw_per_slot() {
 
     let mut forgeries_accepted = 0u64;
 
-    // Vary the preimage across a wide search, keeping the honest path and slot.
     for k in 0..SEARCH {
         let cand = Credential {
             position: slot,
@@ -44,8 +36,6 @@ fn the_grinding_budget_is_exactly_one_valid_draw_per_slot() {
         }
     }
 
-    // Vary the path siblings, keeping the honest preimage. A forged path cannot
-    // re-root the committed leaf to the registered digest.
     for k in 0..SEARCH {
         let mut path = honest.path.clone();
         for (i, sib) in path.siblings.iter_mut().enumerate() {
@@ -64,7 +54,7 @@ fn the_grinding_budget_is_exactly_one_valid_draw_per_slot() {
         }
     }
 
-    let total_valid = 1 + forgeries_accepted; // the honest reveal plus any forgery
+    let total_valid = 1 + forgeries_accepted;
     assert_eq!(total_valid, 1, "more than one draw authenticated for the slot");
 }
 
@@ -96,8 +86,6 @@ fn no_authenticating_credential_beats_the_honest_output() {
                 lowest_authenticating = value;
             }
         } else if value < honest_value {
-            // The adversary can compute lower outputs at will, it just cannot make
-            // one authenticate. This proves the motive is real and the search wide.
             a_lower_forgery_exists = true;
         }
     }

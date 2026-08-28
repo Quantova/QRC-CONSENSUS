@@ -33,8 +33,6 @@ impl Root {
         }
         let depth = match tree_depth(self.slots) {
             Some(depth) => depth,
-            // A slot count past 2^63 cannot form a padded power of two tree. Reject the root
-            // rather than overflow the depth computation and halt the verifier.
             None => return false,
         };
         if path.siblings.len() != depth {
@@ -227,9 +225,6 @@ mod tests {
 
     #[test]
     fn a_slot_count_past_the_power_of_two_ceiling_is_rejected_not_a_panic() {
-        // A committee member can sign an epoch root carrying slots = u64::MAX. Verifying any
-        // membership against it must fail closed, not overflow the depth computation and halt
-        // every verifier on the unguarded apply thread.
         let root = Root {
             digest: [0u8; NODE_BYTES],
             slots: u64::MAX,

@@ -1,8 +1,6 @@
 // Copyright 2026 Quantova Inc
 // SPDX-License-Identifier: Apache-2.0 OR MIT
 
-//! The committee size respects the budget bound. The budget is the target
-
 use qtv_sampler::beacon::Beacon;
 use qtv_sampler::committee::Registry;
 use qtv_sampler::sortition::{expected_committee_size, is_selected};
@@ -26,7 +24,6 @@ fn expected_committee_size_equals_the_budget() {
 
 #[test]
 fn a_budget_above_the_set_yields_the_set_and_no_more() {
-    // Every share saturates, so the expected size is the set, not beyond it.
     let weights = vec![1u64; 8];
     let size = expected_committee_size(&weights, 100);
     assert!((size - 8.0).abs() < 1e-9, "size was {size}");

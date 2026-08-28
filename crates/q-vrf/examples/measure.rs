@@ -1,12 +1,6 @@
 // Copyright 2026 Quantova Inc
 // SPDX-License-Identifier: Apache-2.0 OR MIT
 
-//! Timing and size measurements for the Q-VRF primitive across epoch sizes.
-//!
-//! Reports keygen, eval, prove and verify times, proof size and public key size.
-//! Per operation cost tracks the tree depth, that is the base two logarithm of the
-//! epoch slot count, and is independent of the number of validators in the network.
-
 use std::hint::black_box;
 use std::time::Instant;
 
@@ -19,12 +13,10 @@ fn bench_position(slots: u64) {
         s
     };
 
-    // keygen builds the whole tree once for the epoch.
     let t0 = Instant::now();
     let (sk, pk) = keygen(seed, slots);
     let keygen_ns = t0.elapsed().as_nanos();
 
-    // Warm and size a single transcript.
     let (y0, proof0) = sk.eval_and_prove(slots / 2);
     assert!(verify(&pk, slots / 2, &y0, &proof0));
     let proof_bytes = proof0.size_bytes();
@@ -33,7 +25,6 @@ fn bench_position(slots: u64) {
 
     let iters: u64 = 100_000.min(slots.max(1) * 64);
 
-    // eval
     let t0 = Instant::now();
     for i in 0..iters {
         let pos = i % slots;
@@ -41,7 +32,6 @@ fn bench_position(slots: u64) {
     }
     let eval_ns = t0.elapsed().as_nanos() as f64 / iters as f64;
 
-    // prove
     let t0 = Instant::now();
     for i in 0..iters {
         let pos = i % slots;
@@ -49,7 +39,6 @@ fn bench_position(slots: u64) {
     }
     let prove_ns = t0.elapsed().as_nanos() as f64 / iters as f64;
 
-    // verify
     let (y, proof) = sk.eval_and_prove(slots / 3);
     let pos = slots / 3;
     let t0 = Instant::now();
@@ -77,8 +66,6 @@ fn main() {
         bench_position(slots);
     }
 
-    // A committee of size k verifies k credentials per slot. Show the aggregate stays
-    // far under a 150 ms slot and does not depend on the total validator count.
     let slots = 8_192u64;
     let (sk, pk) = keygen([7u8; 32], slots);
     let transcripts: Vec<_> = (0..1_024u64)

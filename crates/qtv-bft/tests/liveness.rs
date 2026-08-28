@@ -1,8 +1,6 @@
 // Copyright 2026 Quantova Inc
 // SPDX-License-Identifier: Apache-2.0 OR MIT
 
-//! Liveness: once the network is stable, an honest online supermajority makes
-
 use qtv_bft::machine::Machine;
 use qtv_bft::params::supermajority;
 use qtv_bft::validator::{Fault, ValidatorSet};
@@ -19,7 +17,6 @@ fn honest_supermajority_finalizes_every_height() {
 
 #[test]
 fn finalizes_with_a_tolerated_offline_validator() {
-    // MC_Liveness: four validators, one offline, quorum of three, two heights.
     let mut set = ValidatorSet::new(4);
     set.set_fault(4, Fault::Offline);
     let mut machine = Machine::new(set, 4, SEED, 2, 3);
@@ -30,8 +27,6 @@ fn finalizes_with_a_tolerated_offline_validator() {
 
 #[test]
 fn view_change_makes_progress_past_a_faulty_leader() {
-    // The leader of height 1 view 0 is validator 2. Making it offline forces a
-    // view change, after which an honest online leader finalizes the height.
     let mut set = ValidatorSet::new(4);
     set.set_fault(2, Fault::Offline);
     let mut machine = Machine::new(set, 4, SEED, 1, 3);
@@ -48,7 +43,6 @@ fn view_change_makes_progress_past_a_faulty_leader() {
 fn a_stable_honest_leader_is_never_rotated_past() {
     let mut machine = Machine::new(ValidatorSet::new(4), 4, SEED, 1, 3);
     machine.stabilize();
-    // Validator 2 leads height 1 view 0 and is honest and online.
     assert_eq!(machine.leader_of(1, 0), Some(2));
     assert!(
         !machine.timeout(1),
@@ -80,7 +74,6 @@ fn a_larger_committee_still_finalizes() {
 
 #[test]
 fn a_prover_never_enters_a_quorum() {
-    // A prover holds no vote, so adding one does not change finalization.
     let set = ValidatorSet::new(4).with_prover();
     let mut machine = Machine::new(set, 4, SEED, 2, 3);
     let certs = machine.run();

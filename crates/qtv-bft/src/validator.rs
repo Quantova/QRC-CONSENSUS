@@ -21,14 +21,8 @@ pub enum Fault {
     Offline,
 }
 
-// Domain tag under which a validator's secret is expanded into the seed of its
-// ML-DSA-65 signing key. It is distinct from the sortition tree domain in
-// qtv-sampler, so the one secret a validator holds yields two independent derived
-// seeds and knowledge of one derived seed or of the public key reveals neither the
-// other seed nor the secret.
 const SIGNING_KEY_DOMAIN: &[u8] = b"QORUS/validator-keying/v1/ml-dsa-65-signing";
 
-/// Expand a validator's 32 byte secret into the ML-DSA-65 keygen seed. The secret
 pub fn signing_key_seed(secret: &[u8; 32]) -> [u8; 32] {
     const D: usize = SIGNING_KEY_DOMAIN.len();
     let mut buf = [0u8; D + 32];
@@ -110,16 +104,9 @@ impl fmt::Debug for Validator {
     }
 }
 
-// Test and simulation fixtures. These construct a validator from a deterministic,
-// per id seed so the test suite and the local devnet simulation are reproducible.
-// They are compiled only under `cfg(test)` or the `test-fixtures` feature and are
-// never part of a node binary: a production validator is always built from a real
-// secret through `from_secret`, so no signing key is ever derived from the public id
-// on any running path.
 #[cfg(any(test, feature = "test-fixtures"))]
 const FIXTURE_SECRET_DOMAIN: &[u8] = b"QORUS/TEST-ONLY/insecure-fixture-secret/v1";
 
-/// A deterministic, per id secret for tests and the devnet simulation only. This is
 #[cfg(any(test, feature = "test-fixtures"))]
 pub fn fixture_secret(id: ValidatorId) -> [u8; 32] {
     const D: usize = FIXTURE_SECRET_DOMAIN.len();

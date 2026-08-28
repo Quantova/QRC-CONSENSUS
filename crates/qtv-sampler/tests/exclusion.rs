@@ -1,8 +1,6 @@
 // Copyright 2026 Quantova Inc
 // SPDX-License-Identifier: Apache-2.0 OR MIT
 
-//! A prover holds zero votes and is never in a committee. Provers are excluded
-
 use qtv_sampler::beacon::Beacon;
 use qtv_sampler::committee::Registry;
 use qtv_sampler::validator::SamplerValidator;

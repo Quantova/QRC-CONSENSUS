@@ -226,7 +226,6 @@ pub fn verify_sampled(
 
 const ATTESTED_LEAF_DOMAIN: &[u8] = b"QORUS/fold/attested-leaf";
 
-/// The fold leaf for an attesting committee member, binding the member's attestation
 pub fn attested_leaf(public_key: &PublicKey, stake: u64) -> [u8; 32] {
     let mut buf = Vec::with_capacity(ATTESTED_LEAF_DOMAIN.len() + public_key.len() + 8);
     buf.extend_from_slice(ATTESTED_LEAF_DOMAIN);
@@ -293,7 +292,6 @@ pub struct AttestedFoldCertificate {
     pub openings: Vec<AttestedOpening>,
 }
 
-/// Build a signature carrying fold certificate over the attesters. Each attester is its
 pub fn build_attested(
     attesters: &[(PublicKey, u64, Signature)],
     committee_total: u64,
@@ -328,7 +326,6 @@ pub fn build_attested(
     }
 }
 
-/// Verify a signature carrying fold certificate. Beyond the stake totals, the quorum,
 pub fn verify_attested(
     cert: &AttestedFoldCertificate,
     committee_root: &[u8; 32],

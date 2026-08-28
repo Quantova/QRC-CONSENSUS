@@ -1,8 +1,6 @@
 // Copyright 2026 Quantova Inc
 // SPDX-License-Identifier: Apache-2.0 OR MIT
 
-//! A certificate built from an entitled supermajority verifies, and a
-
 use qtv_attest::aggregate::aggregate;
 use qtv_attest::verify::RejectReason;
 use qtv_attest::{
@@ -21,7 +19,6 @@ fn an_entitled_supermajority_certificate_verifies() {
     let block = Block::new(1, [9u8; 32], Parent::Genesis);
     let commitment = CommitteeCommitment::from_attesters(0, &refs);
 
-    // Three of four entitled members attest, a supermajority.
     let atts: Vec<_> = members[..3]
         .iter()
         .map(|a| a.attest(1, 1, 0, 0, commitment.digest(), block, &beacon))
@@ -41,17 +38,13 @@ fn a_certificate_missing_the_supermajority_does_not_verify() {
     let block = Block::new(1, [9u8; 32], Parent::Genesis);
     let commitment = CommitteeCommitment::from_attesters(0, &refs);
 
-    // Only two of four attest, one short of the quorum of three.
     let atts: Vec<_> = members[..2]
         .iter()
         .map(|a| a.attest(1, 1, 0, 0, commitment.digest(), block, &beacon))
         .collect();
 
-    // Aggregation refuses to form a certificate.
     assert!(aggregate(1, 1, 0, block, &commitment, &beacon, &atts, 3).is_none());
 
-    // A certificate hand built from the same two attestations is rejected as
-    // not a quorum, so it never finalizes the block.
     let envelope = Envelope::new(1, 0, block, &commitment);
     let cert = Certificate::new(envelope, atts);
     assert_eq!(

@@ -1,8 +1,6 @@
 // Copyright 2026 Quantova Inc
 // SPDX-License-Identifier: Apache-2.0 OR MIT
 
-//! Attestations use real module lattice signatures. A genuine attestation
-
 use qtv_bft::attest::Attestation;
 use qtv_bft::block::{Block, Parent};
 use qtv_bft::certificate::aggregate;
@@ -42,12 +40,10 @@ fn a_forged_attestation_cannot_complete_a_quorum() {
     let set = ValidatorSet::new(4);
     let committee = vec![1, 2, 3, 4];
     let block = Block::new(1, [42u8; 32], Parent::Genesis);
-    // Two genuine attestations, one short of the quorum of three.
     let mut atts: Vec<Attestation> = [1u64, 2]
         .iter()
         .map(|&id| Attestation::create(set.get(id).unwrap(), 1, block))
         .collect();
-    // A forged third attestation must not close the gap.
     let mut forged = Attestation::create(set.get(3).unwrap(), 1, block);
     forged.sig[0] ^= 255;
     atts.push(forged);

@@ -1,14 +1,11 @@
 // Copyright 2026 Quantova Inc
 // SPDX-License-Identifier: Apache-2.0 OR MIT
 
-//! Safety: no two conflicting blocks are ever finalized at one height, the
-
 use qtv_bft::block::{Block, Parent};
 use qtv_bft::certificate::Certificate;
 use qtv_bft::machine::Machine;
 use qtv_bft::validator::{Fault, ValidatorSet};
 
-/// Agreement: certificates at the same height finalize the same block.
 fn agreement_holds(certs: &[Certificate]) -> bool {
     for a in certs {
         for b in certs {
@@ -26,33 +23,27 @@ fn byzantine_set() -> ValidatorSet {
     set
 }
 
-/// Drive one adversarial height where the byzantine leader equivocates on both
 fn drive_equivocation(seed: [u8; 32], honest_for_a: [bool; 3]) -> Machine {
     let mut machine = Machine::new(byzantine_set(), 4, seed, 1, 1);
     machine.stabilize();
 
-    // The leader of height 1 view 0 is validator 2, the byzantine.
     assert_eq!(machine.leader_of(1, 0), Some(2));
 
     let block_a = Block::new(1, [100u8; 32], Parent::Genesis);
     let block_b = Block::new(1, [200u8; 32], Parent::Genesis);
 
-    // The byzantine leader proposes two conflicting blocks in the same view.
     assert!(machine.byz_propose(1, block_a));
     assert!(machine.byz_propose(1, block_b));
 
-    // The byzantine validator double signs, attesting both blocks.
     machine.byz_vote(2, 1, block_a);
     machine.byz_vote(2, 1, block_b);
 
-    // The honest validators 1, 3, 4 each attest one of the two blocks.
     let honest = [1u64, 3, 4];
     for (i, &id) in honest.iter().enumerate() {
         let block = if honest_for_a[i] { block_a } else { block_b };
         machine.vote(id, 1, block);
     }
 
-    // Attempt to finalize each block. At most one can gather a quorum.
     machine.finalize(1, block_a);
     machine.finalize(1, block_b);
     machine
@@ -69,7 +60,6 @@ fn agreement_holds_across_every_honest_split() {
                 agreement_holds(certs),
                 "conflicting finalization at seed {seed:?} split {split:?}"
             );
-            // Never both blocks: the distinct finalized blocks number at most one.
             let mut blocks: Vec<_> = certs.iter().map(|c| c.block).collect();
             blocks.dedup();
             assert!(blocks.len() <= 1);
@@ -79,8 +69,6 @@ fn agreement_holds_across_every_honest_split() {
 
 #[test]
 fn a_two_thirds_honest_split_still_finalizes() {
-    // Two honest for A plus the equivocating byzantine reach the quorum of
-    // three, so finalization is not vacuous, while B stays short.
     let machine = drive_equivocation([192u8; 32], [true, true, false]);
     let certs = machine.certificates();
     assert_eq!(certs.len(), 1);
@@ -93,14 +81,11 @@ fn the_equivocator_is_the_only_slashed_validator() {
     let machine = drive_equivocation([192u8; 32], [true, false, false]);
     let slashed = machine.slashed();
     assert_eq!(slashed, vec![2]);
-    // Only a byzantine validator is ever slashed, honest ones never equivocate.
     assert!(slashed.iter().all(|&id| id == 2));
 }
 
 #[test]
 fn honest_leader_run_never_conflicts_over_many_seeds() {
-    // The honest happy path over several seeds and heights also preserves
-    // Agreement, and no honest validator is ever slashed.
     for n in 0..12u8 {
         let seed = [n; 32];
         let mut machine = Machine::new(ValidatorSet::new(4), 4, seed, 3, 3);

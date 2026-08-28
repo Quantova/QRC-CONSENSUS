@@ -1,8 +1,6 @@
 // Copyright 2026 Quantova Inc
 // SPDX-License-Identifier: Apache-2.0 OR MIT
 
-//! The same beacon and roots give the same committee and the same leader. The
-
 use qtv_sampler::beacon::Beacon;
 use qtv_sampler::committee::{Committee, Registry};
 use qtv_sampler::params::DOMAIN_COMMITTEE;
@@ -17,9 +15,6 @@ fn registry() -> Registry {
     .with_floor(0)
 }
 
-// The ids paired with their committee outputs over the beacon, the full
-// observable committee. The output binds the beacon, so it distinguishes draws
-// under different beacons even though the committed preimage is the same.
 fn fingerprint(c: &Committee, beacon: &Beacon, slot: u64) -> Vec<(u64, [u8; 32])> {
     c.members
         .iter()
@@ -54,8 +49,6 @@ fn a_different_beacon_changes_the_outputs() {
     let next = genesis.advance(&[3u8; 32], 1);
     let a = reg.sample_committee(&genesis, 0);
     let b = reg.sample_committee(&next, 0);
-    // The generous budget admits the whole set under either beacon, but the
-    // deterministic outputs differ because they bind the beacon.
     assert_eq!(a.ids(), b.ids());
     assert_ne!(fingerprint(&a, &genesis, 0), fingerprint(&b, &next, 0));
 }

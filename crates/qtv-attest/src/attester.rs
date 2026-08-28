@@ -36,7 +36,6 @@ pub fn epoch_registration_verifies(
     verify(attest_pk, &msg, sig, EPOCH_REG_CONTEXT)
 }
 
-/// A validator that attests. It holds one high entropy secret and derives from it,
 pub struct Attester {
     signer: Validator,
     sampler: SamplerValidator,
@@ -103,7 +102,6 @@ impl Attester {
         self.sampler.root()
     }
 
-    /// The attester's own sortition reveal for a slot.
     pub fn reveal(&self, slot: u64) -> qtv_sampler::sortition::Credential {
         self.sampler.reveal(slot)
     }
@@ -124,16 +122,9 @@ impl Attester {
     }
 }
 
-// Test and simulation fixtures. An attester built here derives its one secret from a
-// deterministic, per id seed so the test suite and the local devnet simulation are
-// reproducible. They are compiled only under `cfg(test)` or the `test-fixtures`
-// feature and are never part of a node binary: a production attester is always built
-// from a real secret through `from_secret`, so neither its signing key nor its
-// sortition tree is ever derived from the public id on any running path.
 #[cfg(any(test, feature = "test-fixtures"))]
 const FIXTURE_SECRET_DOMAIN: &[u8] = b"QORUS/TEST-ONLY/insecure-fixture-secret/v1";
 
-/// A deterministic, per id secret for tests and the devnet simulation only, shared
 #[cfg(any(test, feature = "test-fixtures"))]
 pub fn fixture_secret(id: ValidatorId) -> [u8; 32] {
     const D: usize = FIXTURE_SECRET_DOMAIN.len();
@@ -181,10 +172,8 @@ mod tests {
         let secret = [42u8; 32];
         let a = Attester::from_secret(1, &secret, 100);
         let b = Attester::from_secret(1, &secret, 100);
-        // The one secret reproduces both commitments exactly.
         assert_eq!(a.attest_public_key(), b.attest_public_key());
         assert_eq!(a.root(), b.root());
-        // A different secret moves both commitments.
         let c = Attester::from_secret(1, &[43u8; 32], 100);
         assert_ne!(a.attest_public_key(), c.attest_public_key());
         assert_ne!(a.root(), c.root());

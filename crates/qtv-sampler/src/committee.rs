@@ -34,12 +34,10 @@ impl Committee {
         self.members.iter().any(|m| m.id == id)
     }
 
-    /// The committee's reveal preimages in ascending member id order. Each is fixed by
     pub fn reveals(&self) -> Vec<[u8; PREIMAGE_BYTES]> {
         self.members.iter().map(|m| m.credential.preimage).collect()
     }
 
-    /// The next slot beacon, advanced from this committee's reveals rather than from any
     pub fn next_beacon(&self, beacon: &Beacon, slot: u64) -> Beacon {
         beacon.advance_from_reveals(slot, &self.reveals())
     }
@@ -54,7 +52,6 @@ pub fn verify_leader(root: &Root, slot: u64, credential: &Credential) -> bool {
     verify_membership(root, slot, credential)
 }
 
-/// The lowest score member of a committee is its leader for the slot. The score is
 pub fn elect_leader(committee: &Committee, beacon: &Beacon, slot: u64) -> Option<Leader> {
     let mut best: Option<(u128, u64, ValidatorId, Credential)> = None;
     for m in &committee.members {
@@ -71,7 +68,6 @@ pub fn elect_leader(committee: &Committee, beacon: &Beacon, slot: u64) -> Option
     best.map(|(_, _, id, credential)| Leader { id, credential })
 }
 
-/// A validator's own sortition reveal for a slot, its id and its one time credential.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct PublishedReveal {
     pub id: ValidatorId,
@@ -84,7 +80,6 @@ impl PublishedReveal {
     }
 }
 
-/// A view over the registered validator set holding only each validator's registration,
 pub struct CommitteeView {
     registrations: Vec<Registration>,
     budget: u64,
@@ -138,7 +133,6 @@ impl CommitteeView {
             .collect()
     }
 
-    /// Whether a credential published by `id` authenticates to that validator's
     pub fn admits(
         &self,
         beacon: &Beacon,
@@ -162,7 +156,6 @@ impl CommitteeView {
         }
     }
 
-    /// Assemble the committee for a slot from the reveals validators publish for
     pub fn form_committee(
         &self,
         beacon: &Beacon,
@@ -206,9 +199,6 @@ impl CommitteeView {
     }
 }
 
-// Roster backed sampler for the test suite and the local simulation, the reference the
-// sortition math is proven against. Compiled only under cfg(test) or the test-fixtures
-// feature and absent from a default build.
 #[cfg(any(test, feature = "test-fixtures"))]
 pub use roster::Registry;
 

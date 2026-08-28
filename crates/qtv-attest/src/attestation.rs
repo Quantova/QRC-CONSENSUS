@@ -20,10 +20,6 @@ pub fn attestation_message(
     committee: &CommitteeDigest,
     block: &Block,
 ) -> Vec<u8> {
-    // The chain id leads the preimage so an attestation, and therefore the certificate it joins, is
-    // bound to the chain it was produced on. A verifier rebuilds the message with its own chain id, so
-    // a certificate valid on one chain does not verify on another even when the validator keys are
-    // shared across instances.
     let mut msg = Vec::with_capacity(8 + 24 + 33);
     msg.extend_from_slice(&chain_id.to_le_bytes());
     msg.extend_from_slice(&height.to_le_bytes());
@@ -155,8 +151,6 @@ mod tests {
 
     #[test]
     fn an_attestation_is_bound_to_its_chain_and_will_not_verify_under_another() {
-        // The chain id is folded into the signed preimage, so an attestation, and the certificate it
-        // joins, is valid only on its own chain, even when validator keys are shared across instances.
         let (signer, sampler) = parts(1, 100);
         let block = Block::new(1, [5u8; 32], Parent::Genesis);
         let membership = sampler.reveal(0);

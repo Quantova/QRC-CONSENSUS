@@ -1,8 +1,6 @@
 // Copyright 2026 Quantova Inc
 // SPDX-License-Identifier: Apache-2.0 OR MIT
 
-//! An offline validator is skipped and is never slashed, mirroring the
-
 use qtv_bft::machine::Machine;
 use qtv_bft::validator::{Fault, ValidatorSet};
 
@@ -18,7 +16,6 @@ fn set_with_offline(count: usize, offline: &[u64]) -> ValidatorSet {
 
 #[test]
 fn tolerated_offline_validator_still_finalizes_in_order() {
-    // Four validators, one offline. The three online are exactly a quorum.
     let set = set_with_offline(4, &[4]);
     let mut machine = Machine::new(set, 4, SEED, 2, 3);
     let certs = machine.run();
@@ -61,8 +58,6 @@ fn offline_validator_is_never_a_finalized_proposer() {
 
 #[test]
 fn excess_offline_stalls_but_never_slashes() {
-    // Two of four offline leaves only two online, below the quorum of three, so
-    // no height finalizes, yet no validator is ever slashed.
     let set = set_with_offline(4, &[3, 4]);
     let mut machine = Machine::new(set, 4, SEED, 2, 3);
     let certs = machine.run();

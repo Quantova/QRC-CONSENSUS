@@ -1,8 +1,6 @@
 // Copyright 2026 Quantova Inc
 // SPDX-License-Identifier: Apache-2.0 OR MIT
 
-//! Wire format vectors for the one time key sortition. The sortition output, the
-
 use qtv_sampler::beacon::Beacon;
 use qtv_sampler::onetime::{derive_preimage, leaf_hash, node_hash, PREIMAGE_BYTES};
 use qtv_sampler::params::{DOMAIN_COMMITTEE, DOMAIN_LEADER};
@@ -49,10 +47,6 @@ fn tree_hashing_matches_its_pinned_vectors() {
 
 #[test]
 fn a_committed_root_matches_its_pinned_vector() {
-    // The committed root under a fixed validator secret. The secret is an explicit
-    // known input here, not a function of the id, so this vector locks the whole
-    // path from a validator's secret through the domain separated tree seed to the
-    // published root.
     let secret = [0x11u8; 32];
     let v = SamplerValidator::from_secret(1, &secret, 100);
     assert_eq!(

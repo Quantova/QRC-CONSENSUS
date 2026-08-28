@@ -1,8 +1,6 @@
 // Copyright 2026 Quantova Inc
 // SPDX-License-Identifier: Apache-2.0 OR MIT
 
-//! Only native stake counts. A bridged origin tagged holding is rejected as
-
 use qtv_sampler::beacon::Beacon;
 use qtv_sampler::committee::Registry;
 use qtv_sampler::params::DOMAIN_COMMITTEE;
@@ -21,8 +19,6 @@ fn a_bridged_holding_is_never_selected() {
     assert_eq!(v.weight(), 0);
     let beacon = Beacon::genesis();
     let cred = v.reveal(0);
-    // Even a budget as large as the whole bridged amount cannot admit a zero
-    // weight holding.
     assert!(!verify_selection(
         &v.root(),
         &beacon,
@@ -43,7 +39,6 @@ fn a_bridged_validator_stays_out_of_the_committee() {
     ])
     .with_budget(50)
     .with_floor(0);
-    // The bridged holding does not count toward the total weight.
     assert_eq!(reg.total_weight(), 100);
     let committee = reg.sample_committee(&Beacon::genesis(), 0);
     assert!(committee.contains(1));
