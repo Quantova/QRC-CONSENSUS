@@ -21,7 +21,11 @@ fn committee(members: &[Attester]) -> CommitteeCommitment {
 }
 
 fn old_style_draw(slot: u64) -> Credential {
-    let depth = SamplerValidator::new(999, STAKE).reveal(slot).path.siblings.len();
+    let depth = SamplerValidator::new(999, STAKE)
+        .reveal(slot)
+        .path
+        .siblings
+        .len();
     Credential {
         position: slot,
         preimage: [171; 32],

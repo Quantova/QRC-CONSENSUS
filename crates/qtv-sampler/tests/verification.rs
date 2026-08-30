@@ -59,16 +59,7 @@ fn an_unentitled_account_has_a_genuine_but_failing_credential() {
         total,
         &cred,
     );
-    let entitled = verify_selection(
-        &v.root(),
-        &beacon,
-        DOMAIN_COMMITTEE,
-        0,
-        1,
-        total,
-        1,
-        &cred,
-    );
+    let entitled = verify_selection(&v.root(), &beacon, DOMAIN_COMMITTEE, 0, 1, total, 1, &cred);
     assert!(genuine, "the credential is a valid one time reveal");
     assert!(!entitled, "the account is not entitled at its true stake");
 }

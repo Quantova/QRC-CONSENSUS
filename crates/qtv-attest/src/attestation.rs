@@ -68,8 +68,14 @@ impl Attestation {
     }
 
     pub fn signature_verifies(&self, chain_id: u64, attest_pk: &PublicKey) -> bool {
-        let msg =
-            attestation_message(chain_id, self.height, self.slot, self.view, &self.committee, &self.block);
+        let msg = attestation_message(
+            chain_id,
+            self.height,
+            self.slot,
+            self.view,
+            &self.committee,
+            &self.block,
+        );
         verify(attest_pk, &msg, &self.sig, ATTEST_CONTEXT)
     }
 

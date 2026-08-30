@@ -70,10 +70,12 @@ impl EquivocationDetector {
     pub fn observe(&mut self, attestation: &Attestation) -> Option<EquivocationEvidence> {
         let key = (attestation.from, attestation.height);
         match self.seen.get(&key) {
-            Some(previous) if is_equivocation(previous, attestation) => Some(EquivocationEvidence {
-                first: previous.clone(),
-                second: attestation.clone(),
-            }),
+            Some(previous) if is_equivocation(previous, attestation) => {
+                Some(EquivocationEvidence {
+                    first: previous.clone(),
+                    second: attestation.clone(),
+                })
+            }
             Some(_) => None,
             None => {
                 self.seen.insert(key, attestation.clone());
@@ -133,8 +135,13 @@ mod tests {
         let second = att(offender, 1, [2u8; 32]);
 
         let mut detector = EquivocationDetector::new();
-        assert!(detector.observe(&first).is_none(), "the first vote is not yet a fault");
-        let evidence = detector.observe(&second).expect("the conflicting vote is caught");
+        assert!(
+            detector.observe(&first).is_none(),
+            "the first vote is not yet a fault"
+        );
+        let evidence = detector
+            .observe(&second)
+            .expect("the conflicting vote is caught");
         assert_eq!(evidence.offender(), 2);
         assert_eq!(evidence.height(), 1);
 
@@ -155,10 +162,15 @@ mod tests {
         let set = ValidatorSet::new(4);
         let mut detector = EquivocationDetector::new();
         for h in 1..=3u64 {
-            assert!(detector.observe(&att(set.get(1).unwrap(), h, [9u8; 32])).is_none());
+            assert!(detector
+                .observe(&att(set.get(1).unwrap(), h, [9u8; 32]))
+                .is_none());
         }
         let resend = att(set.get(1).unwrap(), 1, [9u8; 32]);
-        assert!(detector.observe(&resend).is_none(), "resending one vote is not a fault");
+        assert!(
+            detector.observe(&resend).is_none(),
+            "resending one vote is not a fault"
+        );
     }
 
     #[test]
@@ -172,7 +184,9 @@ mod tests {
 
         let mut detector = EquivocationDetector::new();
         assert!(detector.observe(&first).is_none());
-        let evidence = detector.observe(&second).expect("the claimed pair is paired");
+        let evidence = detector
+            .observe(&second)
+            .expect("the claimed pair is paired");
         assert_eq!(evidence.offender(), 1);
 
         assert!(!evidence.is_valid(set.public_key(1).unwrap()));

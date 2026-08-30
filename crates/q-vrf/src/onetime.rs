@@ -110,7 +110,8 @@ pub struct OneTimeTree {
 impl OneTimeTree {
     pub fn new(seed: [u8; 32], slots: u64) -> Self {
         assert!(slots >= 1, "a one time tree serves at least one slot");
-        let padded = padded_leaves(slots).expect("a one time tree serves a representable slot count");
+        let padded =
+            padded_leaves(slots).expect("a one time tree serves a representable slot count");
         let padding = leaf_hash(&PADDING_PREIMAGE);
         let mut leaves = Vec::with_capacity(padded);
         for position in 0..padded as u64 {

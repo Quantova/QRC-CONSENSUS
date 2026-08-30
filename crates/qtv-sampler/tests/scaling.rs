@@ -50,7 +50,10 @@ fn the_threshold_is_a_two_thirds_supermajority_the_adversary_cannot_span() {
     assert_eq!(tau, budget * 2 / 3 + 1);
     let adversary = expected * ADVERSARY_STAKE_NUM / ADVERSARY_STAKE_DEN;
     let honest = expected - adversary;
-    assert!(adversary < tau, "the adversary expectation must fall below the threshold");
+    assert!(
+        adversary < tau,
+        "the adversary expectation must fall below the threshold"
+    );
     assert!(
         2 * tau - expected > adversary,
         "two agreeing sets share more than the adversary can hold"

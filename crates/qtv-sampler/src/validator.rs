@@ -267,7 +267,8 @@ mod tests {
     #[test]
     fn bridged_holding_weighs_zero() {
         let tag = OriginTag { chain: 1, asset: 1 };
-        let v = SamplerValidator::from_secret_with_stake(3, &[3u8; 32], Stake::bridged(1_000_000, tag));
+        let v =
+            SamplerValidator::from_secret_with_stake(3, &[3u8; 32], Stake::bridged(1_000_000, tag));
         assert_eq!(v.weight(), 0);
     }
 

@@ -43,7 +43,12 @@ fn bench_position(slots: u64) {
     let pos = slots / 3;
     let t0 = Instant::now();
     for _ in 0..iters {
-        black_box(verify(black_box(&pk), black_box(pos), black_box(&y), black_box(&proof)));
+        black_box(verify(
+            black_box(&pk),
+            black_box(pos),
+            black_box(&y),
+            black_box(&proof),
+        ));
     }
     let verify_ns = t0.elapsed().as_nanos() as f64 / iters as f64;
 

@@ -47,5 +47,8 @@ fn two_independent_secrets_yield_independent_keys() {
     let a = Validator::from_secret(1, &[0x01u8; 32]);
     let b = Validator::from_secret(2, &[0x02u8; 32]);
     assert_ne!(a.public_key(), b.public_key());
-    assert_ne!(signing_key_seed(&[0x01u8; 32]), signing_key_seed(&[0x02u8; 32]));
+    assert_ne!(
+        signing_key_seed(&[0x01u8; 32]),
+        signing_key_seed(&[0x02u8; 32])
+    );
 }

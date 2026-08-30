@@ -118,7 +118,16 @@ impl Attester {
     ) -> Attestation {
         let _ = beacon;
         let membership = self.sampler.reveal(slot);
-        Attestation::create(&self.signer, chain_id, height, slot, view, committee, block, membership)
+        Attestation::create(
+            &self.signer,
+            chain_id,
+            height,
+            slot,
+            view,
+            committee,
+            block,
+            membership,
+        )
     }
 }
 
@@ -197,7 +206,11 @@ mod tests {
         let a = Attester::new(1, 100);
         let (root, sig) = a.epoch_registration(3);
         assert_eq!(root, a.at_epoch(3).root());
-        assert_ne!(root, a.root(), "the rotated root differs from the genesis root");
+        assert_ne!(
+            root,
+            a.root(),
+            "the rotated root differs from the genesis root"
+        );
         assert!(epoch_registration_verifies(
             a.attest_public_key(),
             a.id(),

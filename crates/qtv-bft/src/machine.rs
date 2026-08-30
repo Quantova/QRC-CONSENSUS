@@ -117,7 +117,11 @@ impl Machine {
     }
 
     pub fn committee_for(&self, height: Height) -> Vec<ValidatorId> {
-        sample_committee(&self.set, &self.seed_for_height(height), self.committee_size)
+        sample_committee(
+            &self.set,
+            &self.seed_for_height(height),
+            self.committee_size,
+        )
     }
 
     pub fn leader_of(&self, height: Height, view: View) -> Option<ValidatorId> {
@@ -454,7 +458,10 @@ mod tests {
         assert!(m.slashes().is_empty(), "one vote is not yet a fault");
         assert!(m.byz_vote(2, 1, second));
 
-        assert!(m.is_slashed(2), "the equivocator is slashed live as its second vote lands");
+        assert!(
+            m.is_slashed(2),
+            "the equivocator is slashed live as its second vote lands"
+        );
         assert_eq!(m.slashes().len(), 1);
         assert_eq!(m.slashes()[0].validator, 2);
         for peer in [1u64, 3, 4] {

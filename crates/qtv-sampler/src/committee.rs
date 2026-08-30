@@ -4,7 +4,9 @@
 use crate::beacon::Beacon;
 use crate::onetime::{Root, PREIMAGE_BYTES};
 use crate::params::{COMMITTEE_BUDGET, DOMAIN_COMMITTEE, DOMAIN_LEADER, MIN_SELF_STAKE};
-use crate::sortition::{leader_neg_log2, leader_prefers, verify_membership, verify_selection, Credential};
+use crate::sortition::{
+    leader_neg_log2, leader_prefers, verify_membership, verify_selection, Credential,
+};
 use crate::validator::{Registration, ValidatorId};
 
 pub struct Member {
@@ -194,7 +196,12 @@ impl CommitteeView {
         Committee { members }
     }
 
-    pub fn elect_leader(&self, committee: &Committee, beacon: &Beacon, slot: u64) -> Option<Leader> {
+    pub fn elect_leader(
+        &self,
+        committee: &Committee,
+        beacon: &Beacon,
+        slot: u64,
+    ) -> Option<Leader> {
         elect_leader(committee, beacon, slot)
     }
 }
@@ -412,12 +419,17 @@ mod tests {
             assert_eq!(elected, elect_leader(&committee, &beacon, slot).unwrap().id);
             let mut best: Option<(f64, ValidatorId)> = None;
             for m in &committee.members {
-                let score = leader_score(&m.credential.output(&beacon, DOMAIN_LEADER, slot), m.weight);
+                let score =
+                    leader_score(&m.credential.output(&beacon, DOMAIN_LEADER, slot), m.weight);
                 if best.map_or(true, |(bs, bid)| score < bs || (score == bs && m.id < bid)) {
                     best = Some((score, m.id));
                 }
             }
-            assert_eq!(elected, best.unwrap().1, "the leader differs at slot {slot}");
+            assert_eq!(
+                elected,
+                best.unwrap().1,
+                "the leader differs at slot {slot}"
+            );
         }
     }
 
@@ -451,21 +463,25 @@ mod tests {
             shake256(&candidate.to_le_bytes(), &mut digest);
 
             let reveal_next = committee.next_beacon(&beacon, slot);
-            reveal_draws.insert(
-                proposer
-                    .reveal(next_slot)
-                    .value(&reveal_next, DOMAIN_LEADER, next_slot),
-            );
+            reveal_draws.insert(proposer.reveal(next_slot).value(
+                &reveal_next,
+                DOMAIN_LEADER,
+                next_slot,
+            ));
 
             let digest_next = beacon.advance(&digest, slot);
-            digest_draws.insert(
-                proposer
-                    .reveal(next_slot)
-                    .value(&digest_next, DOMAIN_LEADER, next_slot),
-            );
+            digest_draws.insert(proposer.reveal(next_slot).value(
+                &digest_next,
+                DOMAIN_LEADER,
+                next_slot,
+            ));
         }
 
-        assert_eq!(reveal_draws.len(), 1, "the reveal beacon leaves the proposer no lever");
+        assert_eq!(
+            reveal_draws.len(),
+            1,
+            "the reveal beacon leaves the proposer no lever"
+        );
         assert_eq!(*reveal_draws.iter().next().unwrap(), fixed);
         assert!(
             digest_draws.len() > 1,

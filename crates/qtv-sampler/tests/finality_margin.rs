@@ -45,7 +45,10 @@ fn pinning_tau_to_the_expected_size_is_fork_feasible_when_the_draw_over_draws() 
             feasible_slots += 1;
         }
     }
-    assert!(over_draw_seen, "the sweep must exercise an over draw of the expected size");
+    assert!(
+        over_draw_seen,
+        "the sweep must exercise an over draw of the expected size"
+    );
     assert!(
         feasible_slots > 0,
         "a threshold pinned to the expected size leaves fork feasible slots under an over draw"
@@ -86,5 +89,8 @@ fn a_draw_smaller_than_expected_keeps_the_expected_floor_and_stays_safe() {
             );
         }
     }
-    assert!(under_draw_seen, "the sweep must exercise an under draw of the expected size");
+    assert!(
+        under_draw_seen,
+        "the sweep must exercise an under draw of the expected size"
+    );
 }

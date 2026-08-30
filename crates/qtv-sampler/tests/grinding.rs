@@ -55,7 +55,10 @@ fn the_grinding_budget_is_exactly_one_valid_draw_per_slot() {
     }
 
     let total_valid = 1 + forgeries_accepted;
-    assert_eq!(total_valid, 1, "more than one draw authenticated for the slot");
+    assert_eq!(
+        total_valid, 1,
+        "more than one draw authenticated for the slot"
+    );
 }
 
 #[test]

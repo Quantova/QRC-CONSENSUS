@@ -113,7 +113,10 @@ pub fn output_from_preimage(position: u64, preimage: &[u8; PREIMAGE_BYTES]) -> O
 }
 
 pub fn verify(pk: &PublicKey, position: u64, output: &Output, proof: &Proof) -> bool {
-    if !pk.root().verify_membership(position, &proof.preimage, &proof.path) {
+    if !pk
+        .root()
+        .verify_membership(position, &proof.preimage, &proof.path)
+    {
         return false;
     }
     output_from_preimage(position, &proof.preimage) == *output

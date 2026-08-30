@@ -109,7 +109,9 @@ fn aggregate_metered(
         round += 1;
     }
 
-    let effective_tau = tau.max(qtv_sampler::params::finality_threshold(commitment.len() as u64));
+    let effective_tau = tau.max(qtv_sampler::params::finality_threshold(
+        commitment.len() as u64
+    ));
     let cert = if admitted.len() as u64 >= effective_tau {
         let envelope = Envelope::new(height, slot, block, commitment);
         Some(Certificate::new(envelope, admitted))
@@ -214,7 +216,10 @@ mod tests {
             verifications, 4,
             "each of the four members is verified once, the 12,000 copies add no work"
         );
-        assert!(verifications < flood, "verification does not scale with the flood");
+        assert!(
+            verifications < flood,
+            "verification does not scale with the flood"
+        );
         assert!(
             verifications <= MAX_ATTEST_VERIFICATIONS_PER_ROUND,
             "verifications stay within the hard cap"
@@ -267,7 +272,10 @@ mod tests {
         ];
         let (cert, verifications) =
             aggregate_metered(1, 1, 0, block, &commitment, &beacon, &atts, TAU);
-        assert_eq!(verifications, 3, "a clean quorum spends no verification beyond its signers");
+        assert_eq!(
+            verifications, 3,
+            "a clean quorum spends no verification beyond its signers"
+        );
         let cert = cert.expect("an entitled supermajority aggregates");
         assert_eq!(cert.attesters(), vec![1, 2, 3]);
         assert!(
@@ -379,10 +387,7 @@ mod tests {
             verifications < flood_size,
             "verification does not scale with the flood"
         );
-        assert!(
-            cert.is_none(),
-            "a flood of forgeries forms no certificate"
-        );
+        assert!(cert.is_none(), "a flood of forgeries forms no certificate");
     }
 
     #[test]

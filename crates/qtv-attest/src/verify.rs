@@ -38,7 +38,14 @@ impl Certificate {
         beacon: &Beacon,
         tau: u64,
     ) -> Verdict {
-        verify_body(chain_id, &self.envelope, &self.attestations, commitment, beacon, tau)
+        verify_body(
+            chain_id,
+            &self.envelope,
+            &self.attestations,
+            commitment,
+            beacon,
+            tau,
+        )
     }
 }
 
@@ -84,7 +91,9 @@ fn verify_body(
         }
         seen.push(att.from);
     }
-    let effective_tau = tau.max(qtv_sampler::params::finality_threshold(commitment.len() as u64));
+    let effective_tau = tau.max(qtv_sampler::params::finality_threshold(
+        commitment.len() as u64
+    ));
     if seen.len() as u64 >= effective_tau {
         Verdict::Verified
     } else {

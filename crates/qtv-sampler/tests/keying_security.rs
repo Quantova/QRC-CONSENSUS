@@ -14,7 +14,11 @@ fn the_tree_seed_is_a_function_of_the_secret_alone_not_the_id() {
     let secret = [0x21u8; 32];
     let a = SamplerValidator::from_secret(1, &secret, 100);
     let b = SamplerValidator::from_secret(999_999, &secret, 100);
-    assert_eq!(a.root(), b.root(), "the id is not an input to the key material");
+    assert_eq!(
+        a.root(),
+        b.root(),
+        "the id is not an input to the key material"
+    );
 
     let c = SamplerValidator::from_secret(1, &[0x22u8; 32], 100);
     assert_ne!(a.root(), c.root());
@@ -38,7 +42,10 @@ fn two_independent_secrets_are_independent() {
     let b = SamplerValidator::from_secret(2, &[0x02u8; 32], 100);
 
     assert_ne!(a.root(), b.root());
-    assert_ne!(sortition_tree_seed(&[0x01u8; 32]), sortition_tree_seed(&[0x02u8; 32]));
+    assert_ne!(
+        sortition_tree_seed(&[0x01u8; 32]),
+        sortition_tree_seed(&[0x02u8; 32])
+    );
 
     let slot = 3;
     let ra = a.reveal(slot);
@@ -112,13 +119,17 @@ fn the_draw_still_functions_and_an_honest_validator_is_selected() {
         SamplerValidator::from_secret(2, &[0x72u8; 32], 2_000),
         SamplerValidator::from_secret(3, &[0x73u8; 32], 2_000),
     ];
-    let reg = Registry::new(validators).with_budget(SATURATING_BUDGET).with_floor(0);
+    let reg = Registry::new(validators)
+        .with_budget(SATURATING_BUDGET)
+        .with_floor(0);
     let beacon = Beacon::genesis();
     let slot = 1;
 
     let committee = reg.sample_committee(&beacon, slot);
     assert!(!committee.is_empty(), "an honest committee was drawn");
-    let leader = reg.elect_leader(&committee, &beacon, slot).expect("a leader is elected");
+    let leader = reg
+        .elect_leader(&committee, &beacon, slot)
+        .expect("a leader is elected");
     assert!(committee.contains(leader.id));
 
     let root = reg.registration(leader.id).unwrap().root;

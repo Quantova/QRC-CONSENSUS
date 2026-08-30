@@ -96,9 +96,19 @@ mod tests {
     #[test]
     fn advance_from_reveals_is_deterministic_and_binds_every_reveal() {
         let b = Beacon::genesis();
-        let reveals = [[1u8; PREIMAGE_BYTES], [2u8; PREIMAGE_BYTES], [3u8; PREIMAGE_BYTES]];
-        assert_eq!(b.advance_from_reveals(5, &reveals), b.advance_from_reveals(5, &reveals));
-        assert_ne!(b.advance_from_reveals(5, &reveals), b.advance_from_reveals(6, &reveals));
+        let reveals = [
+            [1u8; PREIMAGE_BYTES],
+            [2u8; PREIMAGE_BYTES],
+            [3u8; PREIMAGE_BYTES],
+        ];
+        assert_eq!(
+            b.advance_from_reveals(5, &reveals),
+            b.advance_from_reveals(5, &reveals)
+        );
+        assert_ne!(
+            b.advance_from_reveals(5, &reveals),
+            b.advance_from_reveals(6, &reveals)
+        );
 
         let mut moved = reveals;
         moved[1][0] ^= 1;

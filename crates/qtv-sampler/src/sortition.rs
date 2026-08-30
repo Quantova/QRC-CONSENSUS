@@ -86,7 +86,10 @@ pub fn expected_committee_size(weights: &[u64], budget: u64) -> f64 {
 }
 
 pub fn expected_committee(weights: &[u64], budget: u64) -> u64 {
-    let total: u128 = weights.iter().map(|&w| w as u128).fold(0u128, u128::saturating_add);
+    let total: u128 = weights
+        .iter()
+        .map(|&w| w as u128)
+        .fold(0u128, u128::saturating_add);
     if total == 0 {
         return 0;
     }
@@ -307,7 +310,9 @@ mod tests {
                 let w = weights[(c as usize) % weights.len()];
                 let id = c + 1;
                 let nl = leader_neg_log2(&out);
-                if best_int.map_or(true, |(bnl, bw, bid)| leader_prefers(nl, w, id, bnl, bw, bid)) {
+                if best_int.map_or(true, |(bnl, bw, bid)| {
+                    leader_prefers(nl, w, id, bnl, bw, bid)
+                }) {
                     best_int = Some((nl, w, id));
                 }
                 let s = leader_score(&out, w);

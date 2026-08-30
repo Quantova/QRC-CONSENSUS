@@ -125,11 +125,7 @@ pub fn fold_root(leaves: &[([u8; 32], u64)]) -> ([u8; 32], u64) {
         .unwrap_or(([0u8; 32], 0))
 }
 
-pub fn build(
-    leaves: &[([u8; 32], u64)],
-    total_stake: u64,
-    sample: &[usize],
-) -> FoldCertificate {
+pub fn build(leaves: &[([u8; 32], u64)], total_stake: u64, sample: &[usize]) -> FoldCertificate {
     let levels = build_levels(leaves);
     let (root, attested_stake) = levels
         .last()
@@ -377,7 +373,9 @@ mod tests {
     }
 
     fn committee(n: usize) -> Vec<([u8; 32], u64)> {
-        (0..n).map(|i| (leaf(i as u8), 1 + (i as u64 % 5))).collect()
+        (0..n)
+            .map(|i| (leaf(i as u8), 1 + (i as u64 % 5)))
+            .collect()
     }
 
     fn total(leaves: &[([u8; 32], u64)]) -> u64 {
@@ -408,7 +406,11 @@ mod tests {
             assert_eq!(cert.root, root);
             for opening in &cert.openings {
                 let (got_root, got_stake) = opening.fold_to_root();
-                assert_eq!(got_root, root, "opening {} of {n} must land on the root", opening.index);
+                assert_eq!(
+                    got_root, root,
+                    "opening {} of {n} must land on the root",
+                    opening.index
+                );
                 assert_eq!(
                     got_stake,
                     total(&leaves),
@@ -475,7 +477,10 @@ mod tests {
         let sample: Vec<usize> = (0..12).collect();
         let mut forged = build(&leaves, full, &sample);
         forged.attested_stake = full * 2;
-        assert!(!verify(&forged, full, 12), "the attested stake must be bound to the fold");
+        assert!(
+            !verify(&forged, full, 12),
+            "the attested stake must be bound to the fold"
+        );
     }
 
     #[test]
@@ -484,7 +489,10 @@ mod tests {
         let full = total(&leaves);
         let cert = build(&leaves, full, &[0, 2, 4]);
         assert!(verify(&cert, full, 3));
-        assert!(!verify(&cert, full, 4), "a certificate must carry the expected sample count");
+        assert!(
+            !verify(&cert, full, 4),
+            "a certificate must carry the expected sample count"
+        );
     }
 
     #[test]
@@ -574,7 +582,8 @@ mod tests {
         slot: u64,
     ) -> (Vec<(PublicKey, u64, Signature)>, Vec<u8>, &'static [u8]) {
         let beacon = Beacon::genesis();
-        let subject = crate::attestation::attestation_message(1, height, slot, 0, &[0u8; 32], &block);
+        let subject =
+            crate::attestation::attestation_message(1, height, slot, 0, &[0u8; 32], &block);
         let members: Vec<(PublicKey, u64, Signature)> = (1..=n as u64)
             .map(|id| {
                 let a = Attester::new(id, 100);
@@ -591,10 +600,17 @@ mod tests {
         let block = Block::new(height, [9u8; 32], Parent::Genesis);
         let (members, subject, context) = signed_committee(n, block, height, slot);
         let full: u64 = members.iter().map(|(_, s, _)| s).sum();
-        let croot = attested_committee_root(&members.iter().map(|(pk, s, _)| (*pk, *s)).collect::<Vec<_>>());
+        let croot = attested_committee_root(
+            &members
+                .iter()
+                .map(|(pk, s, _)| (*pk, *s))
+                .collect::<Vec<_>>(),
+        );
 
         let cert = build_attested(&members, full, k);
-        assert!(verify_attested(&cert, &croot, full, n, k, &subject, context));
+        assert!(verify_attested(
+            &cert, &croot, full, n, k, &subject, context
+        ));
 
         let leaves: Vec<([u8; 32], u64)> = members
             .iter()
@@ -604,7 +620,9 @@ mod tests {
 
         let mut forged = cert.clone();
         forged.openings[0].signature[0] ^= 1;
-        assert!(!verify_attested(&forged, &croot, full, n, k, &subject, context));
+        assert!(!verify_attested(
+            &forged, &croot, full, n, k, &subject, context
+        ));
     }
 
     #[test]
@@ -613,17 +631,40 @@ mod tests {
         let block = Block::new(height, [9u8; 32], Parent::Genesis);
         let (members, subject, context) = signed_committee(n, block, height, slot);
         let full: u64 = members.iter().map(|(_, s, _)| s).sum();
-        let croot = attested_committee_root(&members.iter().map(|(pk, s, _)| (*pk, *s)).collect::<Vec<_>>());
+        let croot = attested_committee_root(
+            &members
+                .iter()
+                .map(|(pk, s, _)| (*pk, *s))
+                .collect::<Vec<_>>(),
+        );
         let cert = build_attested(&members, full, k);
-        assert!(verify_attested(&cert, &croot, full, n, k, &subject, context));
+        assert!(verify_attested(
+            &cert, &croot, full, n, k, &subject, context
+        ));
 
         let mut swapped_sig = cert.clone();
         swapped_sig.openings[0].signature = cert.openings[1].signature;
-        assert!(!verify_attested(&swapped_sig, &croot, full, n, k, &subject, context));
+        assert!(!verify_attested(
+            &swapped_sig,
+            &croot,
+            full,
+            n,
+            k,
+            &subject,
+            context
+        ));
 
         let mut swapped_key = cert.clone();
         swapped_key.openings[0].public_key = cert.openings[1].public_key;
-        assert!(!verify_attested(&swapped_key, &croot, full, n, k, &subject, context));
+        assert!(!verify_attested(
+            &swapped_key,
+            &croot,
+            full,
+            n,
+            k,
+            &subject,
+            context
+        ));
 
         let other = Block::new(height, [10u8; 32], Parent::Genesis);
         let wrong = crate::attestation::attestation_message(1, height, slot, 0, &[0u8; 32], &other);
@@ -636,7 +677,12 @@ mod tests {
         let block = Block::new(height, [9u8; 32], Parent::Genesis);
         let (members, subject, context) = signed_committee(n, block, height, slot);
         let full: u64 = members.iter().map(|(_, s, _)| s).sum();
-        let croot = attested_committee_root(&members.iter().map(|(pk, s, _)| (*pk, *s)).collect::<Vec<_>>());
+        let croot = attested_committee_root(
+            &members
+                .iter()
+                .map(|(pk, s, _)| (*pk, *s))
+                .collect::<Vec<_>>(),
+        );
 
         let forgers: Vec<(PublicKey, u64, Signature)> = (100..100 + n as u64)
             .map(|id| {
@@ -647,7 +693,17 @@ mod tests {
             .collect();
         let forged = build_attested(&forgers, full, k);
 
-        assert!(verify_attested(&forged, &forged.root, full, n, k, &subject, context));
-        assert!(!verify_attested(&forged, &croot, full, n, k, &subject, context));
+        assert!(verify_attested(
+            &forged,
+            &forged.root,
+            full,
+            n,
+            k,
+            &subject,
+            context
+        ));
+        assert!(!verify_attested(
+            &forged, &croot, full, n, k, &subject, context
+        ));
     }
 }

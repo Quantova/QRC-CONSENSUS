@@ -51,11 +51,17 @@ mod tests {
         let tau = finality_threshold(e);
         let adversary_seats = e * ADVERSARY_STAKE_NUM / ADVERSARY_STAKE_DEN;
         let honest_seats = e - adversary_seats;
-        assert!(adversary_seats < tau, "the adversary alone must fall below the threshold");
+        assert!(
+            adversary_seats < tau,
+            "the adversary alone must fall below the threshold"
+        );
         assert!(
             2 * tau - e > adversary_seats,
             "two agreeing sets share more seats than the adversary can hold, so both cannot reach the threshold"
         );
-        assert!(tau <= honest_seats, "the honest set must be able to reach the threshold");
+        assert!(
+            tau <= honest_seats,
+            "the honest set must be able to reach the threshold"
+        );
     }
 }

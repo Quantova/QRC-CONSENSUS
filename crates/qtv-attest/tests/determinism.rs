@@ -47,7 +47,8 @@ fn the_certificate_is_independent_of_attestation_order() {
     let a2 = members[1].attest(1, 1, 0, 0, commitment.digest(), block, &beacon);
     let a3 = members[2].attest(1, 1, 0, 0, commitment.digest(), block, &beacon);
 
-    let forward = aggregate(1, 
+    let forward = aggregate(
+        1,
         1,
         0,
         block,
@@ -57,7 +58,8 @@ fn the_certificate_is_independent_of_attestation_order() {
         3,
     )
     .expect("quorum");
-    let reverse = aggregate(1, 1, 0, block, &commitment, &beacon, &[a3, a2, a1], 3).expect("quorum");
+    let reverse =
+        aggregate(1, 1, 0, block, &commitment, &beacon, &[a3, a2, a1], 3).expect("quorum");
 
     assert_eq!(forward.attesters(), reverse.attesters());
     assert_eq!(forward.digest(), reverse.digest());

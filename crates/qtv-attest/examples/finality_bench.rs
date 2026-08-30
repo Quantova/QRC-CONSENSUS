@@ -38,7 +38,10 @@ fn measure(committee_size: usize) {
     let t1 = Instant::now();
     let verdict = cert.verify(1, &commitment, &beacon, tau);
     let verify_ms = t1.elapsed().as_secs_f64() * 1e3;
-    assert!(verdict.is_verified(), "the certificate must verify before a number is trusted");
+    assert!(
+        verdict.is_verified(),
+        "the certificate must verify before a number is trusted"
+    );
 
     let size_kb = (cert.attestations.len() * SIG_BYTES) as f64 / 1024.0;
     println!(
@@ -49,7 +52,9 @@ fn measure(committee_size: usize) {
 }
 
 fn main() {
-    let arg = std::env::args().nth(1).and_then(|a| a.parse::<usize>().ok());
+    let arg = std::env::args()
+        .nth(1)
+        .and_then(|a| a.parse::<usize>().ok());
     println!("Finality certificate cost against committee size (committee is bounded at the budget, 500).");
     match arg {
         Some(size) => measure(size),

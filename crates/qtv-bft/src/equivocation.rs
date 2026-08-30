@@ -42,7 +42,11 @@ mod tests {
     fn a_single_vote_per_height_is_never_flagged() {
         let a = Validator::new(1);
         let b = Validator::new(2);
-        let atts = vec![att(&a, 1, [1u8; 32]), att(&b, 1, [1u8; 32]), att(&a, 2, [5u8; 32])];
+        let atts = vec![
+            att(&a, 1, [1u8; 32]),
+            att(&b, 1, [1u8; 32]),
+            att(&a, 2, [5u8; 32]),
+        ];
         assert!(equivocators(&atts).is_empty());
     }
 
