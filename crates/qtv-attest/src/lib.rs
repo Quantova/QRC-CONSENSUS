@@ -1,5 +1,8 @@
 // Copyright 2026 Quantova Inc
 // SPDX-License-Identifier: Apache-2.0 OR MIT
+#![allow(clippy::too_many_arguments)]
+#![allow(clippy::manual_is_multiple_of)]
+#![allow(clippy::type_complexity)]
 
 pub mod aggregate;
 pub mod attestation;

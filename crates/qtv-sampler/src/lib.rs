@@ -1,5 +1,8 @@
 // Copyright 2026 Quantova Inc
 // SPDX-License-Identifier: Apache-2.0 OR MIT
+#![allow(clippy::manual_is_multiple_of)]
+#![allow(clippy::map_clone)]
+#![allow(clippy::unnecessary_map_or)]
 
 pub mod beacon;
 pub mod committee;
