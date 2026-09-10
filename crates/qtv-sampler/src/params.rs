@@ -5,6 +5,8 @@ pub const COMMITTEE_BUDGET: u64 = 500;
 
 pub const MIN_SELF_STAKE: u64 = 2_000;
 
+pub const STAKE_CAP_MULTIPLE: u64 = 10;
+
 pub const ADVERSARY_STAKE_NUM: u64 = 1;
 
 pub const ADVERSARY_STAKE_DEN: u64 = 3;

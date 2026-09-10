@@ -3,7 +3,9 @@
 
 use crate::beacon::Beacon;
 use crate::onetime::{Root, PREIMAGE_BYTES};
-use crate::params::{COMMITTEE_BUDGET, DOMAIN_COMMITTEE, DOMAIN_LEADER, MIN_SELF_STAKE};
+use crate::params::{
+    COMMITTEE_BUDGET, DOMAIN_COMMITTEE, DOMAIN_LEADER, MIN_SELF_STAKE, STAKE_CAP_MULTIPLE,
+};
 use crate::sortition::{
     leader_neg_log2, leader_prefers, verify_membership, verify_selection, Credential,
 };
@@ -119,19 +121,44 @@ impl CommitteeView {
         self.registrations.iter().find(|r| r.id == id)
     }
 
+    pub fn stake_cap(&self) -> u64 {
+        let mut eligible: Vec<u64> = self
+            .registrations
+            .iter()
+            .map(|r| r.weight)
+            .filter(|&w| w >= self.floor)
+            .collect();
+        if eligible.is_empty() {
+            return self.floor;
+        }
+        eligible.sort_unstable();
+        let median = eligible[eligible.len() / 2];
+        median.saturating_mul(STAKE_CAP_MULTIPLE).max(self.floor)
+    }
+
+    pub fn effective_weight(&self, weight: u64) -> u64 {
+        if weight < self.floor {
+            return 0;
+        }
+        weight.min(self.stake_cap())
+    }
+
     pub fn total_weight(&self) -> u64 {
+        let cap = self.stake_cap();
         self.registrations
             .iter()
             .map(|r| r.weight)
             .filter(|&w| w >= self.floor)
+            .map(|w| w.min(cap))
             .fold(0u64, u64::saturating_add)
     }
 
     pub fn weights(&self) -> Vec<u64> {
+        let cap = self.stake_cap();
         self.registrations
             .iter()
             .filter(|r| r.weight >= self.floor)
-            .map(|r| r.weight)
+            .map(|r| r.weight.min(cap))
             .collect()
     }
 
@@ -149,7 +176,7 @@ impl CommitteeView {
                 beacon,
                 DOMAIN_COMMITTEE,
                 slot,
-                reg.weight,
+                self.effective_weight(reg.weight),
                 total,
                 self.budget,
                 credential,
@@ -179,7 +206,7 @@ impl CommitteeView {
                 beacon,
                 DOMAIN_COMMITTEE,
                 slot,
-                reg.weight,
+                self.effective_weight(reg.weight),
                 total,
                 self.budget,
                 &reveal.credential,
@@ -487,5 +514,62 @@ mod tests {
             digest_draws.len() > 1,
             "the old certificate digest beacon let the proposer grind its next draw"
         );
+    }
+}
+
+#[cfg(test)]
+mod stake_cap_tests {
+    use super::*;
+    use crate::params::{COMMITTEE_BUDGET, MIN_SELF_STAKE};
+
+    fn view(weights: &[u64]) -> CommitteeView {
+        let regs = weights
+            .iter()
+            .enumerate()
+            .map(|(i, &w)| Registration {
+                id: i as ValidatorId + 1,
+                weight: w,
+                root: Root { digest: [0u8; 32], slots: 1 },
+            })
+            .collect();
+        CommitteeView::new(regs)
+    }
+
+    #[test]
+    fn a_balanced_roster_is_unchanged_by_the_cap() {
+        let v = view(&[MIN_SELF_STAKE; 4]);
+        assert_eq!(v.total_weight(), MIN_SELF_STAKE * 4);
+        for w in v.weights() {
+            assert_eq!(w, MIN_SELF_STAKE);
+        }
+    }
+
+    #[test]
+    fn one_outsized_staker_cannot_dilute_the_others_draw() {
+        let outsized = MIN_SELF_STAKE * 1_000;
+        let v = view(&[outsized, MIN_SELF_STAKE, MIN_SELF_STAKE, MIN_SELF_STAKE]);
+        let total = v.total_weight();
+        let honest = v.effective_weight(MIN_SELF_STAKE);
+        assert!(
+            v.effective_weight(outsized) < outsized,
+            "the outsized stake must be capped for sortition"
+        );
+        assert!(
+            (COMMITTEE_BUDGET as u128) * (honest as u128) >= total as u128,
+            "an ordinary validator must still saturate its draw once the outsized stake is capped"
+        );
+    }
+
+    #[test]
+    fn the_cap_never_falls_below_the_entry_floor() {
+        let v = view(&[MIN_SELF_STAKE, MIN_SELF_STAKE]);
+        assert!(v.stake_cap() >= v.floor());
+        assert_eq!(v.effective_weight(MIN_SELF_STAKE), MIN_SELF_STAKE);
+    }
+
+    #[test]
+    fn a_stake_below_the_floor_carries_no_weight() {
+        let v = view(&[MIN_SELF_STAKE]);
+        assert_eq!(v.effective_weight(MIN_SELF_STAKE - 1), 0);
     }
 }
