@@ -10,6 +10,7 @@ use crate::sortition::{
     leader_neg_log2, leader_prefers, verify_membership, verify_selection, Credential,
 };
 use crate::validator::{Registration, ValidatorId};
+use std::sync::OnceLock;
 
 pub struct Member {
     pub id: ValidatorId,
@@ -88,6 +89,7 @@ pub struct CommitteeView {
     registrations: Vec<Registration>,
     budget: u64,
     floor: u64,
+    cap: OnceLock<u64>,
 }
 
 impl CommitteeView {
@@ -96,6 +98,7 @@ impl CommitteeView {
             registrations,
             budget: COMMITTEE_BUDGET,
             floor: MIN_SELF_STAKE,
+            cap: OnceLock::new(),
         }
     }
 
@@ -106,6 +109,7 @@ impl CommitteeView {
 
     pub fn with_floor(mut self, floor: u64) -> Self {
         self.floor = floor;
+        self.cap = OnceLock::new();
         self
     }
 
@@ -122,18 +126,20 @@ impl CommitteeView {
     }
 
     pub fn stake_cap(&self) -> u64 {
-        let mut eligible: Vec<u64> = self
-            .registrations
-            .iter()
-            .map(|r| r.weight)
-            .filter(|&w| w >= self.floor)
-            .collect();
-        if eligible.is_empty() {
-            return self.floor;
-        }
-        eligible.sort_unstable();
-        let median = eligible[eligible.len() / 2];
-        median.saturating_mul(STAKE_CAP_MULTIPLE).max(self.floor)
+        *self.cap.get_or_init(|| {
+            let mut eligible: Vec<u64> = self
+                .registrations
+                .iter()
+                .map(|r| r.weight)
+                .filter(|&w| w >= self.floor)
+                .collect();
+            if eligible.is_empty() {
+                return self.floor;
+            }
+            eligible.sort_unstable();
+            let median = eligible[eligible.len() / 2];
+            median.saturating_mul(STAKE_CAP_MULTIPLE).max(self.floor)
+        })
     }
 
     pub fn effective_weight(&self, weight: u64) -> u64 {
@@ -169,7 +175,6 @@ impl CommitteeView {
         id: ValidatorId,
         credential: &Credential,
     ) -> bool {
-        let total = self.total_weight();
         match self.registration(id) {
             Some(reg) if reg.weight >= self.floor => verify_selection(
                 &reg.root,
@@ -177,7 +182,7 @@ impl CommitteeView {
                 DOMAIN_COMMITTEE,
                 slot,
                 self.effective_weight(reg.weight),
-                total,
+                self.total_weight(),
                 self.budget,
                 credential,
             ),
@@ -565,6 +570,24 @@ mod stake_cap_tests {
         let v = view(&[MIN_SELF_STAKE, MIN_SELF_STAKE]);
         assert!(v.stake_cap() >= v.floor());
         assert_eq!(v.effective_weight(MIN_SELF_STAKE), MIN_SELF_STAKE);
+    }
+
+    #[test]
+    fn the_cached_cap_follows_a_changed_floor() {
+        let seeded = view(&[
+            MIN_SELF_STAKE,
+            MIN_SELF_STAKE,
+            MIN_SELF_STAKE,
+            MIN_SELF_STAKE * 100,
+        ]);
+        let low = seeded.stake_cap();
+        assert_eq!(seeded.stake_cap(), low, "the cap must be stable once cached");
+        let raised = seeded.with_floor(MIN_SELF_STAKE * 100);
+        assert!(
+            raised.stake_cap() >= raised.floor(),
+            "a raised floor must rebuild the cap, not serve the one cached under the old floor"
+        );
+        assert_eq!(raised.effective_weight(MIN_SELF_STAKE), 0);
     }
 
     #[test]
