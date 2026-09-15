@@ -112,7 +112,14 @@ fn aggregate_metered(
     let effective_tau = tau.max(qtv_sampler::params::finality_threshold(
         commitment.len() as u64
     ));
-    let cert = if admitted.len() as u64 >= effective_tau {
+    let admitted_weight: u128 = admitted
+        .iter()
+        .map(|a| commitment.weight_of(a.from) as u128)
+        .fold(0u128, |acc, w| acc.saturating_add(w));
+    let committee_weight = commitment.committee_weight() as u128;
+    let weight_ok = committee_weight == 0
+        || admitted_weight.saturating_mul(3) >= committee_weight.saturating_mul(2);
+    let cert = if admitted.len() as u64 >= effective_tau && weight_ok {
         let envelope = Envelope::new(height, slot, block, commitment);
         Some(Certificate::new(envelope, admitted))
     } else {
@@ -132,6 +139,38 @@ mod tests {
 
     fn committee(attesters: &[&Attester]) -> CommitteeCommitment {
         CommitteeCommitment::from_attesters_with_budget(0, attesters, BUDGET)
+    }
+
+    #[test]
+    fn a_seat_supermajority_holding_a_stake_minority_cannot_finalize() {
+        let a = Attester::new(1, 10);
+        let b = Attester::new(2, 10);
+        let c = Attester::new(3, 10);
+        let d = Attester::new(4, 100);
+        let beacon = Beacon::genesis();
+        let block = Block::new(1, [9u8; 32], Parent::Genesis);
+        let commitment =
+            CommitteeCommitment::from_attesters_with_budget(0, &[&a, &b, &c, &d], 40);
+
+        let light = vec![
+            a.attest(1, 1, 0, 0, commitment.digest(), block, &beacon),
+            b.attest(1, 1, 0, 0, commitment.digest(), block, &beacon),
+            c.attest(1, 1, 0, 0, commitment.digest(), block, &beacon),
+        ];
+        assert!(
+            aggregate(1, 1, 0, block, &commitment, &beacon, &light, TAU).is_none(),
+            "three of four seats holding thirty of one hundred thirty weight is not a stake quorum"
+        );
+
+        let with_stake = vec![
+            a.attest(1, 1, 0, 0, commitment.digest(), block, &beacon),
+            b.attest(1, 1, 0, 0, commitment.digest(), block, &beacon),
+            d.attest(1, 1, 0, 0, commitment.digest(), block, &beacon),
+        ];
+        assert!(
+            aggregate(1, 1, 0, block, &commitment, &beacon, &with_stake, TAU).is_some(),
+            "the same seat count but a stake supermajority finalizes"
+        );
     }
 
     #[test]

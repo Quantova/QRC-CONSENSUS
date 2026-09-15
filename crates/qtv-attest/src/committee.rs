@@ -67,6 +67,17 @@ impl CommitteeCommitment {
         self.members.len()
     }
 
+    pub fn committee_weight(&self) -> u64 {
+        self.members
+            .iter()
+            .map(|m| m.weight)
+            .fold(0u64, u64::saturating_add)
+    }
+
+    pub fn weight_of(&self, id: ValidatorId) -> u64 {
+        self.member(id).map(|m| m.weight).unwrap_or(0)
+    }
+
     pub fn is_empty(&self) -> bool {
         self.members.is_empty()
     }
