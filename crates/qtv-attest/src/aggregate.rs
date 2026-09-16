@@ -149,8 +149,7 @@ mod tests {
         let d = Attester::new(4, 100);
         let beacon = Beacon::genesis();
         let block = Block::new(1, [9u8; 32], Parent::Genesis);
-        let commitment =
-            CommitteeCommitment::from_attesters_with_budget(0, &[&a, &b, &c, &d], 40);
+        let commitment = CommitteeCommitment::from_attesters_with_budget(0, &[&a, &b, &c, &d], 40);
 
         let light = vec![
             a.attest(1, 1, 0, 0, commitment.digest(), block, &beacon),
