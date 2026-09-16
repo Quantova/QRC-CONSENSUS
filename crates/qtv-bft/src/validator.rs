@@ -62,7 +62,8 @@ impl Drop for SigningKey {
         for slot in self.bytes.iter_mut() {
             *slot = 0;
         }
-        std::hint::black_box(&mut self.bytes);
+        core::sync::atomic::compiler_fence(core::sync::atomic::Ordering::SeqCst);
+        let _ = core::hint::black_box(&self.bytes);
     }
 }
 
