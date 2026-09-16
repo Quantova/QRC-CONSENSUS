@@ -534,7 +534,10 @@ mod stake_cap_tests {
             .map(|(i, &w)| Registration {
                 id: i as ValidatorId + 1,
                 weight: w,
-                root: Root { digest: [0u8; 32], slots: 1 },
+                root: Root {
+                    digest: [0u8; 32],
+                    slots: 1,
+                },
             })
             .collect();
         CommitteeView::new(regs)
@@ -581,7 +584,11 @@ mod stake_cap_tests {
             MIN_SELF_STAKE * 100,
         ]);
         let low = seeded.stake_cap();
-        assert_eq!(seeded.stake_cap(), low, "the cap must be stable once cached");
+        assert_eq!(
+            seeded.stake_cap(),
+            low,
+            "the cap must be stable once cached"
+        );
         let raised = seeded.with_floor(MIN_SELF_STAKE * 100);
         assert!(
             raised.stake_cap() >= raised.floor(),
