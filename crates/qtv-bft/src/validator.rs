@@ -60,9 +60,9 @@ impl Clone for SigningKey {
 impl Drop for SigningKey {
     fn drop(&mut self) {
         for slot in self.bytes.iter_mut() {
-            unsafe { core::ptr::write_volatile(slot, 0) }
+            *slot = 0;
         }
-        core::sync::atomic::compiler_fence(core::sync::atomic::Ordering::SeqCst);
+        std::hint::black_box(&mut self.bytes);
     }
 }
 
