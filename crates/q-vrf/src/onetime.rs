@@ -48,6 +48,14 @@ pub struct MerklePath {
     pub siblings: Vec<[u8; NODE_BYTES]>,
 }
 
+fn wipe(bytes: &mut [u8]) {
+    for slot in bytes.iter_mut() {
+        *slot = 0;
+    }
+    core::sync::atomic::compiler_fence(core::sync::atomic::Ordering::SeqCst);
+    let _ = core::hint::black_box(bytes);
+}
+
 pub fn derive_preimage(seed: &[u8; 32], position: u64) -> [u8; PREIMAGE_BYTES] {
     const D: usize = DOMAIN_PREIMAGE.len();
     let mut input = [0u8; 32 + D + 8];
@@ -56,6 +64,7 @@ pub fn derive_preimage(seed: &[u8; 32], position: u64) -> [u8; PREIMAGE_BYTES] {
     input[32 + D..].copy_from_slice(&position.to_le_bytes());
     let mut out = [0u8; PREIMAGE_BYTES];
     shake256(&input, &mut out);
+    wipe(&mut input);
     out
 }
 
@@ -105,6 +114,12 @@ pub struct OneTimeTree {
     seed: [u8; 32],
     slots: u64,
     layers: Vec<Vec<[u8; NODE_BYTES]>>,
+}
+
+impl Drop for OneTimeTree {
+    fn drop(&mut self) {
+        wipe(&mut self.seed);
+    }
 }
 
 impl OneTimeTree {

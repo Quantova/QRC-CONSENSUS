@@ -65,6 +65,16 @@ impl Clone for SamplerValidator {
     }
 }
 
+impl Drop for SamplerValidator {
+    fn drop(&mut self) {
+        for slot in self.seed.iter_mut() {
+            *slot = 0;
+        }
+        core::sync::atomic::compiler_fence(core::sync::atomic::Ordering::SeqCst);
+        let _ = core::hint::black_box(&self.seed);
+    }
+}
+
 impl SamplerValidator {
     pub fn from_secret(id: ValidatorId, secret: &[u8; 32], stake: u64) -> Self {
         Self::from_secret_with_slots(id, secret, stake, DEFAULT_SLOTS)
