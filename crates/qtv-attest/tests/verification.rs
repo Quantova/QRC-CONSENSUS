@@ -52,3 +52,44 @@ fn a_certificate_missing_the_supermajority_does_not_verify() {
         Verdict::Rejected(RejectReason::NotAQuorum)
     );
 }
+
+#[test]
+fn a_count_quorum_of_small_seats_cannot_finalize_without_the_stake_behind_it() {
+    let members: Vec<Attester> = vec![
+        Attester::new(1, 10),
+        Attester::new(2, 10),
+        Attester::new(3, 10),
+        Attester::new(4, 970),
+    ];
+    let refs: Vec<&Attester> = members.iter().collect();
+    let beacon = Beacon::genesis();
+    let block = Block::new(1, [9u8; 32], Parent::Genesis);
+    let commitment = CommitteeCommitment::from_attesters(0, &refs);
+
+    let atts: Vec<_> = members[..3]
+        .iter()
+        .map(|a| a.attest(1, 1, 0, 0, commitment.digest(), block, &beacon))
+        .collect();
+
+    assert!(
+        aggregate(1, 1, 0, block, &commitment, &beacon, &atts, 3).is_none(),
+        "three of four seats holding three percent of the stake must not aggregate a certificate"
+    );
+
+    let envelope = Envelope::new(1, 0, block, &commitment);
+    let cert = Certificate::new(envelope, atts);
+    assert_eq!(
+        cert.verify(1, &commitment, &beacon, 3),
+        Verdict::Rejected(RejectReason::NotAQuorum),
+        "a seat majority without a stake supermajority is not finality"
+    );
+
+    let whole: Vec<_> = members
+        .iter()
+        .map(|a| a.attest(1, 1, 0, 0, commitment.digest(), block, &beacon))
+        .collect();
+    assert!(
+        aggregate(1, 1, 0, block, &commitment, &beacon, &whole, 3).is_some(),
+        "the same seats with the large holder behind them do finalize"
+    );
+}
