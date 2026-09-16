@@ -3,7 +3,7 @@
 
 use core::fmt;
 
-use qtv_crypto::ml_dsa::{keygen, sign, PublicKey, SecretKey, Signature};
+use qtv_crypto::ml_dsa::{keygen_into, sign, PublicKey, SecretKey, Signature, SECRET_KEY_BYTES};
 use qtv_crypto::sha3::shake256;
 
 pub type ValidatorId = u64;
@@ -33,18 +33,51 @@ pub fn signing_key_seed(secret: &[u8; 32]) -> [u8; 32] {
     out
 }
 
+struct SigningKey {
+    bytes: SecretKey,
+}
+
+impl SigningKey {
+    fn derive(seed: &[u8; 32]) -> (PublicKey, SigningKey) {
+        let mut held = SigningKey {
+            bytes: [0u8; SECRET_KEY_BYTES],
+        };
+        let pk = keygen_into(seed, &mut held.bytes);
+        (pk, held)
+    }
+
+    fn expose(&self) -> &SecretKey {
+        &self.bytes
+    }
+}
+
+impl Clone for SigningKey {
+    fn clone(&self) -> SigningKey {
+        SigningKey { bytes: self.bytes }
+    }
+}
+
+impl Drop for SigningKey {
+    fn drop(&mut self) {
+        for slot in self.bytes.iter_mut() {
+            unsafe { core::ptr::write_volatile(slot, 0) }
+        }
+        core::sync::atomic::compiler_fence(core::sync::atomic::Ordering::SeqCst);
+    }
+}
+
 #[derive(Clone)]
 pub struct Validator {
     pub id: ValidatorId,
     pub role: Role,
     pub fault: Fault,
     pk: PublicKey,
-    sk: SecretKey,
+    sk: SigningKey,
 }
 
 impl Validator {
     pub fn from_secret(id: ValidatorId, secret: &[u8; 32]) -> Self {
-        let (pk, sk) = keygen(&signing_key_seed(secret));
+        let (pk, sk) = SigningKey::derive(&signing_key_seed(secret));
         Validator {
             id,
             role: Role::Validator,
@@ -90,7 +123,7 @@ impl Validator {
     }
 
     pub fn sign(&self, message: &[u8], context: &[u8]) -> Signature {
-        sign(&self.sk, message, context, &[0u8; 32]).expect("context within bound")
+        sign(self.sk.expose(), message, context, &[0u8; 32]).expect("context within bound")
     }
 }
 
@@ -191,6 +224,21 @@ impl ValidatorSet {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn deriving_into_place_keeps_the_same_identity() {
+        let secret = [7u8; 32];
+        let v = Validator::from_secret(3, &secret);
+        let (expect, _) = qtv_crypto::ml_dsa::keygen(&signing_key_seed(&secret));
+        assert_eq!(v.public_key(), &expect);
+    }
+
+    #[test]
+    fn a_cloned_signer_still_signs_the_same() {
+        let v = Validator::from_secret(1, &[9u8; 32]);
+        let c = v.clone();
+        assert_eq!(v.sign(b"m", b"ctx"), c.sign(b"m", b"ctx"));
+    }
 
     #[test]
     fn voting_ids_are_ascending_validators_only() {
