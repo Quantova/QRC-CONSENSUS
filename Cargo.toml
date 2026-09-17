@@ -13,3 +13,6 @@ opt-level = 3
 
 [profile.test.package.qtv-crypto]
 opt-level = 3
+
+[profile.release]
+overflow-checks = true
