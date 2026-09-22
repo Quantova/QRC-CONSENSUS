@@ -5,9 +5,6 @@
 resolver = "2"
 members = ["crates/qtv-sim", "crates/qtv-bft", "crates/qtv-sampler", "crates/qtv-attest", "crates/q-vrf"]
 
-# The hash based verifiable random function in qtv-crypto is heavy under an
-# unoptimized build. Optimize the crypto dependency in dev and test builds so the
-# sampler tests run in reasonable time, while our own crates stay debuggable.
 [profile.dev.package.qtv-crypto]
 opt-level = 3
 

@@ -23,8 +23,6 @@ pub fn aggregate(
     attestations: &[Attestation],
     tau: u64,
 ) -> Option<Certificate> {
-    // One view at a time, latest first, so a certificate never counts precommits cast in
-    // different views towards one quorum.
     let mut by_view: std::collections::BTreeMap<u64, Vec<&Attestation>> =
         std::collections::BTreeMap::new();
     for att in attestations {
@@ -281,8 +279,6 @@ mod tests {
         let commitment = committee(&[&a, &b, &c, &d]);
         let digest = commitment.digest();
 
-        // Three genuine precommits for one block, but cast in two views. Counted together
-        // they would finalize a block no single view ever agreed on.
         let split = vec![
             a.attest(1, 1, 0, 0, digest, block, &beacon),
             b.attest(1, 1, 0, 2, digest, block, &beacon),
@@ -300,7 +296,6 @@ mod tests {
         assert!(cert.attestations.iter().all(|att| att.view == 2));
         assert!(cert.verify(1, &commitment, &beacon, TAU).is_verified());
 
-        // A peer serving a certificate stitched from real signatures of different views.
         let mut stitched = cert.clone();
         let swap = stitched
             .attestations

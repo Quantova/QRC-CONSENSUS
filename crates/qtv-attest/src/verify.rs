@@ -62,10 +62,6 @@ fn verify_body(
     if envelope.committee != committee_digest {
         return Verdict::Rejected(RejectReason::CommitmentMismatch);
     }
-    // A precommit names the block, not the view it was cast in, so precommits from two
-    // views are not one decision. A node locked in one view may unlock onto another value
-    // in a later one, and a certificate counting both would finalize a block while a
-    // second one gathers its own quorum at the same height. A quorum is one view's.
     let view = attestations.first().map(|att| att.view);
     let mut seen: Vec<u64> = Vec::new();
     for att in attestations {
