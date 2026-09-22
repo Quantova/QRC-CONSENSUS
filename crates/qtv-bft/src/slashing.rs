@@ -67,7 +67,17 @@ impl EquivocationDetector {
         EquivocationDetector::default()
     }
 
-    pub fn observe(&mut self, attestation: &Attestation) -> Option<EquivocationEvidence> {
+    pub fn observe(
+        &mut self,
+        attestation: &Attestation,
+        set: &ValidatorSet,
+    ) -> Option<EquivocationEvidence> {
+        let signed = set
+            .public_key(attestation.from)
+            .is_some_and(|public_key| attestation.verify(public_key));
+        if !signed {
+            return None;
+        }
         let key = (attestation.from, attestation.height);
         match self.seen.get(&key) {
             Some(previous) if is_equivocation(previous, attestation) => {
@@ -136,11 +146,11 @@ mod tests {
 
         let mut detector = EquivocationDetector::new();
         assert!(
-            detector.observe(&first).is_none(),
+            detector.observe(&first, &set).is_none(),
             "the first vote is not yet a fault"
         );
         let evidence = detector
-            .observe(&second)
+            .observe(&second, &set)
             .expect("the conflicting vote is caught");
         assert_eq!(evidence.offender(), 2);
         assert_eq!(evidence.height(), 1);
@@ -163,12 +173,12 @@ mod tests {
         let mut detector = EquivocationDetector::new();
         for h in 1..=3u64 {
             assert!(detector
-                .observe(&att(set.get(1).unwrap(), h, [9u8; 32]))
+                .observe(&att(set.get(1).unwrap(), h, [9u8; 32]), &set)
                 .is_none());
         }
         let resend = att(set.get(1).unwrap(), 1, [9u8; 32]);
         assert!(
-            detector.observe(&resend).is_none(),
+            detector.observe(&resend, &set).is_none(),
             "resending one vote is not a fault"
         );
     }
@@ -183,17 +193,34 @@ mod tests {
         second.from = 1;
 
         let mut detector = EquivocationDetector::new();
-        assert!(detector.observe(&first).is_none());
-        let evidence = detector
-            .observe(&second)
-            .expect("the claimed pair is paired");
-        assert_eq!(evidence.offender(), 1);
+        assert!(detector.observe(&first, &set).is_none());
+        assert!(detector.observe(&second, &set).is_none());
 
+        let evidence = EquivocationEvidence { first, second };
+        assert_eq!(evidence.offender(), 1);
         assert!(!evidence.is_valid(set.public_key(1).unwrap()));
         assert!(
             slash_from_evidence(&evidence, &set).is_none(),
             "an unsigned pair must never slash the named validator"
         );
+    }
+
+    #[test]
+    fn a_forged_first_vote_does_not_shield_a_real_equivocation() {
+        let set = ValidatorSet::new(4);
+        let offender = set.get(2).unwrap();
+        let mut forged = att(set.get(3).unwrap(), 1, [5u8; 32]);
+        forged.from = 2;
+
+        let mut detector = EquivocationDetector::new();
+        assert!(detector.observe(&forged, &set).is_none());
+        assert!(detector
+            .observe(&att(offender, 1, [1u8; 32]), &set)
+            .is_none());
+        let evidence = detector
+            .observe(&att(offender, 1, [2u8; 32]), &set)
+            .expect("the signed double vote is still caught");
+        assert!(slash_from_evidence(&evidence, &set).is_some());
     }
 
     #[test]
@@ -209,7 +236,7 @@ mod tests {
             att(set.get(4).unwrap(), 1, [8u8; 32]),
         ];
         for a in &stream {
-            if let Some(evidence) = detector.observe(a) {
+            if let Some(evidence) = detector.observe(a, &set) {
                 if let Some(slash) = slash_from_evidence(&evidence, &set) {
                     ledger.apply(slash);
                 }

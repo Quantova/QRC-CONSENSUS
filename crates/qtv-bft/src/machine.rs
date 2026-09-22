@@ -281,7 +281,7 @@ impl Machine {
     }
 
     fn detect_and_slash(&mut self, attestation: &Attestation) {
-        if let Some(evidence) = self.detector.observe(attestation) {
+        if let Some(evidence) = self.detector.observe(attestation, &self.set) {
             if let Some(slash) = slash_from_evidence(&evidence, &self.set) {
                 self.ledger.apply(slash);
             }
