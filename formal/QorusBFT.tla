@@ -1,27 +1,16 @@
 ---------------------------- MODULE QorusBFT ----------------------------
-(***************************************************************************)
-(* Formal model of the QORUS byzantine fault tolerant core, stage one.     *)
-(* It follows SPEC-consensus-qorus.md. A committee of validators decides    *)
-(* one block per height. A deterministic leader proposes, committee         *)
-(* members attest, and a supermajority of two thirds plus one aggregates    *)
-(* into a single certificate that finalizes the block. Signatures are       *)
-(* abstracted as an authenticated fact, meaning an attestation is a record  *)
-(* that a named validator attested a named block. Timeouts drive view       *)
-(* changes under partial synchrony. Offline validators are skipped and are  *)
-(* never slashed. Provers hold no vote and never enter a quorum.            *)
-(***************************************************************************)
 EXTENDS Naturals, FiniteSets
 
 CONSTANTS
-    N,             \* number of validators, the committee is Validators
-    Byzantine,     \* the byzantine subset, at most one third minus one
-    Offline,       \* validators that are absent this run, skipped not slashed
-    Provers,       \* provers, disjoint from validators, zero vote
-    Vals,          \* the block payload values available at a height
-    Genesis,       \* the parent tag of the first finalized block
-    ResourceBound, \* the validator resource budget, an abstract bound
-    MaxHeight,     \* highest height the finite model explores
-    MaxView        \* highest view a height may reach before the run ends
+    N,
+    Byzantine,
+    Offline,
+    Provers,
+    Vals,
+    Genesis,
+    ResourceBound,
+    MaxHeight,
+    MaxView
 
 Validators == 1 .. N
 Honest == Validators \ Byzantine
@@ -35,37 +24,26 @@ ASSUME ProversDisjoint == Provers \cap Validators = {}
 ASSUME BudgetPositive == ResourceBound \in Nat \ {0}
 ASSUME HeightBound == MaxHeight \in Nat \ {0}
 ASSUME ViewBound == MaxView \in Nat
-\* The safety hypothesis of the protocol, fewer than one third byzantine.
 ASSUME FaultBound == Cardinality(Byzantine) * 3 < Cardinality(Validators)
 
 -----------------------------------------------------------------------------
-(* A quorum is any set of validators whose size exceeds two thirds of the   *)
-(* committee, which is the two thirds plus one supermajority. Provers are   *)
-(* not validators so they never contribute to a quorum.                     *)
 Quorums == { Q \in SUBSET Validators : Cardinality(Q) * 3 > 2 * Cardinality(Validators) }
 
-(* A block records its height, its payload value, and the value of the      *)
-(* block it descends from. Parents outside Vals are only the Genesis tag.   *)
 Parents == Vals \cup {Genesis}
 BlocksAt(h) == [ height : {h}, val : Vals, parent : Parents ]
 AllBlocks == [ height : Heights, val : Vals, parent : Parents ]
 
-(* The resource budget is an abstract bound. Every block carries a cost and *)
-(* a block is only valid when its cost is within the budget. Raising a      *)
-(* cost above ResourceBound would make the block invalid and unattestable.  *)
 Cost(b) == 1
 WithinBudget(b) == Cost(b) <= ResourceBound
 
-(* Deterministic leader rotation inside the committee, seeded by height and *)
-(* view. Every validator appears as leader as the view advances.            *)
 Leader(h, v) == ((h + v) % N) + 1
 
 -----------------------------------------------------------------------------
 VARIABLES
-    msgs,   \* the growing set of authenticated proposals and attestations
-    certs,  \* the set of finality certificates, one intended per height
-    view,   \* the current view per height, advanced by a timeout
-    stable  \* partial synchrony, TRUE once the network has stabilized
+    msgs,
+    certs,
+    view,
+    stable
 
 vars == << msgs, certs, view, stable >>
 
@@ -73,14 +51,9 @@ Decided(h) == \E c \in certs : c.height = h
 FinalBlockOf(h) == (CHOOSE c \in certs : c.height = h).block
 ParentVal(h) == IF h = MinHeight THEN Genesis ELSE FinalBlockOf(h - 1).val
 
-(* A height is being worked when it is undecided and every earlier height   *)
-(* is already decided, so the chain grows in order.                         *)
 Working(h) == /\ ~ Decided(h)
               /\ \A g \in Heights : (g < h) => Decided(g)
 
-(* A block is valid at a height when it is shaped for that height, carries  *)
-(* a known value, descends from the previous finalized value, and respects  *)
-(* the resource budget.                                                     *)
 ValidBlock(b, h) == /\ b.height = h
                     /\ b.val \in Vals
                     /\ b.parent = ParentVal(h)
@@ -112,7 +85,6 @@ Init == /\ msgs = {}
         /\ view = [ h \in Heights |-> 0 ]
         /\ stable = FALSE
 
-(* The honest leader of the current view proposes its single valid block.   *)
 HonestPropose(h) ==
     LET l == Leader(h, view[h])
         b == HonestProposal(h)
@@ -124,8 +96,6 @@ HonestPropose(h) ==
        /\ msgs' = msgs \cup {m}
        /\ UNCHANGED << certs, view, stable >>
 
-(* A byzantine leader may propose any block, including an invalid one or a   *)
-(* second block in the same view, which is an equivocating proposal.         *)
 ByzPropose(h, b) ==
     LET l == Leader(h, view[h])
         m == [ kind |-> "propose", from |-> l, height |-> h, view |-> view[h], block |-> b ]
@@ -137,10 +107,6 @@ ByzPropose(h, b) ==
        /\ msgs' = msgs \cup {m}
        /\ UNCHANGED << certs, view, stable >>
 
-(* An honest validator attests a validly proposed block from the legitimate  *)
-(* leader of a view it has reached, and only when it has not already         *)
-(* attested a different block at this height, so an honest validator never   *)
-(* equivocates.                                                              *)
 Vote(x, h, b) ==
     LET m == [ kind |-> "vote", from |-> x, height |-> h, block |-> b ]
     IN /\ Working(h)
@@ -153,8 +119,6 @@ Vote(x, h, b) ==
        /\ msgs' = msgs \cup {m}
        /\ UNCHANGED << certs, view, stable >>
 
-(* A byzantine validator may attest any block and may attest two different   *)
-(* blocks at one height, which is equivocation.                              *)
 ByzVote(x, h, b) ==
     LET m == [ kind |-> "vote", from |-> x, height |-> h, block |-> b ]
     IN /\ Working(h)
@@ -164,10 +128,6 @@ ByzVote(x, h, b) ==
        /\ msgs' = msgs \cup {m}
        /\ UNCHANGED << certs, view, stable >>
 
-(* When a quorum has attested one block, the attestations aggregate into a   *)
-(* single certificate and the block is finalized. The rule does not forbid   *)
-(* a second certificate at the same height, so the model would expose a      *)
-(* conflicting finalization if the quorum arithmetic allowed one.            *)
 Finalize(h, b) ==
     LET c == [ height |-> h, block |-> b ]
     IN /\ h \in Heights
@@ -177,9 +137,6 @@ Finalize(h, b) ==
        /\ certs' = certs \cup {c}
        /\ UNCHANGED << msgs, view, stable >>
 
-(* A timeout advances the view of an undecided height, rotating the leader.  *)
-(* Before stabilization the network may time out at any point. After         *)
-(* stabilization it only rotates past a leader that is offline or byzantine. *)
 Timeout(h) ==
     /\ Working(h)
     /\ view[h] < MaxView
@@ -215,7 +172,6 @@ SafeSpec == Init /\ [][Next]_vars
 Spec == Init /\ [][Next]_vars /\ Fairness
 
 -----------------------------------------------------------------------------
-(* Invariants.                                                               *)
 
 TypeOK ==
     /\ msgs \subseteq ( [ kind : {"propose"}, from : Validators, height : Heights, view : 0 .. MaxView, block : AllBlocks ]
@@ -224,15 +180,10 @@ TypeOK ==
     /\ view \in [ Heights -> 0 .. MaxView ]
     /\ stable \in BOOLEAN
 
-(* Safety, no two conflicting blocks are ever finalized at one height.       *)
 Agreement == \A c1, c2 \in certs : (c1.height = c2.height) => (c1.block = c2.block)
 
-(* Safety, a finalized block is valid, meaning well shaped, within budget,   *)
-(* and descending from the previous finalized value.                        *)
 ValidFinalized == \A c \in certs : ValidBlock(c.block, c.height)
 
-(* Safety, a finalized block descends from the previous finalized block, or  *)
-(* from Genesis at the first height.                                         *)
 ChainDescends ==
     \A c \in certs :
         IF c.height = MinHeight
@@ -240,8 +191,6 @@ ChainDescends ==
           ELSE /\ Decided(c.height - 1)
                /\ c.block.parent = FinalBlockOf(c.height - 1).val
 
-(* The set of validators that attested two different blocks at one height,   *)
-(* which is the only slashable fault.                                        *)
 Equivocators ==
     { x \in Validators :
         \E m1, m2 \in msgs :
@@ -250,19 +199,13 @@ Equivocators ==
             /\ m1.height = m2.height
             /\ m1.block # m2.block }
 
-(* Only byzantine validators are ever slashable, honest ones never          *)
-(* equivocate.                                                               *)
 OnlyByzantineSlashed == Equivocators \subseteq Byzantine
 
-(* An absent validator is never slashable, it casts no attestation.         *)
 OfflineNeverSlashed == Offline \cap Equivocators = {}
 
-(* Provers hold no vote, no attestation ever originates from a prover.       *)
 ProversHaveNoVote == \A m \in msgs : m.from \in Validators
 
 -----------------------------------------------------------------------------
-(* Liveness. After the network stabilizes, with an honest online            *)
-(* supermajority, every pending height eventually finalizes.                *)
 AllFinalized == \A h \in Heights : Decided(h)
 Liveness == stable ~> AllFinalized
 
