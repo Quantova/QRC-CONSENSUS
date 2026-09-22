@@ -138,7 +138,12 @@ impl CommitteeView {
             }
             eligible.sort_unstable();
             let median = eligible[eligible.len() / 2];
-            median.saturating_mul(STAKE_CAP_MULTIPLE).max(self.floor)
+            let total: u128 = eligible.iter().map(|&w| u128::from(w)).sum();
+            let share = u64::try_from(total / u128::from(STAKE_CAP_MULTIPLE)).unwrap_or(u64::MAX);
+            median
+                .saturating_mul(STAKE_CAP_MULTIPLE)
+                .max(share)
+                .max(self.floor)
         })
     }
 
@@ -220,7 +225,7 @@ impl CommitteeView {
             }
             members.push(Member {
                 id: reveal.id,
-                weight: reg.weight,
+                weight: self.effective_weight(reg.weight),
                 credential: reveal.credential.clone(),
             });
         }
@@ -363,6 +368,25 @@ mod tests {
         assert!(committee.contains(leader.id));
         let root = reg.registration(leader.id).unwrap().root;
         assert!(verify_leader(&root, 0, &leader.credential));
+    }
+
+    #[test]
+    fn an_assembled_member_carries_its_capped_weight_into_the_leader_draw() {
+        let set = validators(&[100, 100, 100, 100_000]);
+        let view = CommitteeView::new(set.iter().map(Registration::of).collect()).with_floor(0);
+        let beacon = Beacon::genesis();
+        let published: Vec<PublishedReveal> = set
+            .iter()
+            .map(|v| PublishedReveal::new(v.id, v.reveal(0)))
+            .collect();
+        let committee = view.form_committee(&beacon, 0, &published);
+        let whale = committee
+            .members
+            .iter()
+            .find(|m| m.id == 4)
+            .expect("the outsized validator is drawn");
+        assert!(whale.weight < 100_000);
+        assert_eq!(whale.weight, view.effective_weight(100_000));
     }
 
     #[test]
@@ -565,6 +589,21 @@ mod stake_cap_tests {
         assert!(
             (COMMITTEE_BUDGET as u128) * (honest as u128) >= total as u128,
             "an ordinary validator must still saturate its draw once the outsized stake is capped"
+        );
+    }
+
+    #[test]
+    fn a_crowd_of_minimum_stakes_cannot_pull_the_cap_under_honest_large_stakes() {
+        let mut weights = vec![MIN_SELF_STAKE * 500; 10];
+        weights.extend(std::iter::repeat_n(MIN_SELF_STAKE, 500));
+        let v = view(&weights);
+        let honest: u128 = (0..10)
+            .map(|_| u128::from(v.effective_weight(MIN_SELF_STAKE * 500)))
+            .sum();
+        let crowd = u128::from(v.effective_weight(MIN_SELF_STAKE)) * 500;
+        assert!(
+            honest > crowd * 5,
+            "minimum stake registrations lowered the cap onto the large stakers"
         );
     }
 
