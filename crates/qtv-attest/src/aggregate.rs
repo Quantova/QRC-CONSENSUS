@@ -23,17 +23,26 @@ pub fn aggregate(
     attestations: &[Attestation],
     tau: u64,
 ) -> Option<Certificate> {
-    aggregate_metered(
-        chain_id,
-        height,
-        slot,
-        block,
-        commitment,
-        beacon,
-        attestations,
-        tau,
-    )
-    .0
+    // One view at a time, latest first, so a certificate never counts precommits cast in
+    // different views towards one quorum.
+    let mut views: Vec<_> = attestations.iter().map(|att| att.view).collect();
+    views.sort_unstable();
+    views.dedup();
+    for view in views.into_iter().rev() {
+        let same: Vec<Attestation> = attestations
+            .iter()
+            .filter(|att| att.view == view)
+            .cloned()
+            .collect();
+        if let Some(certificate) = aggregate_metered(
+            chain_id, height, slot, block, commitment, beacon, &same, tau,
+        )
+        .0
+        {
+            return Some(certificate);
+        }
+    }
+    None
 }
 
 fn aggregate_metered(
@@ -188,6 +197,50 @@ mod tests {
         ];
         let cert = aggregate(1, 1, 0, block, &commitment, &beacon, &atts, TAU).expect("quorum");
         assert_eq!(cert.attesters(), vec![1, 2, 3]);
+    }
+
+    #[test]
+    fn precommits_from_two_views_never_make_one_quorum() {
+        let a = Attester::new(1, 100);
+        let b = Attester::new(2, 100);
+        let c = Attester::new(3, 100);
+        let d = Attester::new(4, 100);
+        let beacon = Beacon::genesis();
+        let block = Block::new(1, [9u8; 32], Parent::Genesis);
+        let commitment = committee(&[&a, &b, &c, &d]);
+        let digest = commitment.digest();
+
+        // Three genuine precommits for one block, but cast in two views. Counted together
+        // they would finalize a block no single view ever agreed on.
+        let split = vec![
+            a.attest(1, 1, 0, 0, digest, block, &beacon),
+            b.attest(1, 1, 0, 2, digest, block, &beacon),
+            c.attest(1, 1, 0, 2, digest, block, &beacon),
+        ];
+        assert!(
+            aggregate(1, 1, 0, block, &commitment, &beacon, &split, TAU).is_none(),
+            "two in view two and one in view zero is not three in any one view"
+        );
+
+        let mut one_view = split.clone();
+        one_view.push(d.attest(1, 1, 0, 2, digest, block, &beacon));
+        let cert = aggregate(1, 1, 0, block, &commitment, &beacon, &one_view, TAU)
+            .expect("three in view two is a quorum");
+        assert!(cert.attestations.iter().all(|att| att.view == 2));
+        assert!(cert.verify(1, &commitment, &beacon, TAU).is_verified());
+
+        // A peer serving a certificate stitched from real signatures of different views.
+        let mut stitched = cert.clone();
+        let swap = stitched
+            .attestations
+            .iter()
+            .position(|att| att.from == 2)
+            .expect("b is in the quorum");
+        stitched.attestations[swap] = b.attest(1, 1, 0, 0, digest, block, &beacon);
+        assert_eq!(
+            stitched.verify(1, &commitment, &beacon, TAU),
+            crate::verify::Verdict::Rejected(crate::verify::RejectReason::MixedViews)
+        );
     }
 
     #[test]
