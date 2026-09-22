@@ -36,6 +36,7 @@ pub fn epoch_tree_seed(base_seed: &[u8; 32], epoch: u64) -> [u8; 32] {
     buf[D + 32..].copy_from_slice(&epoch.to_le_bytes());
     let mut out = [0u8; 32];
     shake256(&buf, &mut out);
+    crate::wipe(&mut buf);
     out
 }
 

@@ -5,24 +5,6 @@ use crate::onetime::Root;
 use crate::sortition::{verify_membership, Credential};
 
 #[derive(Clone, Debug, PartialEq, Eq)]
-pub struct OutOfPosition {
-    pub root: Root,
-    pub credential: Credential,
-    pub used_slot: u64,
-}
-
-impl OutOfPosition {
-    pub fn is_proven(&self) -> bool {
-        self.used_slot != self.credential.position
-            && self.root.verify_membership(
-                self.credential.position,
-                &self.credential.preimage,
-                &self.credential.path,
-            )
-    }
-}
-
-#[derive(Clone, Debug, PartialEq, Eq)]
 pub struct DoubleDraw {
     pub root: Root,
     pub slot: u64,
@@ -86,31 +68,5 @@ mod tests {
             second: genuine,
         };
         assert!(!swapped.is_proven());
-    }
-
-    #[test]
-    fn a_leaf_reused_at_another_slot_is_an_out_of_position_fault() {
-        let v = SamplerValidator::new(1, 100);
-        let root = v.root();
-        let credential = v.reveal(3);
-        let fault = OutOfPosition {
-            root,
-            credential,
-            used_slot: 7,
-        };
-        assert!(fault.is_proven());
-    }
-
-    #[test]
-    fn a_leaf_at_its_own_slot_is_not_an_out_of_position_fault() {
-        let v = SamplerValidator::new(1, 100);
-        let root = v.root();
-        let credential = v.reveal(3);
-        let fault = OutOfPosition {
-            root,
-            credential,
-            used_slot: 3,
-        };
-        assert!(!fault.is_proven());
     }
 }

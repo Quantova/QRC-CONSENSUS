@@ -2,9 +2,9 @@
 // SPDX-License-Identifier: Apache-2.0 OR MIT
 
 use qtv_sampler::beacon::Beacon;
-use qtv_sampler::evidence::{DoubleDraw, OutOfPosition};
+use qtv_sampler::evidence::DoubleDraw;
 use qtv_sampler::params::DOMAIN_COMMITTEE;
-use qtv_sampler::sortition::{verify_membership, verify_selection, Credential};
+use qtv_sampler::sortition::{verify_membership, verify_selection};
 use qtv_sampler::validator::SamplerValidator;
 
 const SATURATING_BUDGET: u64 = 100;
@@ -76,47 +76,6 @@ fn a_double_draw_needs_two_distinct_authenticating_openings() {
 }
 
 #[test]
-fn a_preimage_out_of_position_is_provable() {
-    let v = SamplerValidator::new(1, 100);
-    let root = v.root();
-
-    let credential = v.reveal(3);
-    let fault = OutOfPosition {
-        root,
-        credential,
-        used_slot: 7,
-    };
-    assert!(fault.is_proven());
-}
-
-#[test]
-fn a_fabricated_out_of_position_over_a_foreign_leaf_is_not_proven() {
-    let v = SamplerValidator::new(1, 100);
-    let other = SamplerValidator::new(2, 100);
-    let root = v.root();
-
-    let foreign = other.reveal(3);
-    let fault = OutOfPosition {
-        root,
-        credential: foreign,
-        used_slot: 7,
-    };
-    assert!(!fault.is_proven());
-
-    let junk = Credential {
-        position: 3,
-        preimage: [85; 32],
-        path: v.reveal(3).path,
-    };
-    let fault = OutOfPosition {
-        root,
-        credential: junk,
-        used_slot: 7,
-    };
-    assert!(!fault.is_proven());
-}
-
-#[test]
 fn the_forged_second_draw_is_rejected_at_verification_and_frames_no_one() {
     let v = SamplerValidator::new(1, 100);
     let beacon = Beacon::genesis();
@@ -155,31 +114,4 @@ fn the_forged_second_draw_is_rejected_at_verification_and_frames_no_one() {
         second: forged,
     };
     assert!(!fault.is_proven());
-}
-
-#[test]
-fn honest_committee_participation_raises_no_fault() {
-    use qtv_sampler::committee::Registry;
-
-    let reg = Registry::new(vec![
-        SamplerValidator::new(1, 100),
-        SamplerValidator::new(2, 100),
-        SamplerValidator::new(3, 100),
-    ])
-    .with_budget(SATURATING_BUDGET)
-    .with_floor(0);
-    let beacon = Beacon::genesis();
-
-    for slot in 0..4u64 {
-        let committee = reg.sample_committee(&beacon, slot);
-        for m in &committee.members {
-            let root = reg.registration(m.id).unwrap().root;
-            let fault = OutOfPosition {
-                root,
-                credential: m.credential.clone(),
-                used_slot: slot,
-            };
-            assert!(!fault.is_proven(), "honest reveal flagged at slot {slot}");
-        }
-    }
 }

@@ -21,6 +21,14 @@ pub enum Fault {
     Offline,
 }
 
+pub(crate) fn wipe(buf: &mut [u8]) {
+    for slot in buf.iter_mut() {
+        *slot = 0;
+    }
+    core::sync::atomic::compiler_fence(core::sync::atomic::Ordering::SeqCst);
+    let _ = core::hint::black_box(&*buf);
+}
+
 const SIGNING_KEY_DOMAIN: &[u8] = b"QORUS/validator-keying/v1/ml-dsa-65-signing";
 
 pub fn signing_key_seed(secret: &[u8; 32]) -> [u8; 32] {
@@ -30,6 +38,7 @@ pub fn signing_key_seed(secret: &[u8; 32]) -> [u8; 32] {
     buf[D..].copy_from_slice(secret);
     let mut out = [0u8; 32];
     shake256(&buf, &mut out);
+    wipe(&mut buf);
     out
 }
 
@@ -78,7 +87,9 @@ pub struct Validator {
 
 impl Validator {
     pub fn from_secret(id: ValidatorId, secret: &[u8; 32]) -> Self {
-        let (pk, sk) = SigningKey::derive(&signing_key_seed(secret));
+        let mut seed = signing_key_seed(secret);
+        let (pk, sk) = SigningKey::derive(&seed);
+        wipe(&mut seed);
         Validator {
             id,
             role: Role::Validator,

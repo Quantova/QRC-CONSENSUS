@@ -13,3 +13,11 @@ pub mod params;
 pub mod sortition;
 pub mod stake;
 pub mod validator;
+
+pub(crate) fn wipe(buf: &mut [u8]) {
+    for slot in buf.iter_mut() {
+        *slot = 0;
+    }
+    core::sync::atomic::compiler_fence(core::sync::atomic::Ordering::SeqCst);
+    let _ = core::hint::black_box(&*buf);
+}

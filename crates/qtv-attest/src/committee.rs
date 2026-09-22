@@ -14,6 +14,7 @@ pub type CommitteeDigest = [u8; 32];
 pub struct MemberKey {
     pub id: ValidatorId,
     pub weight: u64,
+    pub stake: u64,
     pub root: Root,
     pub attest_pk: PublicKey,
 }
@@ -37,6 +38,7 @@ impl CommitteeCommitment {
             .map(|a| MemberKey {
                 id: a.id(),
                 weight: a.weight(),
+                stake: a.weight(),
                 root: a.root(),
                 attest_pk: *a.attest_public_key(),
             })
@@ -78,6 +80,17 @@ impl CommitteeCommitment {
         self.member(id).map(|m| m.weight).unwrap_or(0)
     }
 
+    pub fn committee_stake(&self) -> u64 {
+        self.members
+            .iter()
+            .map(|m| m.stake)
+            .fold(0u64, u64::saturating_add)
+    }
+
+    pub fn stake_of(&self, id: ValidatorId) -> u64 {
+        self.member(id).map(|m| m.stake).unwrap_or(0)
+    }
+
     pub fn is_empty(&self) -> bool {
         self.members.is_empty()
     }
@@ -100,6 +113,7 @@ impl CommitteeCommitment {
         for m in &self.members {
             buf.extend_from_slice(&m.id.to_le_bytes());
             buf.extend_from_slice(&m.weight.to_le_bytes());
+            buf.extend_from_slice(&m.stake.to_le_bytes());
             buf.extend_from_slice(&m.root.digest);
             buf.extend_from_slice(&m.root.slots.to_le_bytes());
             buf.extend_from_slice(&m.attest_pk);

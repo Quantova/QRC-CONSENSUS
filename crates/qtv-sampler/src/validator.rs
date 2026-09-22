@@ -34,6 +34,7 @@ pub fn sortition_tree_seed(secret: &[u8; 32]) -> [u8; 32] {
     buf[D..].copy_from_slice(secret);
     let mut out = [0u8; 32];
     shake256(&buf, &mut out);
+    crate::wipe(&mut buf);
     out
 }
 

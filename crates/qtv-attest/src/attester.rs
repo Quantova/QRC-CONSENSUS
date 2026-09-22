@@ -16,8 +16,14 @@ pub use qtv_bft::validator::ValidatorId;
 
 pub const EPOCH_REG_CONTEXT: &[u8] = b"QORUS-EPOCH-REGISTER";
 
-pub fn epoch_registration_message(id: ValidatorId, epoch: u64, root: &Root) -> Vec<u8> {
-    let mut msg = Vec::with_capacity(8 + 8 + 32 + 8);
+pub fn epoch_registration_message(
+    chain_id: u64,
+    id: ValidatorId,
+    epoch: u64,
+    root: &Root,
+) -> Vec<u8> {
+    let mut msg = Vec::with_capacity(8 + 8 + 8 + 32 + 8);
+    msg.extend_from_slice(&chain_id.to_le_bytes());
     msg.extend_from_slice(&id.to_le_bytes());
     msg.extend_from_slice(&epoch.to_le_bytes());
     msg.extend_from_slice(&root.digest);
@@ -27,12 +33,13 @@ pub fn epoch_registration_message(id: ValidatorId, epoch: u64, root: &Root) -> V
 
 pub fn epoch_registration_verifies(
     attest_pk: &PublicKey,
+    chain_id: u64,
     id: ValidatorId,
     epoch: u64,
     root: &Root,
     sig: &Signature,
 ) -> bool {
-    let msg = epoch_registration_message(id, epoch, root);
+    let msg = epoch_registration_message(chain_id, id, epoch, root);
     verify(attest_pk, &msg, sig, EPOCH_REG_CONTEXT)
 }
 
@@ -79,9 +86,9 @@ impl Attester {
         self.sampler.epoch()
     }
 
-    pub fn epoch_registration(&self, epoch: u64) -> (Root, Signature) {
+    pub fn epoch_registration(&self, chain_id: u64, epoch: u64) -> (Root, Signature) {
         let root = self.sampler.rotate_to(epoch).root();
-        let msg = epoch_registration_message(self.id(), epoch, &root);
+        let msg = epoch_registration_message(chain_id, self.id(), epoch, &root);
         let sig = self.signer.sign(&msg, EPOCH_REG_CONTEXT);
         (root, sig)
     }
@@ -204,7 +211,7 @@ mod tests {
     #[test]
     fn an_epoch_registration_authenticates_the_rotated_root_to_the_stable_key() {
         let a = Attester::new(1, 100);
-        let (root, sig) = a.epoch_registration(3);
+        let (root, sig) = a.epoch_registration(7, 3);
         assert_eq!(root, a.at_epoch(3).root());
         assert_ne!(
             root,
@@ -213,18 +220,23 @@ mod tests {
         );
         assert!(epoch_registration_verifies(
             a.attest_public_key(),
+            7,
             a.id(),
             3,
             &root,
             &sig
         ));
         assert!(
-            !epoch_registration_verifies(a.attest_public_key(), a.id(), 4, &root, &sig),
+            !epoch_registration_verifies(a.attest_public_key(), 7, a.id(), 4, &root, &sig),
             "the signature does not carry to another epoch"
+        );
+        assert!(
+            !epoch_registration_verifies(a.attest_public_key(), 8, a.id(), 3, &root, &sig),
+            "the signature does not carry to another chain"
         );
         let other = Attester::new(2, 100);
         assert!(
-            !epoch_registration_verifies(other.attest_public_key(), a.id(), 3, &root, &sig),
+            !epoch_registration_verifies(other.attest_public_key(), 7, a.id(), 3, &root, &sig),
             "another key does not verify the registration"
         );
     }

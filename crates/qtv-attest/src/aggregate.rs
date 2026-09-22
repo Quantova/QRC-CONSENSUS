@@ -25,26 +25,32 @@ pub fn aggregate(
 ) -> Option<Certificate> {
     // One view at a time, latest first, so a certificate never counts precommits cast in
     // different views towards one quorum.
-    let mut views: Vec<_> = attestations.iter().map(|att| att.view).collect();
-    views.sort_unstable();
-    views.dedup();
-    for view in views.into_iter().rev() {
-        let same: Vec<Attestation> = attestations
-            .iter()
-            .filter(|att| att.view == view)
-            .cloned()
-            .collect();
-        if let Some(certificate) = aggregate_metered(
-            chain_id, height, slot, block, commitment, beacon, &same, tau,
-        )
-        .0
-        {
-            return Some(certificate);
+    let mut by_view: std::collections::BTreeMap<u64, Vec<&Attestation>> =
+        std::collections::BTreeMap::new();
+    for att in attestations {
+        by_view.entry(att.view).or_default().push(att);
+    }
+    let mut left = verification_cap(commitment);
+    for same in by_view.values().rev() {
+        if left == 0 {
+            break;
         }
+        let (certificate, used) = aggregate_budgeted(
+            chain_id, height, slot, block, commitment, beacon, same, tau, left,
+        );
+        if certificate.is_some() {
+            return certificate;
+        }
+        left = left.saturating_sub(used);
     }
     None
 }
 
+fn verification_cap(commitment: &CommitteeCommitment) -> u64 {
+    MAX_ATTEST_VERIFICATIONS_PER_ROUND.max(commitment.len() as u64)
+}
+
+#[cfg(test)]
 fn aggregate_metered(
     chain_id: u64,
     height: Height,
@@ -55,7 +61,32 @@ fn aggregate_metered(
     attestations: &[Attestation],
     tau: u64,
 ) -> (Option<Certificate>, u64) {
-    let cap = MAX_ATTEST_VERIFICATIONS_PER_ROUND.max(commitment.len() as u64);
+    let refs: Vec<&Attestation> = attestations.iter().collect();
+    aggregate_budgeted(
+        chain_id,
+        height,
+        slot,
+        block,
+        commitment,
+        beacon,
+        &refs,
+        tau,
+        verification_cap(commitment),
+    )
+}
+
+#[allow(clippy::too_many_arguments)]
+fn aggregate_budgeted(
+    chain_id: u64,
+    height: Height,
+    slot: u64,
+    block: Block,
+    commitment: &CommitteeCommitment,
+    beacon: &Beacon,
+    attestations: &[&Attestation],
+    tau: u64,
+    cap: u64,
+) -> (Option<Certificate>, u64) {
     let committee_digest = commitment.digest();
 
     let mut groups: Vec<(ValidatorId, Vec<&Attestation>)> = Vec::new();
@@ -70,8 +101,8 @@ fn aggregate_metered(
             continue;
         }
         match groups.iter_mut().find(|(id, _)| *id == att.from) {
-            Some((_, bucket)) => bucket.push(att),
-            None => groups.push((att.from, vec![att])),
+            Some((_, bucket)) => bucket.push(*att),
+            None => groups.push((att.from, vec![*att])),
         }
     }
 
@@ -121,13 +152,13 @@ fn aggregate_metered(
     let effective_tau = tau.max(qtv_sampler::params::finality_threshold(
         commitment.len() as u64
     ));
-    let admitted_weight: u128 = admitted
+    let admitted_stake: u128 = admitted
         .iter()
-        .map(|a| commitment.weight_of(a.from) as u128)
+        .map(|a| commitment.stake_of(a.from) as u128)
         .fold(0u128, |acc, w| acc.saturating_add(w));
-    let committee_weight = commitment.committee_weight() as u128;
-    let weight_ok = committee_weight == 0
-        || admitted_weight.saturating_mul(3) >= committee_weight.saturating_mul(2);
+    let committee_stake = commitment.committee_stake() as u128;
+    let weight_ok = committee_stake == 0
+        || admitted_stake.saturating_mul(3) >= committee_stake.saturating_mul(2);
     let cert = if admitted.len() as u64 >= effective_tau && weight_ok {
         let envelope = Envelope::new(height, slot, block, commitment);
         Some(Certificate::new(envelope, admitted))
@@ -179,6 +210,46 @@ mod tests {
             aggregate(1, 1, 0, block, &commitment, &beacon, &with_stake, TAU).is_some(),
             "the same seat count but a stake supermajority finalizes"
         );
+    }
+
+    #[test]
+    fn a_capped_seat_weight_majority_holding_a_stake_minority_cannot_finalize() {
+        use crate::committee::MemberKey;
+        let a = Attester::new(1, 10);
+        let b = Attester::new(2, 10);
+        let c = Attester::new(3, 10);
+        let d = Attester::new(4, 100);
+        let key = |x: &Attester, weight: u64| MemberKey {
+            id: x.id(),
+            weight,
+            stake: x.weight(),
+            root: x.root(),
+            attest_pk: *x.attest_public_key(),
+        };
+        let beacon = Beacon::genesis();
+        let block = Block::new(1, [9u8; 32], Parent::Genesis);
+        let commitment = CommitteeCommitment::from_member_keys(
+            0,
+            vec![key(&a, 10), key(&b, 10), key(&c, 10), key(&d, 12)],
+            40,
+        );
+        let split = vec![
+            a.attest(1, 1, 0, 0, commitment.digest(), block, &beacon),
+            b.attest(1, 1, 0, 0, commitment.digest(), block, &beacon),
+            c.attest(1, 1, 0, 0, commitment.digest(), block, &beacon),
+        ];
+        assert!(
+            aggregate(1, 1, 0, block, &commitment, &beacon, &split, TAU).is_none(),
+            "thirty of forty two capped weight is thirty of one hundred thirty stake"
+        );
+        let staked = vec![
+            a.attest(1, 1, 0, 0, commitment.digest(), block, &beacon),
+            b.attest(1, 1, 0, 0, commitment.digest(), block, &beacon),
+            d.attest(1, 1, 0, 0, commitment.digest(), block, &beacon),
+        ];
+        let cert = aggregate(1, 1, 0, block, &commitment, &beacon, &staked, TAU)
+            .expect("a stake supermajority finalizes");
+        assert!(cert.verify(1, &commitment, &beacon, TAU).is_verified());
     }
 
     #[test]
