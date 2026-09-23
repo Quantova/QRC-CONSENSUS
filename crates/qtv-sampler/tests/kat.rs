@@ -36,8 +36,8 @@ fn tree_hashing_matches_its_pinned_vectors() {
         "1c14fc752fccbc70a12bcab853174024d134aaa97aeffe98cbd55be97a6a6fc4"
     );
     assert_eq!(
-        hex(&leaf_hash(&dp)),
-        "aa4be6d87dc78f568141746867d3e5f5a8ce9d62c3fa16fe5efdd523334e4f8c"
+        hex(&leaf_hash(5, &dp)),
+        "8e149bf9c77bb58fb7d9ec278517fc9c79de7a62f8853319b17f33666acf851f"
     );
     assert_eq!(
         hex(&node_hash(&[1u8; 32], &[2u8; 32])),
@@ -51,7 +51,7 @@ fn a_committed_root_matches_its_pinned_vector() {
     let v = SamplerValidator::from_secret(1, &secret, 100);
     assert_eq!(
         hex(&v.root().digest),
-        "6325bc3101fc51c58d8c4501b99d17532b820c0ce637db0377fc02e25994b577"
+        "7d2caa17f268148ffee8adedb97a00707259bae153a3a0a2d95402f25d3a7d15"
     );
     let other = SamplerValidator::from_secret(2, &secret, 100);
     assert_ne!(

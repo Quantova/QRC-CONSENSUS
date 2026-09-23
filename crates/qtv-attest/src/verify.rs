@@ -103,7 +103,7 @@ fn verify_body(
         .iter()
         .map(|id| commitment.stake_of(*id) as u128)
         .fold(0u128, |acc, w| acc.saturating_add(w));
-    let committee_stake = commitment.committee_stake() as u128;
+    let committee_stake = commitment.committee_stake();
     let weight_ok =
         committee_stake == 0 || seen_stake.saturating_mul(3) >= committee_stake.saturating_mul(2);
     if seen.len() as u64 >= effective_tau && weight_ok {

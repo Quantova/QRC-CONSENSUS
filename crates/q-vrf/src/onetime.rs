@@ -41,7 +41,7 @@ impl Root {
         if path.siblings.len() != depth {
             return false;
         }
-        let leaf = leaf_hash(preimage);
+        let leaf = leaf_hash(position, preimage);
         bind_root(holder, self.slots, &root_from_path(position, &leaf, path)) == self.digest
     }
 }
@@ -81,11 +81,12 @@ pub fn derive_preimage(seed: &[u8; 32], position: u64) -> [u8; PREIMAGE_BYTES] {
     out
 }
 
-pub fn leaf_hash(preimage: &[u8; PREIMAGE_BYTES]) -> [u8; NODE_BYTES] {
+pub fn leaf_hash(position: u64, preimage: &[u8; PREIMAGE_BYTES]) -> [u8; NODE_BYTES] {
     const D: usize = DOMAIN_LEAF.len();
-    let mut buf = [0u8; D + PREIMAGE_BYTES];
+    let mut buf = [0u8; D + 8 + PREIMAGE_BYTES];
     buf[..D].copy_from_slice(DOMAIN_LEAF);
-    buf[D..].copy_from_slice(preimage);
+    buf[D..D + 8].copy_from_slice(&position.to_le_bytes());
+    buf[D + 8..].copy_from_slice(preimage);
     sha3_256(&buf)
 }
 
@@ -141,13 +142,12 @@ impl OneTimeTree {
         assert!(slots >= 1, "a one time tree serves at least one slot");
         let padded =
             padded_leaves(slots).expect("a one time tree serves a representable slot count");
-        let padding = leaf_hash(&PADDING_PREIMAGE);
         let mut leaves = Vec::with_capacity(padded);
         for position in 0..padded as u64 {
             if position < slots {
-                leaves.push(leaf_hash(&derive_preimage(&seed, position)));
+                leaves.push(leaf_hash(position, &derive_preimage(&seed, position)));
             } else {
-                leaves.push(padding);
+                leaves.push(leaf_hash(position, &PADDING_PREIMAGE));
             }
         }
         let mut layers = vec![leaves];
@@ -280,7 +280,7 @@ mod tests {
         let preimage = t.preimage(0);
         let path = t.path(0);
         assert!(path.siblings.is_empty());
-        assert_eq!(root.digest, bind_root(HOLDER, 1, &leaf_hash(&preimage)));
+        assert_eq!(root.digest, bind_root(HOLDER, 1, &leaf_hash(0, &preimage)));
         assert!(root.verify_membership(HOLDER, 0, &preimage, &path));
         assert!(
             !root.verify_membership(HOLDER + 1, 0, &preimage, &path),

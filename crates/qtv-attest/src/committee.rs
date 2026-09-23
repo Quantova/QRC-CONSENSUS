@@ -48,6 +48,7 @@ impl CommitteeCommitment {
 
     pub fn from_member_keys(slot: u64, mut members: Vec<MemberKey>, budget: u64) -> Self {
         members.sort_by_key(|m| m.id);
+        members.dedup_by_key(|m| m.id);
         let total_weight = members
             .iter()
             .map(|m| m.weight)
@@ -80,11 +81,11 @@ impl CommitteeCommitment {
         self.member(id).map(|m| m.weight).unwrap_or(0)
     }
 
-    pub fn committee_stake(&self) -> u64 {
+    pub fn committee_stake(&self) -> u128 {
         self.members
             .iter()
-            .map(|m| m.stake)
-            .fold(0u64, u64::saturating_add)
+            .map(|m| m.stake as u128)
+            .fold(0u128, u128::saturating_add)
     }
 
     pub fn stake_of(&self, id: ValidatorId) -> u64 {

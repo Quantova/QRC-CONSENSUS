@@ -170,7 +170,7 @@ fn the_output_is_domain_separated_and_position_bound() {
     let y = sk.eval(position);
 
     assert_ne!(y.as_slice(), proof.preimage.as_slice());
-    assert_ne!(y, leaf_hash(&proof.preimage));
+    assert_ne!(y, leaf_hash(position, &proof.preimage));
     let _ = pk;
 
     let shifted = output_from_preimage(position + 1, &proof.preimage);
@@ -292,7 +292,7 @@ fn forging_reduces_to_a_sha3_second_preimage_or_collision() {
     let (sk, pk) = keygen([88u8; 32], 128, HOLDER);
     let position = 64u64;
     let honest = sk.prove(position);
-    let committed_leaf = leaf_hash(&honest.preimage);
+    let committed_leaf = leaf_hash(position, &honest.preimage);
 
     let mut node = committed_leaf;
     let mut idx = position;
@@ -314,7 +314,7 @@ fn forging_reduces_to_a_sha3_second_preimage_or_collision() {
         if alt == honest.preimage {
             continue;
         }
-        let alt_leaf = leaf_hash(&alt);
+        let alt_leaf = leaf_hash(position, &alt);
         assert_ne!(
             alt_leaf, committed_leaf,
             "found a SHA3-256 second preimage; report immediately"
