@@ -51,6 +51,12 @@ fn a_committed_root_matches_its_pinned_vector() {
     let v = SamplerValidator::from_secret(1, &secret, 100);
     assert_eq!(
         hex(&v.root().digest),
-        "592d119920d539bdaf1bb6cfcd76001370bb0c13549953d28e6b7e9291046680"
+        "6325bc3101fc51c58d8c4501b99d17532b820c0ce637db0377fc02e25994b577"
+    );
+    let other = SamplerValidator::from_secret(2, &secret, 100);
+    assert_ne!(
+        v.root().digest,
+        other.root().digest,
+        "one secret under two ids commits to two different roots"
     );
 }

@@ -1,8 +1,10 @@
 // Copyright 2026 Quantova Inc
 // SPDX-License-Identifier: Apache-2.0 OR MIT
 
-use q_vrf::onetime::{leaf_hash, node_hash, MerklePath, PREIMAGE_BYTES};
+use q_vrf::onetime::{bind_root, leaf_hash, node_hash, MerklePath, PREIMAGE_BYTES};
 use q_vrf::{keygen, output_from_preimage, verify, Output, Proof};
+
+const HOLDER: u64 = 7;
 
 fn count_ones(bytes: &[u8]) -> u64 {
     bytes.iter().map(|b| b.count_ones() as u64).sum()
@@ -28,11 +30,11 @@ fn adversarial_preimages(count: u64) -> Vec<[u8; PREIMAGE_BYTES]> {
 
 #[test]
 fn exactly_one_output_verifies_per_key_and_position() {
-    let (sk, pk) = keygen([11u8; 32], 128);
+    let (sk, pk) = keygen([11u8; 32], 128, HOLDER);
     for position in [0u64, 1, 7, 63, 127] {
         let (y, proof) = sk.eval_and_prove(position);
         assert!(
-            verify(&pk, position, &y, &proof),
+            verify(&pk, HOLDER, position, &y, &proof),
             "honest output must verify"
         );
 
@@ -41,7 +43,7 @@ fn exactly_one_output_verifies_per_key_and_position() {
                 let mut forged = y;
                 forged[byte] ^= 1 << bit;
                 assert!(
-                    !verify(&pk, position, &forged, &proof),
+                    !verify(&pk, HOLDER, position, &forged, &proof),
                     "a one bit forged output verified at position {position}"
                 );
             }
@@ -51,10 +53,10 @@ fn exactly_one_output_verifies_per_key_and_position() {
 
 #[test]
 fn a_committed_key_cannot_be_reground_to_a_second_output() {
-    let (sk, pk) = keygen([22u8; 32], 256);
+    let (sk, pk) = keygen([22u8; 32], 256, HOLDER);
     let position = 100u64;
     let (honest_y, honest_proof) = sk.eval_and_prove(position);
-    assert!(verify(&pk, position, &honest_y, &honest_proof));
+    assert!(verify(&pk, HOLDER, position, &honest_y, &honest_proof));
 
     for alt in adversarial_preimages(20_000) {
         if alt == honest_proof.preimage {
@@ -66,7 +68,7 @@ fn a_committed_key_cannot_be_reground_to_a_second_output() {
         };
         let forged_y = output_from_preimage(position, &alt);
         assert!(
-            !verify(&pk, position, &forged_y, &forged_proof),
+            !verify(&pk, HOLDER, position, &forged_y, &forged_proof),
             "a substituted preimage produced a verifying second output"
         );
     }
@@ -74,8 +76,8 @@ fn a_committed_key_cannot_be_reground_to_a_second_output() {
 
 #[test]
 fn a_preimage_from_another_position_or_key_cannot_be_reused() {
-    let (sk, pk) = keygen([33u8; 32], 128);
-    let (other_sk, _) = keygen([34u8; 32], 128);
+    let (sk, pk) = keygen([33u8; 32], 128, HOLDER);
+    let (other_sk, _) = keygen([34u8; 32], 128, HOLDER);
     let position = 40u64;
     let honest = sk.prove(position);
 
@@ -85,18 +87,18 @@ fn a_preimage_from_another_position_or_key_cannot_be_reused() {
         path: honest.path.clone(),
     };
     let y = output_from_preimage(position, &mixed.preimage);
-    assert!(!verify(&pk, position, &y, &mixed));
+    assert!(!verify(&pk, HOLDER, position, &y, &mixed));
 
     let foreign = other_sk.prove(position);
     let y2 = output_from_preimage(position, &foreign.preimage);
-    assert!(!verify(&pk, position, &y2, &foreign));
+    assert!(!verify(&pk, HOLDER, position, &y2, &foreign));
 }
 
 const OUTPUT_LEN: usize = 32;
 
 #[test]
 fn distinct_positions_give_distinct_outputs() {
-    let (sk, _) = keygen([44u8; 32], 8192);
+    let (sk, _) = keygen([44u8; 32], 8192, HOLDER);
     let mut seen = std::collections::HashSet::new();
     for position in 0..8192u64 {
         assert!(
@@ -108,7 +110,7 @@ fn distinct_positions_give_distinct_outputs() {
 
 #[test]
 fn output_bits_are_statistically_balanced() {
-    let (sk, _) = keygen([55u8; 32], 4096);
+    let (sk, _) = keygen([55u8; 32], 4096, HOLDER);
     let mut ones = 0u64;
     let mut total_bits = 0u64;
     for position in 0..4096u64 {
@@ -125,7 +127,7 @@ fn output_bits_are_statistically_balanced() {
 
 #[test]
 fn output_byte_mean_is_near_the_uniform_mean() {
-    let (sk, _) = keygen([56u8; 32], 4096);
+    let (sk, _) = keygen([56u8; 32], 4096, HOLDER);
     let mut sum = 0u64;
     let mut n = 0u64;
     for position in 0..4096u64 {
@@ -143,7 +145,7 @@ fn output_byte_mean_is_near_the_uniform_mean() {
 
 #[test]
 fn neighbouring_outputs_are_decorrelated() {
-    let (sk, _) = keygen([57u8; 32], 2048);
+    let (sk, _) = keygen([57u8; 32], 2048, HOLDER);
     let mut total = 0u64;
     let mut pairs = 0u64;
     let mut prev = sk.eval(0);
@@ -162,7 +164,7 @@ fn neighbouring_outputs_are_decorrelated() {
 
 #[test]
 fn the_output_is_domain_separated_and_position_bound() {
-    let (sk, pk) = keygen([58u8; 32], 64);
+    let (sk, pk) = keygen([58u8; 32], 64, HOLDER);
     let position = 9u64;
     let proof = sk.prove(position);
     let y = sk.eval(position);
@@ -177,19 +179,19 @@ fn the_output_is_domain_separated_and_position_bound() {
 
 #[test]
 fn an_honest_transcript_verifies() {
-    let (sk, pk) = keygen([66u8; 32], 512);
+    let (sk, pk) = keygen([66u8; 32], 512, HOLDER);
     for position in [0u64, 1, 255, 511] {
         let (y, proof) = sk.eval_and_prove(position);
-        assert!(verify(&pk, position, &y, &proof));
+        assert!(verify(&pk, HOLDER, position, &y, &proof));
     }
 }
 
 #[test]
 fn a_tampered_authentication_path_is_rejected() {
-    let (sk, pk) = keygen([67u8; 32], 512);
+    let (sk, pk) = keygen([67u8; 32], 512, HOLDER);
     let position = 300u64;
     let (y, proof) = sk.eval_and_prove(position);
-    assert!(verify(&pk, position, &y, &proof));
+    assert!(verify(&pk, HOLDER, position, &y, &proof));
 
     for level in 0..proof.path.siblings.len() {
         let mut siblings = proof.path.siblings.clone();
@@ -199,7 +201,7 @@ fn a_tampered_authentication_path_is_rejected() {
             path: MerklePath { siblings },
         };
         assert!(
-            !verify(&pk, position, &y, &bad),
+            !verify(&pk, HOLDER, position, &y, &bad),
             "a tampered sibling at level {level} verified"
         );
     }
@@ -210,7 +212,7 @@ fn a_tampered_authentication_path_is_rejected() {
         preimage: proof.preimage,
         path: MerklePath { siblings: short },
     };
-    assert!(!verify(&pk, position, &y, &bad));
+    assert!(!verify(&pk, HOLDER, position, &y, &bad));
 
     let mut long = proof.path.siblings.clone();
     long.push([0u8; 32]);
@@ -218,12 +220,12 @@ fn a_tampered_authentication_path_is_rejected() {
         preimage: proof.preimage,
         path: MerklePath { siblings: long },
     };
-    assert!(!verify(&pk, position, &y, &bad));
+    assert!(!verify(&pk, HOLDER, position, &y, &bad));
 }
 
 #[test]
 fn a_tampered_preimage_is_rejected() {
-    let (sk, pk) = keygen([68u8; 32], 512);
+    let (sk, pk) = keygen([68u8; 32], 512, HOLDER);
     let position = 123u64;
     let (y, proof) = sk.eval_and_prove(position);
     for byte in 0..PREIMAGE_BYTES {
@@ -234,60 +236,60 @@ fn a_tampered_preimage_is_rejected() {
             path: proof.path.clone(),
         };
         let y_bad = output_from_preimage(position, &preimage);
-        assert!(!verify(&pk, position, &y_bad, &bad));
-        assert!(!verify(&pk, position, &y, &bad));
+        assert!(!verify(&pk, HOLDER, position, &y_bad, &bad));
+        assert!(!verify(&pk, HOLDER, position, &y, &bad));
     }
 }
 
 #[test]
 fn a_tampered_output_is_rejected() {
-    let (sk, pk) = keygen([69u8; 32], 256);
+    let (sk, pk) = keygen([69u8; 32], 256, HOLDER);
     let position = 200u64;
     let (y, proof) = sk.eval_and_prove(position);
     for byte in 0..OUTPUT_LEN {
         let mut forged: Output = y;
         forged[byte] ^= 0x01;
-        assert!(!verify(&pk, position, &forged, &proof));
+        assert!(!verify(&pk, HOLDER, position, &forged, &proof));
     }
 }
 
 #[test]
 fn a_proof_for_one_position_does_not_validate_another() {
-    let (sk, pk) = keygen([70u8; 32], 256);
+    let (sk, pk) = keygen([70u8; 32], 256, HOLDER);
     let source = 30u64;
     let (y_source, proof) = sk.eval_and_prove(source);
     for target in 0..256u64 {
         if target == source {
             continue;
         }
-        assert!(!verify(&pk, target, &y_source, &proof));
+        assert!(!verify(&pk, HOLDER, target, &y_source, &proof));
         let y_target = output_from_preimage(target, &proof.preimage);
-        assert!(!verify(&pk, target, &y_target, &proof));
+        assert!(!verify(&pk, HOLDER, target, &y_target, &proof));
     }
 }
 
 #[test]
 fn a_position_past_the_slot_count_is_rejected() {
-    let (sk, pk) = keygen([71u8; 32], 100);
+    let (sk, pk) = keygen([71u8; 32], 100, HOLDER);
     let (y, proof) = sk.eval_and_prove(0);
-    assert!(verify(&pk, 0, &y, &proof));
-    assert!(!verify(&pk, 100, &y, &proof));
-    assert!(!verify(&pk, 1_000_000, &y, &proof));
+    assert!(verify(&pk, HOLDER, 0, &y, &proof));
+    assert!(!verify(&pk, HOLDER, 100, &y, &proof));
+    assert!(!verify(&pk, HOLDER, 1_000_000, &y, &proof));
 }
 
 #[test]
 fn a_proof_does_not_verify_under_a_foreign_key() {
-    let (sk_a, pk_a) = keygen([72u8; 32], 256);
-    let (_, pk_b) = keygen([73u8; 32], 256);
+    let (sk_a, pk_a) = keygen([72u8; 32], 256, HOLDER);
+    let (_, pk_b) = keygen([73u8; 32], 256, HOLDER);
     let position = 55u64;
     let (y, proof) = sk_a.eval_and_prove(position);
-    assert!(verify(&pk_a, position, &y, &proof));
-    assert!(!verify(&pk_b, position, &y, &proof));
+    assert!(verify(&pk_a, HOLDER, position, &y, &proof));
+    assert!(!verify(&pk_b, HOLDER, position, &y, &proof));
 }
 
 #[test]
 fn forging_reduces_to_a_sha3_second_preimage_or_collision() {
-    let (sk, pk) = keygen([88u8; 32], 128);
+    let (sk, pk) = keygen([88u8; 32], 128, HOLDER);
     let position = 64u64;
     let honest = sk.prove(position);
     let committed_leaf = leaf_hash(&honest.preimage);
@@ -303,9 +305,9 @@ fn forging_reduces_to_a_sha3_second_preimage_or_collision() {
         idx >>= 1;
     }
     assert_eq!(
-        node,
+        bind_root(HOLDER, pk.slots(), &node),
         pk.digest(),
-        "the honest path must reconstruct the committed root"
+        "the honest path must reconstruct the committed root under its holder"
     );
 
     for alt in adversarial_preimages(50_000) {
@@ -322,6 +324,6 @@ fn forging_reduces_to_a_sha3_second_preimage_or_collision() {
             path: honest.path.clone(),
         };
         let y = output_from_preimage(position, &alt);
-        assert!(!verify(&pk, position, &y, &forged));
+        assert!(!verify(&pk, HOLDER, position, &y, &forged));
     }
 }

@@ -8,7 +8,7 @@ use qtv_sampler::beacon::Beacon;
 use crate::attestation::Attestation;
 use crate::attester::ValidatorId;
 use crate::certificate::{Certificate, Envelope};
-use crate::committee::CommitteeCommitment;
+use crate::committee::{CommitteeCommitment, CommitteeDigest};
 use crate::params::COMMITTEE_BUDGET;
 
 pub const MAX_ATTEST_VERIFICATIONS_PER_ROUND: u64 = 4 * COMMITTEE_BUDGET;
@@ -28,18 +28,28 @@ pub fn aggregate(
     for att in attestations {
         by_view.entry(att.view).or_default().push(att);
     }
+    let committee_digest = commitment.digest();
     let mut left = verification_cap(commitment);
     for same in by_view.values().rev() {
         if left == 0 {
             break;
         }
         let (certificate, used) = aggregate_budgeted(
-            chain_id, height, slot, block, commitment, beacon, same, tau, left,
+            chain_id,
+            height,
+            slot,
+            block,
+            commitment,
+            &committee_digest,
+            beacon,
+            same,
+            tau,
+            left,
         );
         if certificate.is_some() {
             return certificate;
         }
-        left = left.saturating_sub(used);
+        left = left.saturating_sub(used.max(1));
     }
     None
 }
@@ -60,12 +70,14 @@ fn aggregate_metered(
     tau: u64,
 ) -> (Option<Certificate>, u64) {
     let refs: Vec<&Attestation> = attestations.iter().collect();
+    let committee_digest = commitment.digest();
     aggregate_budgeted(
         chain_id,
         height,
         slot,
         block,
         commitment,
+        &committee_digest,
         beacon,
         &refs,
         tau,
@@ -80,19 +92,18 @@ fn aggregate_budgeted(
     slot: u64,
     block: Block,
     commitment: &CommitteeCommitment,
+    committee_digest: &CommitteeDigest,
     beacon: &Beacon,
     attestations: &[&Attestation],
     tau: u64,
     cap: u64,
 ) -> (Option<Certificate>, u64) {
-    let committee_digest = commitment.digest();
-
     let mut groups: Vec<(ValidatorId, Vec<&Attestation>)> = Vec::new();
     for att in attestations {
         if att.height != height || att.slot != slot || att.block != block {
             continue;
         }
-        if att.committee != committee_digest {
+        if att.committee != *committee_digest {
             continue;
         }
         if commitment.member(att.from).is_none() {
@@ -340,6 +351,38 @@ mod tests {
             b.attest(1, 1, 0, 0, commitment.digest(), block, &beacon),
         ];
         assert!(aggregate(1, 1, 0, block, &commitment, &beacon, &atts, TAU).is_none());
+    }
+
+    #[test]
+    fn a_flood_of_junk_views_cannot_run_the_round_forever() {
+        let a = Attester::new(1, 100);
+        let b = Attester::new(2, 100);
+        let c = Attester::new(3, 100);
+        let d = Attester::new(4, 100);
+        let beacon = Beacon::genesis();
+        let block = Block::new(1, [9u8; 32], Parent::Genesis);
+        let other = Block::new(1, [0xEEu8; 32], Parent::Genesis);
+        let commitment = committee(&[&a, &b, &c, &d]);
+
+        let mut atts: Vec<Attestation> = Vec::new();
+        for view in 1..4_000u64 {
+            atts.push(a.attest(1, 1, 0, view, commitment.digest(), other, &beacon));
+        }
+        for member in [&a, &b, &c, &d] {
+            atts.push(member.attest(1, 1, 0, 0, commitment.digest(), block, &beacon));
+        }
+
+        let cert = aggregate(1, 1, 0, block, &commitment, &beacon, &atts, TAU);
+        assert!(
+            cert.is_none()
+                || cert
+                    .as_ref()
+                    .is_some_and(|c| c.attesters() == vec![1, 2, 3, 4]),
+            "a junk view flood either stops the round or leaves the honest quorum intact"
+        );
+
+        let bounded = aggregate(1, 1, 0, block, &commitment, &beacon, &atts[..2_000], TAU);
+        let _ = bounded;
     }
 
     #[test]

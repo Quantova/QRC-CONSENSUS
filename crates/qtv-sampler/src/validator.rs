@@ -60,6 +60,7 @@ impl Clone for SamplerValidator {
             key: keygen(
                 crate::epoch::epoch_tree_seed(&self.seed, self.epoch),
                 self.key.slots(),
+                self.id,
             )
             .0,
         }
@@ -95,7 +96,7 @@ impl SamplerValidator {
             stake: Stake::native(stake),
             seed,
             epoch: 0,
-            key: keygen(seed, slots).0,
+            key: keygen(seed, slots, id).0,
         }
     }
 
@@ -114,6 +115,7 @@ impl SamplerValidator {
             key: keygen(
                 crate::epoch::epoch_tree_seed(&self.seed, epoch),
                 self.key.slots(),
+                self.id,
             )
             .0,
         }
@@ -296,7 +298,9 @@ mod tests {
         let v = SamplerValidator::from_secret(1, &[1u8; 32], 100);
         let reg = Registration::of(&v);
         let cred = v.reveal(5);
-        assert!(reg.root.verify_membership(5, &cred.preimage, &cred.path));
+        assert!(reg
+            .root
+            .verify_membership(v.id, 5, &cred.preimage, &cred.path));
     }
 
     #[test]
@@ -325,7 +329,8 @@ mod tests {
             let reg = Registration::of(&rotated);
             let cred = rotated.reveal(slot);
             assert!(
-                reg.root.verify_membership(slot, &cred.preimage, &cred.path),
+                reg.root
+                    .verify_membership(rotated.id, slot, &cred.preimage, &cred.path),
                 "the rotated reveal failed to authenticate at height {height}"
             );
             highest = height;

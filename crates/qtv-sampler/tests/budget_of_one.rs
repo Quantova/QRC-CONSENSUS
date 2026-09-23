@@ -32,7 +32,7 @@ fn the_committed_leaf_is_the_only_valid_draw_for_a_slot() {
 
     let honest = v.reveal(slot);
     assert!(
-        verify_membership(&root, slot, &honest),
+        verify_membership(&root, v.id, slot, &honest),
         "the committed leaf authenticates"
     );
 
@@ -46,7 +46,7 @@ fn the_committed_leaf_is_the_only_valid_draw_for_a_slot() {
             continue;
         }
         assert!(
-            !verify_membership(&root, slot, &forged),
+            !verify_membership(&root, v.id, slot, &forged),
             "a second, different preimage for the slot was accepted at k={k}"
         );
     }
@@ -62,6 +62,7 @@ fn a_second_draw_revealed_for_one_slot_is_rejected() {
     let honest = v.reveal(slot);
     assert!(verify_selection(
         &root,
+        v.id,
         &beacon,
         DOMAIN_COMMITTEE,
         slot,
@@ -75,6 +76,7 @@ fn a_second_draw_revealed_for_one_slot_is_rejected() {
     second.preimage = v.reveal(7).preimage;
     assert!(!verify_selection(
         &root,
+        v.id,
         &beacon,
         DOMAIN_COMMITTEE,
         slot,
@@ -94,6 +96,7 @@ fn a_preimage_used_out_of_its_position_is_rejected() {
     let out_of_place = v.reveal_out_of_position(3, 7);
     assert!(!verify_selection(
         &root,
+        v.id,
         &beacon,
         DOMAIN_COMMITTEE,
         7,
@@ -106,6 +109,7 @@ fn a_preimage_used_out_of_its_position_is_rejected() {
     let in_place = v.reveal(3);
     assert!(verify_selection(
         &root,
+        v.id,
         &beacon,
         DOMAIN_COMMITTEE,
         3,
@@ -140,6 +144,7 @@ fn a_draw_against_a_root_not_in_the_registry_is_rejected() {
     };
     assert!(!verify_selection(
         &fake_root,
+        outsider.id,
         &beacon,
         DOMAIN_COMMITTEE,
         0,
@@ -152,6 +157,7 @@ fn a_draw_against_a_root_not_in_the_registry_is_rejected() {
     let member_one_root = reg.registration(1).unwrap().root;
     assert!(!verify_selection(
         &member_one_root,
+        outsider.id,
         &beacon,
         DOMAIN_COMMITTEE,
         0,
@@ -164,6 +170,7 @@ fn a_draw_against_a_root_not_in_the_registry_is_rejected() {
     let own = Registration::of(&outsider);
     assert!(verify_selection(
         &own.root,
+        outsider.id,
         &beacon,
         DOMAIN_COMMITTEE,
         0,

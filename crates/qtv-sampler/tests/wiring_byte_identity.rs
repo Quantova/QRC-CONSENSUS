@@ -35,11 +35,11 @@ fn beacon() -> Beacon {
 }
 
 const ROOTS: [&str; 5] = [
-    "592d119920d539bdaf1bb6cfcd76001370bb0c13549953d28e6b7e9291046680",
-    "30a2c177d347f2378dad84e0b30ae6e3de039eae9c96deaf3377c6582a31af85",
-    "62869efa05fab3903f82d1d15d14ea280a494ed3386f01127bb4c52520d00a3e",
-    "53cdea20d025cc8dac4b8c1535673ece92cb822b6d0e7d008ca4830a5c6c5e6a",
-    "be0f7dbe7255b1835e40c843f7c00243d19622b9f1141f2ad172b62af536db47",
+    "6325bc3101fc51c58d8c4501b99d17532b820c0ce637db0377fc02e25994b577",
+    "70d5558e53e89089e831f1eb293fd8b0b10fc45c61e7e420cd39d45e0925af95",
+    "e13bd4085198664efde4a23187142c9c60216d60a0877c0f6fbd18a85f670492",
+    "d2886c281644a8c9cf0829381a3dc75f1f7dd939b793fa86c1376a6787d87cb4",
+    "48bfaa3ac30858aeb3cb8e07ffdea369e06d4ec2ed217eab15530c2ad2c41e92",
 ];
 
 #[test]
@@ -123,7 +123,7 @@ fn the_sortition_credential_is_the_q_vrf_proof_over_the_committed_tree() {
     let v = SamplerValidator::from_secret(id, &secret, stake);
 
     let seed = sortition_tree_seed(&secret);
-    let (sk, pk) = keygen(seed, DEFAULT_SLOTS);
+    let (sk, pk) = keygen(seed, DEFAULT_SLOTS, id);
 
     assert_eq!(
         pk.root().digest,
@@ -143,7 +143,7 @@ fn the_sortition_credential_is_the_q_vrf_proof_over_the_committed_tree() {
             "the reveal path is not the q-vrf proof path at slot {slot}"
         );
         assert!(
-            verify(&pk, slot, &y, &proof),
+            verify(&pk, id, slot, &y, &proof),
             "the q-vrf transcript for the sortition credential failed to verify at slot {slot}"
         );
     }

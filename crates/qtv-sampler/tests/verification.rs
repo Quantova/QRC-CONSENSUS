@@ -15,6 +15,7 @@ fn selected_account_credential_verifies() {
     let cred = v.reveal(0);
     assert!(verify_selection(
         &v.root(),
+        v.id,
         &beacon,
         DOMAIN_COMMITTEE,
         0,
@@ -32,6 +33,7 @@ fn a_prover_is_never_entitled() {
     let cred = p.reveal(0);
     assert!(!verify_selection(
         &p.root(),
+        p.id,
         &beacon,
         DOMAIN_COMMITTEE,
         0,
@@ -51,6 +53,7 @@ fn an_unentitled_account_has_a_genuine_but_failing_credential() {
 
     let genuine = verify_selection(
         &v.root(),
+        v.id,
         &beacon,
         DOMAIN_COMMITTEE,
         0,
@@ -59,7 +62,17 @@ fn an_unentitled_account_has_a_genuine_but_failing_credential() {
         total,
         &cred,
     );
-    let entitled = verify_selection(&v.root(), &beacon, DOMAIN_COMMITTEE, 0, 1, total, 1, &cred);
+    let entitled = verify_selection(
+        &v.root(),
+        v.id,
+        &beacon,
+        DOMAIN_COMMITTEE,
+        0,
+        1,
+        total,
+        1,
+        &cred,
+    );
     assert!(genuine, "the credential is a valid one time reveal");
     assert!(!entitled, "the account is not entitled at its true stake");
 }
@@ -72,6 +85,7 @@ fn a_tampered_preimage_does_not_verify() {
     cred.preimage[0] ^= 1;
     assert!(!verify_selection(
         &v.root(),
+        v.id,
         &beacon,
         DOMAIN_COMMITTEE,
         0,
@@ -90,6 +104,7 @@ fn another_root_does_not_verify_the_credential() {
     let cred = v.reveal(0);
     assert!(!verify_selection(
         &other.root(),
+        other.id,
         &beacon,
         DOMAIN_COMMITTEE,
         0,

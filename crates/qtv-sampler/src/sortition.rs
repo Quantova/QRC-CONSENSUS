@@ -182,9 +182,10 @@ impl Credential {
     }
 }
 
-pub fn verify_membership(root: &Root, slot: u64, credential: &Credential) -> bool {
+pub fn verify_membership(root: &Root, holder: u64, slot: u64, credential: &Credential) -> bool {
     credential.position == slot
         && PublicKey::from_root(*root).opens(
+            holder,
             credential.position,
             &credential.preimage,
             &credential.path,
@@ -194,6 +195,7 @@ pub fn verify_membership(root: &Root, slot: u64, credential: &Credential) -> boo
 #[allow(clippy::too_many_arguments)]
 pub fn verify_selection(
     root: &Root,
+    holder: u64,
     beacon: &Beacon,
     domain: &[u8],
     slot: u64,
@@ -202,7 +204,7 @@ pub fn verify_selection(
     budget: u64,
     credential: &Credential,
 ) -> bool {
-    if !verify_membership(root, slot, credential) {
+    if !verify_membership(root, holder, slot, credential) {
         return false;
     }
     let value = credential.value(beacon, domain, slot);

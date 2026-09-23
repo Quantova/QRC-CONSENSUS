@@ -47,8 +47,15 @@ impl PublicKey {
         self.root
     }
 
-    pub fn opens(&self, position: u64, preimage: &[u8; PREIMAGE_BYTES], path: &MerklePath) -> bool {
-        self.root.verify_membership(position, preimage, path)
+    pub fn opens(
+        &self,
+        holder: u64,
+        position: u64,
+        preimage: &[u8; PREIMAGE_BYTES],
+        path: &MerklePath,
+    ) -> bool {
+        self.root
+            .verify_membership(holder, position, preimage, path)
     }
 }
 
@@ -63,6 +70,10 @@ impl SecretKey {
 
     pub fn slots(&self) -> u64 {
         self.tree.slots()
+    }
+
+    pub fn holder(&self) -> u64 {
+        self.tree.holder()
     }
 
     pub fn eval(&self, position: u64) -> Output {
@@ -97,8 +108,8 @@ impl Proof {
     }
 }
 
-pub fn keygen(seed: [u8; 32], epoch_slots: u64) -> (SecretKey, PublicKey) {
-    let tree = OneTimeTree::new(seed, epoch_slots);
+pub fn keygen(seed: [u8; 32], epoch_slots: u64, holder: u64) -> (SecretKey, PublicKey) {
+    let tree = OneTimeTree::new(seed, epoch_slots, holder);
     let pk = PublicKey::from_root(tree.root());
     (SecretKey { tree }, pk)
 }
@@ -112,10 +123,10 @@ pub fn output_from_preimage(position: u64, preimage: &[u8; PREIMAGE_BYTES]) -> O
     sha3_256(&buf)
 }
 
-pub fn verify(pk: &PublicKey, position: u64, output: &Output, proof: &Proof) -> bool {
+pub fn verify(pk: &PublicKey, holder: u64, position: u64, output: &Output, proof: &Proof) -> bool {
     if !pk
         .root()
-        .verify_membership(position, &proof.preimage, &proof.path)
+        .verify_membership(holder, position, &proof.preimage, &proof.path)
     {
         return false;
     }
@@ -126,20 +137,22 @@ pub fn verify(pk: &PublicKey, position: u64, output: &Output, proof: &Proof) -> 
 mod tests {
     use super::*;
 
+    const HOLDER: u64 = 7;
+
     #[test]
     fn keygen_eval_prove_verify_round_trip() {
-        let (sk, pk) = keygen([3u8; 32], 64);
+        let (sk, pk) = keygen([3u8; 32], 64, HOLDER);
         for position in 0..64 {
             let (y, proof) = sk.eval_and_prove(position);
-            assert!(verify(&pk, position, &y, &proof));
+            assert!(verify(&pk, HOLDER, position, &y, &proof));
             assert_eq!(sk.eval(position), y);
         }
     }
 
     #[test]
     fn eval_is_deterministic_in_the_key() {
-        let (sk_a, _) = keygen([9u8; 32], 32);
-        let (sk_b, _) = keygen([9u8; 32], 32);
+        let (sk_a, _) = keygen([9u8; 32], 32, HOLDER);
+        let (sk_b, _) = keygen([9u8; 32], 32, HOLDER);
         for position in 0..32 {
             assert_eq!(sk_a.eval(position), sk_b.eval(position));
         }
@@ -147,10 +160,10 @@ mod tests {
 
     #[test]
     fn a_different_seed_gives_a_different_key_and_output() {
-        let (sk_a, pk_a) = keygen([1u8; 32], 32);
-        let (_, pk_b) = keygen([2u8; 32], 32);
+        let (sk_a, pk_a) = keygen([1u8; 32], 32, HOLDER);
+        let (_, pk_b) = keygen([2u8; 32], 32, HOLDER);
         assert_ne!(pk_a, pk_b);
-        let (sk_c, _) = keygen([2u8; 32], 32);
+        let (sk_c, _) = keygen([2u8; 32], 32, HOLDER);
         assert_ne!(sk_a.eval(5), sk_c.eval(5));
     }
 }

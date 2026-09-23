@@ -53,8 +53,8 @@ pub struct Leader {
     pub credential: Credential,
 }
 
-pub fn verify_leader(root: &Root, slot: u64, credential: &Credential) -> bool {
-    verify_membership(root, slot, credential)
+pub fn verify_leader(root: &Root, holder: u64, slot: u64, credential: &Credential) -> bool {
+    verify_membership(root, holder, slot, credential)
 }
 
 pub fn elect_leader(committee: &Committee, beacon: &Beacon, slot: u64) -> Option<Leader> {
@@ -183,6 +183,7 @@ impl CommitteeView {
         match self.registration(id) {
             Some(reg) if reg.weight >= self.floor => verify_selection(
                 &reg.root,
+                id,
                 beacon,
                 DOMAIN_COMMITTEE,
                 slot,
@@ -213,6 +214,7 @@ impl CommitteeView {
             };
             if !verify_selection(
                 &reg.root,
+                reveal.id,
                 beacon,
                 DOMAIN_COMMITTEE,
                 slot,
@@ -367,7 +369,7 @@ mod tests {
         let leader = reg.elect_leader(&committee, &beacon, 0).unwrap();
         assert!(committee.contains(leader.id));
         let root = reg.registration(leader.id).unwrap().root;
-        assert!(verify_leader(&root, 0, &leader.credential));
+        assert!(verify_leader(&root, leader.id, 0, &leader.credential));
     }
 
     #[test]

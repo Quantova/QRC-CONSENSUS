@@ -89,6 +89,7 @@ impl Attestation {
     ) -> bool {
         verify_selection(
             root,
+            self.from,
             beacon,
             DOMAIN_COMMITTEE,
             self.slot,

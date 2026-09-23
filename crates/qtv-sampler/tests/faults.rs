@@ -22,6 +22,7 @@ fn a_forged_second_draw_over_a_genuine_reveal_is_not_a_fault() {
 
     let fault = DoubleDraw {
         root,
+        holder: v.id,
         slot,
         first: honest.clone(),
         second: forged.clone(),
@@ -30,6 +31,7 @@ fn a_forged_second_draw_over_a_genuine_reveal_is_not_a_fault() {
 
     let swapped = DoubleDraw {
         root,
+        holder: v.id,
         slot,
         first: forged,
         second: honest,
@@ -44,6 +46,7 @@ fn an_honest_single_reveal_is_not_a_double_draw() {
     let slot = 2;
     let fault = DoubleDraw {
         root,
+        holder: v.id,
         slot,
         first: v.reveal(slot),
         second: v.reveal(slot),
@@ -58,16 +61,17 @@ fn a_double_draw_needs_two_distinct_authenticating_openings() {
     let slot = 2;
 
     let genuine = v.reveal(slot);
-    assert!(verify_membership(&root, slot, &genuine));
+    assert!(verify_membership(&root, v.id, slot, &genuine));
 
     for other in [0u64, 1, 3, 9, 40] {
         let mut alt = v.reveal(slot);
         alt.preimage = v.reveal(other).preimage;
-        assert!(!verify_membership(&root, slot, &alt));
+        assert!(!verify_membership(&root, v.id, slot, &alt));
     }
 
     let both_authenticate = DoubleDraw {
         root,
+        holder: v.id,
         slot,
         first: genuine.clone(),
         second: genuine,
@@ -88,6 +92,7 @@ fn the_forged_second_draw_is_rejected_at_verification_and_frames_no_one() {
 
     assert!(verify_selection(
         &root,
+        v.id,
         &beacon,
         DOMAIN_COMMITTEE,
         slot,
@@ -98,6 +103,7 @@ fn the_forged_second_draw_is_rejected_at_verification_and_frames_no_one() {
     ));
     assert!(!verify_selection(
         &root,
+        v.id,
         &beacon,
         DOMAIN_COMMITTEE,
         slot,
@@ -109,6 +115,7 @@ fn the_forged_second_draw_is_rejected_at_verification_and_frames_no_one() {
 
     let fault = DoubleDraw {
         root,
+        holder: v.id,
         slot,
         first: honest,
         second: forged,

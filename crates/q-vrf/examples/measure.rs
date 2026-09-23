@@ -6,6 +6,8 @@ use std::time::Instant;
 
 use q_vrf::{keygen, verify};
 
+const HOLDER: u64 = 7;
+
 fn bench_position(slots: u64) {
     let seed = {
         let mut s = [0u8; 32];
@@ -14,11 +16,11 @@ fn bench_position(slots: u64) {
     };
 
     let t0 = Instant::now();
-    let (sk, pk) = keygen(seed, slots);
+    let (sk, pk) = keygen(seed, slots, HOLDER);
     let keygen_ns = t0.elapsed().as_nanos();
 
     let (y0, proof0) = sk.eval_and_prove(slots / 2);
-    assert!(verify(&pk, slots / 2, &y0, &proof0));
+    assert!(verify(&pk, HOLDER, slots / 2, &y0, &proof0));
     let proof_bytes = proof0.size_bytes();
     let pk_bytes = pk.size_bytes();
     let depth = pk.depth();
@@ -45,6 +47,7 @@ fn bench_position(slots: u64) {
     for _ in 0..iters {
         black_box(verify(
             black_box(&pk),
+            black_box(HOLDER),
             black_box(pos),
             black_box(&y),
             black_box(&proof),
@@ -72,7 +75,7 @@ fn main() {
     }
 
     let slots = 8_192u64;
-    let (sk, pk) = keygen([7u8; 32], slots);
+    let (sk, pk) = keygen([7u8; 32], slots, HOLDER);
     let transcripts: Vec<_> = (0..1_024u64)
         .map(|i| {
             let pos = i % slots;
@@ -83,7 +86,7 @@ fn main() {
     let t0 = Instant::now();
     let mut ok = 0u64;
     for (pos, y, proof) in &transcripts {
-        if verify(&pk, *pos, y, proof) {
+        if verify(&pk, HOLDER, *pos, y, proof) {
             ok += 1;
         }
     }

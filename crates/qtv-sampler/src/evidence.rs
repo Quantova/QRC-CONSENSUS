@@ -7,6 +7,7 @@ use crate::sortition::{verify_membership, Credential};
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct DoubleDraw {
     pub root: Root,
+    pub holder: u64,
     pub slot: u64,
     pub first: Credential,
     pub second: Credential,
@@ -17,8 +18,8 @@ impl DoubleDraw {
         self.first != self.second
             && self.first.position == self.slot
             && self.second.position == self.slot
-            && verify_membership(&self.root, self.slot, &self.first)
-            && verify_membership(&self.root, self.slot, &self.second)
+            && verify_membership(&self.root, self.holder, self.slot, &self.first)
+            && verify_membership(&self.root, self.holder, self.slot, &self.second)
     }
 }
 
@@ -35,6 +36,7 @@ mod tests {
         let b = v.reveal(4);
         let dd = DoubleDraw {
             root,
+            holder: v.id,
             slot: 4,
             first: a,
             second: b,
@@ -55,6 +57,7 @@ mod tests {
 
         let dd = DoubleDraw {
             root,
+            holder: v.id,
             slot,
             first: genuine.clone(),
             second: fabricated.clone(),
@@ -63,6 +66,7 @@ mod tests {
 
         let swapped = DoubleDraw {
             root,
+            holder: v.id,
             slot,
             first: fabricated,
             second: genuine,

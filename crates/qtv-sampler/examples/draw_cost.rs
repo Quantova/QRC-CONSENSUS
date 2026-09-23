@@ -31,6 +31,7 @@ fn draw_cost(slots: u64) -> (usize, f64, f64) {
     let verify = ns_per_op(500_000, || {
         black_box(verify_selection(
             &root,
+            v.id,
             &beacon,
             DOMAIN_COMMITTEE,
             slot,

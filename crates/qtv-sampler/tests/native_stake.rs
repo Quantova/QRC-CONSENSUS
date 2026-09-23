@@ -21,6 +21,7 @@ fn a_bridged_holding_is_never_selected() {
     let cred = v.reveal(0);
     assert!(!verify_selection(
         &v.root(),
+        v.id,
         &beacon,
         DOMAIN_COMMITTEE,
         0,

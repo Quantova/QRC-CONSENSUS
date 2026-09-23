@@ -13,6 +13,8 @@ const DOMAIN_LEAF: &[u8] = b"QORUS/onetime/leaf";
 
 const DOMAIN_NODE: &[u8] = b"QORUS/onetime/node";
 
+const DOMAIN_ROOT: &[u8] = b"QORUS/onetime/root";
+
 const PADDING_PREIMAGE: [u8; PREIMAGE_BYTES] = [0u8; PREIMAGE_BYTES];
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -24,6 +26,7 @@ pub struct Root {
 impl Root {
     pub fn verify_membership(
         &self,
+        holder: u64,
         position: u64,
         preimage: &[u8; PREIMAGE_BYTES],
         path: &MerklePath,
@@ -39,8 +42,18 @@ impl Root {
             return false;
         }
         let leaf = leaf_hash(preimage);
-        root_from_path(position, &leaf, path) == self.digest
+        bind_root(holder, self.slots, &root_from_path(position, &leaf, path)) == self.digest
     }
+}
+
+pub fn bind_root(holder: u64, slots: u64, inner: &[u8; NODE_BYTES]) -> [u8; NODE_BYTES] {
+    const D: usize = DOMAIN_ROOT.len();
+    let mut buf = [0u8; D + 8 + 8 + NODE_BYTES];
+    buf[..D].copy_from_slice(DOMAIN_ROOT);
+    buf[D..D + 8].copy_from_slice(&holder.to_le_bytes());
+    buf[D + 8..D + 16].copy_from_slice(&slots.to_le_bytes());
+    buf[D + 16..].copy_from_slice(inner);
+    sha3_256(&buf)
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -113,6 +126,7 @@ fn root_from_path(
 pub struct OneTimeTree {
     seed: [u8; 32],
     slots: u64,
+    holder: u64,
     layers: Vec<Vec<[u8; NODE_BYTES]>>,
 }
 
@@ -123,7 +137,7 @@ impl Drop for OneTimeTree {
 }
 
 impl OneTimeTree {
-    pub fn new(seed: [u8; 32], slots: u64) -> Self {
+    pub fn new(seed: [u8; 32], slots: u64, holder: u64) -> Self {
         assert!(slots >= 1, "a one time tree serves at least one slot");
         let padded =
             padded_leaves(slots).expect("a one time tree serves a representable slot count");
@@ -148,8 +162,13 @@ impl OneTimeTree {
         OneTimeTree {
             seed,
             slots,
+            holder,
             layers,
         }
+    }
+
+    pub fn holder(&self) -> u64 {
+        self.holder
     }
 
     pub fn slots(&self) -> u64 {
@@ -158,7 +177,7 @@ impl OneTimeTree {
 
     pub fn root(&self) -> Root {
         Root {
-            digest: self.layers.last().unwrap()[0],
+            digest: bind_root(self.holder, self.slots, &self.layers.last().unwrap()[0]),
             slots: self.slots,
         }
     }
@@ -190,8 +209,10 @@ impl OneTimeTree {
 mod tests {
     use super::*;
 
+    const HOLDER: u64 = 7;
+
     fn tree(seed_byte: u8, slots: u64) -> OneTimeTree {
-        OneTimeTree::new([seed_byte; 32], slots)
+        OneTimeTree::new([seed_byte; 32], slots, HOLDER)
     }
 
     #[test]
@@ -201,7 +222,7 @@ mod tests {
         for position in 0..16 {
             let preimage = t.preimage(position);
             let path = t.path(position);
-            assert!(root.verify_membership(position, &preimage, &path));
+            assert!(root.verify_membership(HOLDER, position, &preimage, &path));
         }
     }
 
@@ -211,10 +232,10 @@ mod tests {
         let root = t.root();
         let preimage = t.preimage(3);
         let path = t.path(3);
-        assert!(root.verify_membership(3, &preimage, &path));
+        assert!(root.verify_membership(HOLDER, 3, &preimage, &path));
         for other in 0..16 {
             if other != 3 {
-                assert!(!root.verify_membership(other, &preimage, &path));
+                assert!(!root.verify_membership(HOLDER, other, &preimage, &path));
             }
         }
     }
@@ -225,8 +246,8 @@ mod tests {
         let b = tree(2, 16);
         let preimage = a.preimage(5);
         let path = a.path(5);
-        assert!(a.root().verify_membership(5, &preimage, &path));
-        assert!(!b.root().verify_membership(5, &preimage, &path));
+        assert!(a.root().verify_membership(HOLDER, 5, &preimage, &path));
+        assert!(!b.root().verify_membership(HOLDER, 5, &preimage, &path));
     }
 
     #[test]
@@ -235,8 +256,8 @@ mod tests {
         let root = t.root();
         let preimage = t.preimage(0);
         let path = t.path(0);
-        assert!(root.verify_membership(0, &preimage, &path));
-        assert!(!root.verify_membership(3, &preimage, &path));
+        assert!(root.verify_membership(HOLDER, 0, &preimage, &path));
+        assert!(!root.verify_membership(HOLDER, 3, &preimage, &path));
     }
 
     #[test]
@@ -249,7 +270,7 @@ mod tests {
         let path = MerklePath {
             siblings: Vec::new(),
         };
-        assert!(!root.verify_membership(0, &preimage, &path));
+        assert!(!root.verify_membership(HOLDER, 0, &preimage, &path));
     }
 
     #[test]
@@ -259,8 +280,33 @@ mod tests {
         let preimage = t.preimage(0);
         let path = t.path(0);
         assert!(path.siblings.is_empty());
-        assert_eq!(root.digest, leaf_hash(&preimage));
-        assert!(root.verify_membership(0, &preimage, &path));
+        assert_eq!(root.digest, bind_root(HOLDER, 1, &leaf_hash(&preimage)));
+        assert!(root.verify_membership(HOLDER, 0, &preimage, &path));
+        assert!(
+            !root.verify_membership(HOLDER + 1, 0, &preimage, &path),
+            "a root opens only under the holder it was built for"
+        );
+    }
+
+    #[test]
+    fn a_tree_built_for_one_holder_opens_for_no_other() {
+        let mine = OneTimeTree::new([5u8; 32], 16, 11);
+        let root = mine.root();
+        let preimage = mine.preimage(4);
+        let path = mine.path(4);
+        assert!(root.verify_membership(11, 4, &preimage, &path));
+        for other in [0u64, 10, 12, u64::MAX] {
+            assert!(
+                !root.verify_membership(other, 4, &preimage, &path),
+                "a credential replayed under another id must not open"
+            );
+        }
+        let theirs = OneTimeTree::new([5u8; 32], 16, 12);
+        assert_ne!(
+            mine.root().digest,
+            theirs.root().digest,
+            "the same seed under two ids commits to two different roots"
+        );
     }
 
     #[test]
@@ -276,6 +322,6 @@ mod tests {
         let preimage = t.preimage(2);
         let mut path = t.path(2);
         path.siblings.pop();
-        assert!(!root.verify_membership(2, &preimage, &path));
+        assert!(!root.verify_membership(HOLDER, 2, &preimage, &path));
     }
 }

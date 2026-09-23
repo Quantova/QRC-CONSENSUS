@@ -80,6 +80,6 @@ fn leader_eligibility_rejects_an_old_mechanism_draw() {
     let leader = SamplerValidator::new(1, STAKE);
     let root = leader.root();
     let genuine = leader.reveal(0);
-    assert!(verify_leader(&root, 0, &genuine));
-    assert!(!verify_leader(&root, 0, &old_style_draw(0)));
+    assert!(verify_leader(&root, leader.id, 0, &genuine));
+    assert!(!verify_leader(&root, leader.id, 0, &old_style_draw(0)));
 }

@@ -18,7 +18,7 @@ fn the_grinding_budget_is_exactly_one_valid_draw_per_slot() {
     let slot = 4;
 
     let honest = v.reveal(slot);
-    assert!(verify_membership(&root, slot, &honest));
+    assert!(verify_membership(&root, v.id, slot, &honest));
 
     let mut forgeries_accepted = 0u64;
 
@@ -31,7 +31,7 @@ fn the_grinding_budget_is_exactly_one_valid_draw_per_slot() {
         if cand.preimage == honest.preimage {
             continue;
         }
-        if verify_membership(&root, slot, &cand) {
+        if verify_membership(&root, v.id, slot, &cand) {
             forgeries_accepted += 1;
         }
     }
@@ -49,7 +49,7 @@ fn the_grinding_budget_is_exactly_one_valid_draw_per_slot() {
             preimage: honest.preimage,
             path,
         };
-        if verify_membership(&root, slot, &cand) {
+        if verify_membership(&root, v.id, slot, &cand) {
             forgeries_accepted += 1;
         }
     }
@@ -84,7 +84,7 @@ fn no_authenticating_credential_beats_the_honest_output() {
             continue;
         }
         let value = cand.value(&beacon, DOMAIN_LEADER, slot);
-        if verify_membership(&root, slot, &cand) {
+        if verify_membership(&root, v.id, slot, &cand) {
             if value < lowest_authenticating {
                 lowest_authenticating = value;
             }
@@ -113,15 +113,16 @@ fn an_alternate_key_cannot_stand_in_for_the_bonded_root() {
 
     let alt = alternate.reveal(slot);
     assert!(
-        verify_membership(&alternate.root(), slot, &alt),
+        verify_membership(&alternate.root(), alternate.id, slot, &alt),
         "the alternate key is genuine against its own root"
     );
     assert!(
-        !verify_membership(&root, slot, &alt),
+        !verify_membership(&root, bonded.id, slot, &alt),
         "the alternate key authenticated against the bonded root"
     );
     assert!(!verify_selection(
         &root,
+        bonded.id,
         &beacon,
         DOMAIN_COMMITTEE,
         slot,
@@ -134,6 +135,7 @@ fn an_alternate_key_cannot_stand_in_for_the_bonded_root() {
     let honest = bonded.reveal(slot);
     assert!(verify_selection(
         &root,
+        bonded.id,
         &beacon,
         DOMAIN_COMMITTEE,
         slot,
@@ -202,7 +204,7 @@ fn a_member_cannot_grind_a_lower_leadership_score() {
         let cand_score = leader_score(&cand.output(&beacon, DOMAIN_LEADER, slot), 100);
         if cand_score < honest_score {
             assert!(
-                !verify_membership(&root, slot, &cand),
+                !verify_membership(&root, v.id, slot, &cand),
                 "a lower-scoring credential authenticated and could seize leadership"
             );
         }
