@@ -18,7 +18,9 @@ fn a_bridged_holding_is_never_selected() {
     let v = SamplerValidator::with_stake(1, Stake::bridged(1_000_000, TAG));
     assert_eq!(v.weight(), 0);
     let beacon = Beacon::genesis();
-    let cred = v.reveal(0);
+    let cred = v
+        .reveal(0)
+        .expect("the position is within the committed slots");
     assert!(!verify_selection(
         &v.root(),
         v.id,

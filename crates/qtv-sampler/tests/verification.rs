@@ -12,7 +12,9 @@ const SATURATING_BUDGET: u64 = 4;
 fn selected_account_credential_verifies() {
     let v = SamplerValidator::new(1, 100);
     let beacon = Beacon::genesis();
-    let cred = v.reveal(0);
+    let cred = v
+        .reveal(0)
+        .expect("the position is within the committed slots");
     assert!(verify_selection(
         &v.root(),
         v.id,
@@ -30,7 +32,9 @@ fn selected_account_credential_verifies() {
 fn a_prover_is_never_entitled() {
     let p = SamplerValidator::prover(9);
     let beacon = Beacon::genesis();
-    let cred = p.reveal(0);
+    let cred = p
+        .reveal(0)
+        .expect("the position is within the committed slots");
     assert!(!verify_selection(
         &p.root(),
         p.id,
@@ -49,7 +53,9 @@ fn an_unentitled_account_has_a_genuine_but_failing_credential() {
     let v = SamplerValidator::new(1, 1);
     let total = 1_000_000;
     let beacon = Beacon::genesis();
-    let cred = v.reveal(0);
+    let cred = v
+        .reveal(0)
+        .expect("the position is within the committed slots");
 
     let genuine = verify_selection(
         &v.root(),
@@ -81,7 +87,9 @@ fn an_unentitled_account_has_a_genuine_but_failing_credential() {
 fn a_tampered_preimage_does_not_verify() {
     let v = SamplerValidator::new(1, 100);
     let beacon = Beacon::genesis();
-    let mut cred = v.reveal(0);
+    let mut cred = v
+        .reveal(0)
+        .expect("the position is within the committed slots");
     cred.preimage[0] ^= 1;
     assert!(!verify_selection(
         &v.root(),
@@ -101,7 +109,9 @@ fn another_root_does_not_verify_the_credential() {
     let v = SamplerValidator::new(1, 100);
     let other = SamplerValidator::new(2, 100);
     let beacon = Beacon::genesis();
-    let cred = v.reveal(0);
+    let cred = v
+        .reveal(0)
+        .expect("the position is within the committed slots");
     assert!(!verify_selection(
         &other.root(),
         other.id,

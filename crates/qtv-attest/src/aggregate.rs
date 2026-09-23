@@ -28,11 +28,18 @@ pub fn aggregate(
     for att in attestations {
         by_view.entry(att.view).or_default().push(att);
     }
+    if slot != commitment.slot {
+        return None;
+    }
     let committee_digest = commitment.digest();
     let mut left = verification_cap(commitment);
     for same in by_view.values().rev() {
         if left == 0 {
             break;
+        }
+        let distinct: std::collections::BTreeSet<_> = same.iter().map(|att| att.from).collect();
+        if (distinct.len() as u64) < tau {
+            continue;
         }
         let (certificate, used) = aggregate_budgeted(
             chain_id,
@@ -49,7 +56,7 @@ pub fn aggregate(
         if certificate.is_some() {
             return certificate;
         }
-        left = left.saturating_sub(used.max(1));
+        left = left.saturating_sub(used);
     }
     None
 }
@@ -201,9 +208,12 @@ mod tests {
         let commitment = CommitteeCommitment::from_attesters_with_budget(0, &[&a, &b, &c, &d], 40);
 
         let light = vec![
-            a.attest(1, 1, 0, 0, commitment.digest(), block, &beacon),
-            b.attest(1, 1, 0, 0, commitment.digest(), block, &beacon),
-            c.attest(1, 1, 0, 0, commitment.digest(), block, &beacon),
+            a.attest(1, 1, 0, 0, commitment.digest(), block, &beacon)
+                .expect("the attester serves this slot"),
+            b.attest(1, 1, 0, 0, commitment.digest(), block, &beacon)
+                .expect("the attester serves this slot"),
+            c.attest(1, 1, 0, 0, commitment.digest(), block, &beacon)
+                .expect("the attester serves this slot"),
         ];
         assert!(
             aggregate(1, 1, 0, block, &commitment, &beacon, &light, TAU).is_none(),
@@ -211,9 +221,12 @@ mod tests {
         );
 
         let with_stake = vec![
-            a.attest(1, 1, 0, 0, commitment.digest(), block, &beacon),
-            b.attest(1, 1, 0, 0, commitment.digest(), block, &beacon),
-            d.attest(1, 1, 0, 0, commitment.digest(), block, &beacon),
+            a.attest(1, 1, 0, 0, commitment.digest(), block, &beacon)
+                .expect("the attester serves this slot"),
+            b.attest(1, 1, 0, 0, commitment.digest(), block, &beacon)
+                .expect("the attester serves this slot"),
+            d.attest(1, 1, 0, 0, commitment.digest(), block, &beacon)
+                .expect("the attester serves this slot"),
         ];
         assert!(
             aggregate(1, 1, 0, block, &commitment, &beacon, &with_stake, TAU).is_some(),
@@ -243,18 +256,24 @@ mod tests {
             40,
         );
         let split = vec![
-            a.attest(1, 1, 0, 0, commitment.digest(), block, &beacon),
-            b.attest(1, 1, 0, 0, commitment.digest(), block, &beacon),
-            c.attest(1, 1, 0, 0, commitment.digest(), block, &beacon),
+            a.attest(1, 1, 0, 0, commitment.digest(), block, &beacon)
+                .expect("the attester serves this slot"),
+            b.attest(1, 1, 0, 0, commitment.digest(), block, &beacon)
+                .expect("the attester serves this slot"),
+            c.attest(1, 1, 0, 0, commitment.digest(), block, &beacon)
+                .expect("the attester serves this slot"),
         ];
         assert!(
             aggregate(1, 1, 0, block, &commitment, &beacon, &split, TAU).is_none(),
             "thirty of forty two capped weight is thirty of one hundred thirty stake"
         );
         let staked = vec![
-            a.attest(1, 1, 0, 0, commitment.digest(), block, &beacon),
-            b.attest(1, 1, 0, 0, commitment.digest(), block, &beacon),
-            d.attest(1, 1, 0, 0, commitment.digest(), block, &beacon),
+            a.attest(1, 1, 0, 0, commitment.digest(), block, &beacon)
+                .expect("the attester serves this slot"),
+            b.attest(1, 1, 0, 0, commitment.digest(), block, &beacon)
+                .expect("the attester serves this slot"),
+            d.attest(1, 1, 0, 0, commitment.digest(), block, &beacon)
+                .expect("the attester serves this slot"),
         ];
         let cert = aggregate(1, 1, 0, block, &commitment, &beacon, &staked, TAU)
             .expect("a stake supermajority finalizes");
@@ -271,9 +290,12 @@ mod tests {
         let block = Block::new(1, [9u8; 32], Parent::Genesis);
         let commitment = committee(&[&a, &b, &c, &d]);
         let atts = vec![
-            a.attest(1, 1, 0, 0, commitment.digest(), block, &beacon),
-            b.attest(1, 1, 0, 0, commitment.digest(), block, &beacon),
-            c.attest(1, 1, 0, 0, commitment.digest(), block, &beacon),
+            a.attest(1, 1, 0, 0, commitment.digest(), block, &beacon)
+                .expect("the attester serves this slot"),
+            b.attest(1, 1, 0, 0, commitment.digest(), block, &beacon)
+                .expect("the attester serves this slot"),
+            c.attest(1, 1, 0, 0, commitment.digest(), block, &beacon)
+                .expect("the attester serves this slot"),
         ];
         let cert = aggregate(1, 1, 0, block, &commitment, &beacon, &atts, TAU).expect("quorum");
         assert_eq!(cert.attesters(), vec![1, 2, 3]);
@@ -291,9 +313,12 @@ mod tests {
         let digest = commitment.digest();
 
         let split = vec![
-            a.attest(1, 1, 0, 0, digest, block, &beacon),
-            b.attest(1, 1, 0, 2, digest, block, &beacon),
-            c.attest(1, 1, 0, 2, digest, block, &beacon),
+            a.attest(1, 1, 0, 0, digest, block, &beacon)
+                .expect("the attester serves this slot"),
+            b.attest(1, 1, 0, 2, digest, block, &beacon)
+                .expect("the attester serves this slot"),
+            c.attest(1, 1, 0, 2, digest, block, &beacon)
+                .expect("the attester serves this slot"),
         ];
         assert!(
             aggregate(1, 1, 0, block, &commitment, &beacon, &split, TAU).is_none(),
@@ -301,7 +326,10 @@ mod tests {
         );
 
         let mut one_view = split.clone();
-        one_view.push(d.attest(1, 1, 0, 2, digest, block, &beacon));
+        one_view.push(
+            d.attest(1, 1, 0, 2, digest, block, &beacon)
+                .expect("the attester serves this slot"),
+        );
         let cert = aggregate(1, 1, 0, block, &commitment, &beacon, &one_view, TAU)
             .expect("three in view two is a quorum");
         assert!(cert.attestations.iter().all(|att| att.view == 2));
@@ -313,7 +341,9 @@ mod tests {
             .iter()
             .position(|att| att.from == 2)
             .expect("b is in the quorum");
-        stitched.attestations[swap] = b.attest(1, 1, 0, 0, digest, block, &beacon);
+        stitched.attestations[swap] = b
+            .attest(1, 1, 0, 0, digest, block, &beacon)
+            .expect("the attester serves this slot");
         assert_eq!(
             stitched.verify(1, &commitment, &beacon, TAU),
             crate::verify::Verdict::Rejected(crate::verify::RejectReason::MixedViews)
@@ -330,8 +360,10 @@ mod tests {
         let block = Block::new(1, [9u8; 32], Parent::Genesis);
         let commitment = committee(&[&a, &b, &c, &d]);
         let atts = vec![
-            a.attest(1, 1, 0, 0, commitment.digest(), block, &beacon),
-            b.attest(1, 1, 0, 0, commitment.digest(), block, &beacon),
+            a.attest(1, 1, 0, 0, commitment.digest(), block, &beacon)
+                .expect("the attester serves this slot"),
+            b.attest(1, 1, 0, 0, commitment.digest(), block, &beacon)
+                .expect("the attester serves this slot"),
         ];
         assert!(aggregate(1, 1, 0, block, &commitment, &beacon, &atts, TAU).is_none());
     }
@@ -346,9 +378,12 @@ mod tests {
         let block = Block::new(1, [9u8; 32], Parent::Genesis);
         let commitment = committee(&[&a, &b, &c, &d]);
         let atts = vec![
-            a.attest(1, 1, 0, 0, commitment.digest(), block, &beacon),
-            a.attest(1, 1, 0, 0, commitment.digest(), block, &beacon),
-            b.attest(1, 1, 0, 0, commitment.digest(), block, &beacon),
+            a.attest(1, 1, 0, 0, commitment.digest(), block, &beacon)
+                .expect("the attester serves this slot"),
+            a.attest(1, 1, 0, 0, commitment.digest(), block, &beacon)
+                .expect("the attester serves this slot"),
+            b.attest(1, 1, 0, 0, commitment.digest(), block, &beacon)
+                .expect("the attester serves this slot"),
         ];
         assert!(aggregate(1, 1, 0, block, &commitment, &beacon, &atts, TAU).is_none());
     }
@@ -366,10 +401,17 @@ mod tests {
 
         let mut atts: Vec<Attestation> = Vec::new();
         for view in 1..4_000u64 {
-            atts.push(a.attest(1, 1, 0, view, commitment.digest(), other, &beacon));
+            atts.push(
+                a.attest(1, 1, 0, view, commitment.digest(), other, &beacon)
+                    .expect("the attester serves this slot"),
+            );
         }
         for member in [&a, &b, &c, &d] {
-            atts.push(member.attest(1, 1, 0, 0, commitment.digest(), block, &beacon));
+            atts.push(
+                member
+                    .attest(1, 1, 0, 0, commitment.digest(), block, &beacon)
+                    .expect("the attester serves this slot"),
+            );
         }
 
         let cert = aggregate(1, 1, 0, block, &commitment, &beacon, &atts, TAU);
@@ -399,12 +441,32 @@ mod tests {
 
         let mut atts: Vec<Attestation> = Vec::new();
         for _ in 0..2_000 {
-            atts.push(a.attest(1, 1, 0, 0, commitment.digest(), block, &beacon));
-            atts.push(b.attest(1, 1, 0, 0, commitment.digest(), block, &beacon));
-            atts.push(c.attest(1, 1, 0, 0, commitment.digest(), block, &beacon));
-            atts.push(d.attest(1, 1, 0, 0, commitment.digest(), block, &beacon));
-            atts.push(outsider_one.attest(1, 1, 0, 0, commitment.digest(), block, &beacon));
-            atts.push(outsider_two.attest(1, 1, 0, 0, commitment.digest(), block, &beacon));
+            atts.push(
+                a.attest(1, 1, 0, 0, commitment.digest(), block, &beacon)
+                    .expect("the attester serves this slot"),
+            );
+            atts.push(
+                b.attest(1, 1, 0, 0, commitment.digest(), block, &beacon)
+                    .expect("the attester serves this slot"),
+            );
+            atts.push(
+                c.attest(1, 1, 0, 0, commitment.digest(), block, &beacon)
+                    .expect("the attester serves this slot"),
+            );
+            atts.push(
+                d.attest(1, 1, 0, 0, commitment.digest(), block, &beacon)
+                    .expect("the attester serves this slot"),
+            );
+            atts.push(
+                outsider_one
+                    .attest(1, 1, 0, 0, commitment.digest(), block, &beacon)
+                    .expect("the attester serves this slot"),
+            );
+            atts.push(
+                outsider_two
+                    .attest(1, 1, 0, 0, commitment.digest(), block, &beacon)
+                    .expect("the attester serves this slot"),
+            );
         }
         let flood = atts.len() as u64;
         assert_eq!(flood, 12_000, "the flood is far larger than the committee");
@@ -438,13 +500,20 @@ mod tests {
         let block = Block::new(1, [9u8; 32], Parent::Genesis);
         let commitment = committee(&[&a, &b, &c, &d]);
         let atts = vec![
-            a.attest(1, 1, 0, 0, commitment.digest(), block, &beacon),
-            a.attest(1, 1, 0, 0, commitment.digest(), block, &beacon),
-            a.attest(1, 1, 0, 0, commitment.digest(), block, &beacon),
-            a.attest(1, 1, 0, 0, commitment.digest(), block, &beacon),
-            a.attest(1, 1, 0, 0, commitment.digest(), block, &beacon),
-            b.attest(1, 1, 0, 0, commitment.digest(), block, &beacon),
-            c.attest(1, 1, 0, 0, commitment.digest(), block, &beacon),
+            a.attest(1, 1, 0, 0, commitment.digest(), block, &beacon)
+                .expect("the attester serves this slot"),
+            a.attest(1, 1, 0, 0, commitment.digest(), block, &beacon)
+                .expect("the attester serves this slot"),
+            a.attest(1, 1, 0, 0, commitment.digest(), block, &beacon)
+                .expect("the attester serves this slot"),
+            a.attest(1, 1, 0, 0, commitment.digest(), block, &beacon)
+                .expect("the attester serves this slot"),
+            a.attest(1, 1, 0, 0, commitment.digest(), block, &beacon)
+                .expect("the attester serves this slot"),
+            b.attest(1, 1, 0, 0, commitment.digest(), block, &beacon)
+                .expect("the attester serves this slot"),
+            c.attest(1, 1, 0, 0, commitment.digest(), block, &beacon)
+                .expect("the attester serves this slot"),
         ];
         let (cert, verifications) =
             aggregate_metered(1, 1, 0, block, &commitment, &beacon, &atts, TAU);
@@ -466,9 +535,12 @@ mod tests {
         let block = Block::new(1, [9u8; 32], Parent::Genesis);
         let commitment = committee(&[&a, &b, &c, &d]);
         let atts = vec![
-            a.attest(1, 1, 0, 0, commitment.digest(), block, &beacon),
-            b.attest(1, 1, 0, 0, commitment.digest(), block, &beacon),
-            c.attest(1, 1, 0, 0, commitment.digest(), block, &beacon),
+            a.attest(1, 1, 0, 0, commitment.digest(), block, &beacon)
+                .expect("the attester serves this slot"),
+            b.attest(1, 1, 0, 0, commitment.digest(), block, &beacon)
+                .expect("the attester serves this slot"),
+            c.attest(1, 1, 0, 0, commitment.digest(), block, &beacon)
+                .expect("the attester serves this slot"),
         ];
         let (cert, verifications) =
             aggregate_metered(1, 1, 0, block, &commitment, &beacon, &atts, TAU);
@@ -500,12 +572,16 @@ mod tests {
             a.attest_public_key(),
             "the impostor holds a different key under member 1's id"
         );
-        let forged = impostor.attest(1, 1, 0, 0, commitment.digest(), block, &beacon);
+        let forged = impostor
+            .attest(1, 1, 0, 0, commitment.digest(), block, &beacon)
+            .expect("the attester serves this slot");
 
         let atts_forged = vec![
             forged.clone(),
-            b.attest(1, 1, 0, 0, commitment.digest(), block, &beacon),
-            c.attest(1, 1, 0, 0, commitment.digest(), block, &beacon),
+            b.attest(1, 1, 0, 0, commitment.digest(), block, &beacon)
+                .expect("the attester serves this slot"),
+            c.attest(1, 1, 0, 0, commitment.digest(), block, &beacon)
+                .expect("the attester serves this slot"),
         ];
         assert!(
             aggregate(1, 1, 0, block, &commitment, &beacon, &atts_forged, TAU).is_none(),
@@ -513,9 +589,12 @@ mod tests {
         );
 
         let atts_genuine = vec![
-            a.attest(1, 1, 0, 0, commitment.digest(), block, &beacon),
-            b.attest(1, 1, 0, 0, commitment.digest(), block, &beacon),
-            c.attest(1, 1, 0, 0, commitment.digest(), block, &beacon),
+            a.attest(1, 1, 0, 0, commitment.digest(), block, &beacon)
+                .expect("the attester serves this slot"),
+            b.attest(1, 1, 0, 0, commitment.digest(), block, &beacon)
+                .expect("the attester serves this slot"),
+            c.attest(1, 1, 0, 0, commitment.digest(), block, &beacon)
+                .expect("the attester serves this slot"),
         ];
         let cert = aggregate(1, 1, 0, block, &commitment, &beacon, &atts_genuine, TAU)
             .expect("the genuine signer completes the quorum");
@@ -533,13 +612,24 @@ mod tests {
         let commitment = committee(&[&a, &b, &c, &d]);
 
         let impostor = Attester::from_secret(1, &[7u8; 32], 100);
-        let forged = impostor.attest(1, 1, 0, 0, commitment.digest(), block, &beacon);
+        let forged = impostor
+            .attest(1, 1, 0, 0, commitment.digest(), block, &beacon)
+            .expect("the attester serves this slot");
 
         let forgeries = 64u64;
         let mut atts: Vec<Attestation> = (0..forgeries).map(|_| forged.clone()).collect();
-        atts.push(a.attest(1, 1, 0, 0, commitment.digest(), block, &beacon));
-        atts.push(b.attest(1, 1, 0, 0, commitment.digest(), block, &beacon));
-        atts.push(c.attest(1, 1, 0, 0, commitment.digest(), block, &beacon));
+        atts.push(
+            a.attest(1, 1, 0, 0, commitment.digest(), block, &beacon)
+                .expect("the attester serves this slot"),
+        );
+        atts.push(
+            b.attest(1, 1, 0, 0, commitment.digest(), block, &beacon)
+                .expect("the attester serves this slot"),
+        );
+        atts.push(
+            c.attest(1, 1, 0, 0, commitment.digest(), block, &beacon)
+                .expect("the attester serves this slot"),
+        );
 
         let (cert, verifications) =
             aggregate_metered(1, 1, 0, block, &commitment, &beacon, &atts, TAU);
@@ -572,7 +662,9 @@ mod tests {
         let commitment = committee(&[&a, &b, &c, &d]);
 
         let impostor = Attester::from_secret(1, &[7u8; 32], 100);
-        let forged = impostor.attest(1, 1, 0, 0, commitment.digest(), block, &beacon);
+        let forged = impostor
+            .attest(1, 1, 0, 0, commitment.digest(), block, &beacon)
+            .expect("the attester serves this slot");
         let flood_size = MAX_ATTEST_VERIFICATIONS_PER_ROUND + 500;
         let atts: Vec<Attestation> = (0..flood_size).map(|_| forged.clone()).collect();
 
@@ -601,12 +693,23 @@ mod tests {
         let commitment = committee(&[&a, &b, &c, &d]);
 
         let impostor = Attester::from_secret(1, &[7u8; 32], 100);
-        let forged = impostor.attest(1, 1, 0, 0, commitment.digest(), block, &beacon);
+        let forged = impostor
+            .attest(1, 1, 0, 0, commitment.digest(), block, &beacon)
+            .expect("the attester serves this slot");
         let flood_size = MAX_ATTEST_VERIFICATIONS_PER_ROUND + 500;
         let mut atts: Vec<Attestation> = (0..flood_size).map(|_| forged.clone()).collect();
-        atts.push(b.attest(1, 1, 0, 0, commitment.digest(), block, &beacon));
-        atts.push(c.attest(1, 1, 0, 0, commitment.digest(), block, &beacon));
-        atts.push(d.attest(1, 1, 0, 0, commitment.digest(), block, &beacon));
+        atts.push(
+            b.attest(1, 1, 0, 0, commitment.digest(), block, &beacon)
+                .expect("the attester serves this slot"),
+        );
+        atts.push(
+            c.attest(1, 1, 0, 0, commitment.digest(), block, &beacon)
+                .expect("the attester serves this slot"),
+        );
+        atts.push(
+            d.attest(1, 1, 0, 0, commitment.digest(), block, &beacon)
+                .expect("the attester serves this slot"),
+        );
 
         let cert = aggregate(1, 1, 0, block, &commitment, &beacon, &atts, TAU)
             .expect("the genuine members finalize despite a same-id forge flood");
@@ -626,7 +729,10 @@ mod tests {
         let real = committee(&refs);
         let three: Vec<Attestation> = members[..3]
             .iter()
-            .map(|a| a.attest(1, 1, 0, 0, real.digest(), block, &beacon))
+            .map(|a| {
+                a.attest(1, 1, 0, 0, real.digest(), block, &beacon)
+                    .expect("the attester serves this slot")
+            })
             .collect();
         assert!(
             aggregate(1, 1, 0, block, &real, &beacon, &three, TAU).is_none(),
@@ -651,17 +757,29 @@ mod tests {
         let commitment = committee(&[&a, &b, &c, &d]);
 
         let mut atts = vec![
-            a.attest(1, 1, 0, 0, commitment.digest(), block, &beacon),
-            b.attest(1, 1, 0, 0, commitment.digest(), block, &beacon),
-            c.attest(1, 1, 0, 0, commitment.digest(), block, &beacon),
+            a.attest(1, 1, 0, 0, commitment.digest(), block, &beacon)
+                .expect("the attester serves this slot"),
+            b.attest(1, 1, 0, 0, commitment.digest(), block, &beacon)
+                .expect("the attester serves this slot"),
+            c.attest(1, 1, 0, 0, commitment.digest(), block, &beacon)
+                .expect("the attester serves this slot"),
         ];
         let i1 = Attester::from_secret(1, &[7u8; 32], 100);
         let i2 = Attester::from_secret(2, &[8u8; 32], 100);
         let i3 = Attester::from_secret(3, &[9u8; 32], 100);
         for _ in 0..3_000 {
-            atts.push(i1.attest(1, 1, 0, 0, commitment.digest(), block, &beacon));
-            atts.push(i2.attest(1, 1, 0, 0, commitment.digest(), block, &beacon));
-            atts.push(i3.attest(1, 1, 0, 0, commitment.digest(), block, &beacon));
+            atts.push(
+                i1.attest(1, 1, 0, 0, commitment.digest(), block, &beacon)
+                    .expect("the attester serves this slot"),
+            );
+            atts.push(
+                i2.attest(1, 1, 0, 0, commitment.digest(), block, &beacon)
+                    .expect("the attester serves this slot"),
+            );
+            atts.push(
+                i3.attest(1, 1, 0, 0, commitment.digest(), block, &beacon)
+                    .expect("the attester serves this slot"),
+            );
         }
 
         let cert = aggregate(1, 1, 0, block, &commitment, &beacon, &atts, TAU)
@@ -685,8 +803,10 @@ mod tests {
 
         let envelope = Envelope::new(1, 0, block, &commitment);
         let two_signers = vec![
-            a.attest(1, 1, 0, 0, commitment.digest(), block, &beacon),
-            b.attest(1, 1, 0, 0, commitment.digest(), block, &beacon),
+            a.attest(1, 1, 0, 0, commitment.digest(), block, &beacon)
+                .expect("the attester serves this slot"),
+            b.attest(1, 1, 0, 0, commitment.digest(), block, &beacon)
+                .expect("the attester serves this slot"),
         ];
         let thin = Certificate::new(envelope, two_signers);
         assert!(
@@ -702,9 +822,12 @@ mod tests {
             &commitment,
             &beacon,
             &[
-                a.attest(1, 1, 0, 0, commitment.digest(), block, &beacon),
-                b.attest(1, 1, 0, 0, commitment.digest(), block, &beacon),
-                c.attest(1, 1, 0, 0, commitment.digest(), block, &beacon),
+                a.attest(1, 1, 0, 0, commitment.digest(), block, &beacon)
+                    .expect("the attester serves this slot"),
+                b.attest(1, 1, 0, 0, commitment.digest(), block, &beacon)
+                    .expect("the attester serves this slot"),
+                c.attest(1, 1, 0, 0, commitment.digest(), block, &beacon)
+                    .expect("the attester serves this slot"),
             ],
             TAU,
         )

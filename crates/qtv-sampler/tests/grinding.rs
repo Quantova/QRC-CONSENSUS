@@ -17,7 +17,9 @@ fn the_grinding_budget_is_exactly_one_valid_draw_per_slot() {
     let root = v.root();
     let slot = 4;
 
-    let honest = v.reveal(slot);
+    let honest = v
+        .reveal(slot)
+        .expect("the position is within the committed slots");
     assert!(verify_membership(&root, v.id, slot, &honest));
 
     let mut forgeries_accepted = 0u64;
@@ -68,7 +70,9 @@ fn no_authenticating_credential_beats_the_honest_output() {
     let beacon = Beacon::genesis();
     let slot = 9;
 
-    let honest = v.reveal(slot);
+    let honest = v
+        .reveal(slot)
+        .expect("the position is within the committed slots");
     let honest_value = honest.value(&beacon, DOMAIN_LEADER, slot);
 
     let mut a_lower_forgery_exists = false;
@@ -111,7 +115,9 @@ fn an_alternate_key_cannot_stand_in_for_the_bonded_root() {
     let root = bonded.root();
     let slot = 3;
 
-    let alt = alternate.reveal(slot);
+    let alt = alternate
+        .reveal(slot)
+        .expect("the position is within the committed slots");
     assert!(
         verify_membership(&alternate.root(), alternate.id, slot, &alt),
         "the alternate key is genuine against its own root"
@@ -132,7 +138,9 @@ fn an_alternate_key_cannot_stand_in_for_the_bonded_root() {
         &alt,
     ));
 
-    let honest = bonded.reveal(slot);
+    let honest = bonded
+        .reveal(slot)
+        .expect("the position is within the committed slots");
     assert!(verify_selection(
         &root,
         bonded.id,
@@ -156,13 +164,21 @@ fn a_second_independent_draw_costs_a_second_bonded_root() {
 
     assert_ne!(a.root(), b.root(), "two bonds carry two roots");
     assert_eq!(
-        a.reveal(slot),
-        a.reveal(slot),
+        a.reveal(slot)
+            .expect("the position is within the committed slots"),
+        a.reveal(slot)
+            .expect("the position is within the committed slots"),
         "one root re-reveals the identical draw"
     );
 
-    let value_a = a.reveal(slot).value(&beacon, DOMAIN_COMMITTEE, slot);
-    let value_b = b.reveal(slot).value(&beacon, DOMAIN_COMMITTEE, slot);
+    let value_a = a
+        .reveal(slot)
+        .expect("the position is within the committed slots")
+        .value(&beacon, DOMAIN_COMMITTEE, slot);
+    let value_b = b
+        .reveal(slot)
+        .expect("the position is within the committed slots")
+        .value(&beacon, DOMAIN_COMMITTEE, slot);
     assert_ne!(
         value_a, value_b,
         "the second draw is an independent hash under the second root"
@@ -175,9 +191,15 @@ fn effort_does_not_change_the_draw() {
     let beacon = Beacon::genesis();
     let slot = 11;
 
-    let first = v.reveal(slot).value(&beacon, DOMAIN_COMMITTEE, slot);
+    let first = v
+        .reveal(slot)
+        .expect("the position is within the committed slots")
+        .value(&beacon, DOMAIN_COMMITTEE, slot);
     for _ in 0..SEARCH {
-        let again = v.reveal(slot).value(&beacon, DOMAIN_COMMITTEE, slot);
+        let again = v
+            .reveal(slot)
+            .expect("the position is within the committed slots")
+            .value(&beacon, DOMAIN_COMMITTEE, slot);
         assert_eq!(again, first, "recomputation changed the draw");
     }
 }
@@ -189,7 +211,9 @@ fn a_member_cannot_grind_a_lower_leadership_score() {
     let beacon = Beacon::genesis();
     let slot = 2;
 
-    let honest = v.reveal(slot);
+    let honest = v
+        .reveal(slot)
+        .expect("the position is within the committed slots");
     let honest_score = leader_score(&honest.output(&beacon, DOMAIN_LEADER, slot), 100);
 
     for k in 0..SEARCH {

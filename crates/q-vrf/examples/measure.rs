@@ -19,7 +19,9 @@ fn bench_position(slots: u64) {
     let (sk, pk) = keygen(seed, slots, HOLDER);
     let keygen_ns = t0.elapsed().as_nanos();
 
-    let (y0, proof0) = sk.eval_and_prove(slots / 2);
+    let (y0, proof0) = sk
+        .eval_and_prove(slots / 2)
+        .expect("the position is within the committed slots");
     assert!(verify(&pk, HOLDER, slots / 2, &y0, &proof0));
     let proof_bytes = proof0.size_bytes();
     let pk_bytes = pk.size_bytes();
@@ -41,7 +43,9 @@ fn bench_position(slots: u64) {
     }
     let prove_ns = t0.elapsed().as_nanos() as f64 / iters as f64;
 
-    let (y, proof) = sk.eval_and_prove(slots / 3);
+    let (y, proof) = sk
+        .eval_and_prove(slots / 3)
+        .expect("the position is within the committed slots");
     let pos = slots / 3;
     let t0 = Instant::now();
     for _ in 0..iters {
@@ -79,7 +83,9 @@ fn main() {
     let transcripts: Vec<_> = (0..1_024u64)
         .map(|i| {
             let pos = i % slots;
-            let (y, proof) = sk.eval_and_prove(pos);
+            let (y, proof) = sk
+                .eval_and_prove(pos)
+                .expect("the position is within the committed slots");
             (pos, y, proof)
         })
         .collect();

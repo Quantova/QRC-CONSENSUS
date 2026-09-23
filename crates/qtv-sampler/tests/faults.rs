@@ -15,9 +15,16 @@ fn a_forged_second_draw_over_a_genuine_reveal_is_not_a_fault() {
     let root = v.root();
     let slot = 2;
 
-    let honest = v.reveal(slot);
-    let mut forged = v.reveal(slot);
-    forged.preimage = v.reveal(9).preimage;
+    let honest = v
+        .reveal(slot)
+        .expect("the position is within the committed slots");
+    let mut forged = v
+        .reveal(slot)
+        .expect("the position is within the committed slots");
+    forged.preimage = v
+        .reveal(9)
+        .expect("the position is within the committed slots")
+        .preimage;
     assert_ne!(honest, forged);
 
     let fault = DoubleDraw {
@@ -48,8 +55,12 @@ fn an_honest_single_reveal_is_not_a_double_draw() {
         root,
         holder: v.id,
         slot,
-        first: v.reveal(slot),
-        second: v.reveal(slot),
+        first: v
+            .reveal(slot)
+            .expect("the position is within the committed slots"),
+        second: v
+            .reveal(slot)
+            .expect("the position is within the committed slots"),
     };
     assert!(!fault.is_proven());
 }
@@ -60,12 +71,19 @@ fn a_double_draw_needs_two_distinct_authenticating_openings() {
     let root = v.root();
     let slot = 2;
 
-    let genuine = v.reveal(slot);
+    let genuine = v
+        .reveal(slot)
+        .expect("the position is within the committed slots");
     assert!(verify_membership(&root, v.id, slot, &genuine));
 
     for other in [0u64, 1, 3, 9, 40] {
-        let mut alt = v.reveal(slot);
-        alt.preimage = v.reveal(other).preimage;
+        let mut alt = v
+            .reveal(slot)
+            .expect("the position is within the committed slots");
+        alt.preimage = v
+            .reveal(other)
+            .expect("the position is within the committed slots")
+            .preimage;
         assert!(!verify_membership(&root, v.id, slot, &alt));
     }
 
@@ -86,9 +104,16 @@ fn the_forged_second_draw_is_rejected_at_verification_and_frames_no_one() {
     let root = v.root();
     let slot = 5;
 
-    let honest = v.reveal(slot);
-    let mut forged = v.reveal(slot);
-    forged.preimage = v.reveal(1).preimage;
+    let honest = v
+        .reveal(slot)
+        .expect("the position is within the committed slots");
+    let mut forged = v
+        .reveal(slot)
+        .expect("the position is within the committed slots");
+    forged.preimage = v
+        .reveal(1)
+        .expect("the position is within the committed slots")
+        .preimage;
 
     assert!(verify_selection(
         &root,

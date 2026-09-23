@@ -21,7 +21,10 @@ fn an_entitled_supermajority_certificate_verifies() {
 
     let atts: Vec<_> = members[..3]
         .iter()
-        .map(|a| a.attest(1, 1, 0, 0, commitment.digest(), block, &beacon))
+        .map(|a| {
+            a.attest(1, 1, 0, 0, commitment.digest(), block, &beacon)
+                .expect("the attester serves this slot")
+        })
         .collect();
 
     let cert = aggregate(1, 1, 0, block, &commitment, &beacon, &atts, 3).expect("quorum");
@@ -40,7 +43,10 @@ fn a_certificate_missing_the_supermajority_does_not_verify() {
 
     let atts: Vec<_> = members[..2]
         .iter()
-        .map(|a| a.attest(1, 1, 0, 0, commitment.digest(), block, &beacon))
+        .map(|a| {
+            a.attest(1, 1, 0, 0, commitment.digest(), block, &beacon)
+                .expect("the attester serves this slot")
+        })
         .collect();
 
     assert!(aggregate(1, 1, 0, block, &commitment, &beacon, &atts, 3).is_none());
@@ -68,7 +74,10 @@ fn a_count_quorum_of_small_seats_cannot_finalize_without_the_stake_behind_it() {
 
     let atts: Vec<_> = members[..3]
         .iter()
-        .map(|a| a.attest(1, 1, 0, 0, commitment.digest(), block, &beacon))
+        .map(|a| {
+            a.attest(1, 1, 0, 0, commitment.digest(), block, &beacon)
+                .expect("the attester serves this slot")
+        })
         .collect();
 
     assert!(
@@ -86,7 +95,10 @@ fn a_count_quorum_of_small_seats_cannot_finalize_without_the_stake_behind_it() {
 
     let whole: Vec<_> = members
         .iter()
-        .map(|a| a.attest(1, 1, 0, 0, commitment.digest(), block, &beacon))
+        .map(|a| {
+            a.attest(1, 1, 0, 0, commitment.digest(), block, &beacon)
+                .expect("the attester serves this slot")
+        })
         .collect();
     assert!(
         aggregate(1, 1, 0, block, &commitment, &beacon, &whole, 3).is_some(),

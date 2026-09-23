@@ -32,8 +32,12 @@ mod tests {
     fn an_honest_pair_of_reveals_is_not_a_fault() {
         let v = SamplerValidator::new(1, 100);
         let root = v.root();
-        let a = v.reveal(4);
-        let b = v.reveal(4);
+        let a = v
+            .reveal(4)
+            .expect("the position is within the committed slots");
+        let b = v
+            .reveal(4)
+            .expect("the position is within the committed slots");
         let dd = DoubleDraw {
             root,
             holder: v.id,
@@ -50,9 +54,16 @@ mod tests {
         let root = v.root();
         let slot = 4;
 
-        let genuine = v.reveal(slot);
-        let mut fabricated = v.reveal(slot);
-        fabricated.preimage = v.reveal(9).preimage;
+        let genuine = v
+            .reveal(slot)
+            .expect("the position is within the committed slots");
+        let mut fabricated = v
+            .reveal(slot)
+            .expect("the position is within the committed slots");
+        fabricated.preimage = v
+            .reveal(9)
+            .expect("the position is within the committed slots")
+            .preimage;
         assert_ne!(genuine, fabricated);
 
         let dd = DoubleDraw {

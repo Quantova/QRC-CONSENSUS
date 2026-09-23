@@ -76,23 +76,23 @@ impl SecretKey {
         self.tree.holder()
     }
 
-    pub fn eval(&self, position: u64) -> Output {
-        let preimage = self.tree.preimage(position);
-        output_from_preimage(position, &preimage)
+    pub fn eval(&self, position: u64) -> Option<Output> {
+        let preimage = self.tree.preimage(position)?;
+        Some(output_from_preimage(position, &preimage))
     }
 
-    pub fn prove(&self, position: u64) -> Proof {
-        Proof {
-            preimage: self.tree.preimage(position),
-            path: self.tree.path(position),
-        }
+    pub fn prove(&self, position: u64) -> Option<Proof> {
+        Some(Proof {
+            preimage: self.tree.preimage(position)?,
+            path: self.tree.path(position)?,
+        })
     }
 
-    pub fn eval_and_prove(&self, position: u64) -> (Output, Proof) {
-        let preimage = self.tree.preimage(position);
-        let path = self.tree.path(position);
+    pub fn eval_and_prove(&self, position: u64) -> Option<(Output, Proof)> {
+        let preimage = self.tree.preimage(position)?;
+        let path = self.tree.path(position)?;
         let output = output_from_preimage(position, &preimage);
-        (output, Proof { preimage, path })
+        Some((output, Proof { preimage, path }))
     }
 }
 
@@ -143,9 +143,15 @@ mod tests {
     fn keygen_eval_prove_verify_round_trip() {
         let (sk, pk) = keygen([3u8; 32], 64, HOLDER);
         for position in 0..64 {
-            let (y, proof) = sk.eval_and_prove(position);
+            let (y, proof) = sk
+                .eval_and_prove(position)
+                .expect("the position is within the committed slots");
             assert!(verify(&pk, HOLDER, position, &y, &proof));
-            assert_eq!(sk.eval(position), y);
+            assert_eq!(
+                sk.eval(position)
+                    .expect("the position is within the committed slots"),
+                y
+            );
         }
     }
 
@@ -154,7 +160,12 @@ mod tests {
         let (sk_a, _) = keygen([9u8; 32], 32, HOLDER);
         let (sk_b, _) = keygen([9u8; 32], 32, HOLDER);
         for position in 0..32 {
-            assert_eq!(sk_a.eval(position), sk_b.eval(position));
+            assert_eq!(
+                sk_a.eval(position)
+                    .expect("the position is within the committed slots"),
+                sk_b.eval(position)
+                    .expect("the position is within the committed slots")
+            );
         }
     }
 
@@ -164,6 +175,11 @@ mod tests {
         let (_, pk_b) = keygen([2u8; 32], 32, HOLDER);
         assert_ne!(pk_a, pk_b);
         let (sk_c, _) = keygen([2u8; 32], 32, HOLDER);
-        assert_ne!(sk_a.eval(5), sk_c.eval(5));
+        assert_ne!(
+            sk_a.eval(5)
+                .expect("the position is within the committed slots"),
+            sk_c.eval(5)
+                .expect("the position is within the committed slots")
+        );
     }
 }

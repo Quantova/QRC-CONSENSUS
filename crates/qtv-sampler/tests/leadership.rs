@@ -17,7 +17,9 @@ fn candidate(id: u64, weight: u64, is_attacker: bool) -> Candidate {
     Candidate {
         weight,
         is_attacker,
-        credential: v.reveal(0),
+        credential: v
+            .reveal(0)
+            .expect("the position is within the committed slots"),
     }
 }
 

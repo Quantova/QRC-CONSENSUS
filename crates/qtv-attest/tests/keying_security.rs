@@ -28,10 +28,14 @@ fn a_party_with_only_the_public_key_cannot_forge_an_attestation() {
     let victim = Attester::from_secret(1, &[0xa1u8; 32], STAKE);
     let impostor = Attester::from_secret(1, &[0xb2u8; 32], STAKE);
 
-    let victim_att = victim.attest(1, 1, 0, 0, [0u8; 32], block, &beacon);
+    let victim_att = victim
+        .attest(1, 1, 0, 0, [0u8; 32], block, &beacon)
+        .expect("the attester serves this slot");
     assert!(victim_att.signature_verifies(1, victim.attest_public_key()));
 
-    let forged = impostor.attest(1, 1, 0, 0, [0u8; 32], block, &beacon);
+    let forged = impostor
+        .attest(1, 1, 0, 0, [0u8; 32], block, &beacon)
+        .expect("the attester serves this slot");
     assert!(
         !forged.signature_verifies(1, victim.attest_public_key()),
         "a party holding only the victim public key forged an attestation under it"
@@ -58,7 +62,10 @@ fn an_impostor_certificate_under_the_victim_commitment_is_rejected() {
         .collect();
     let forged: Vec<_> = impostors[..3]
         .iter()
-        .map(|a| a.attest(1, 1, 0, 0, commitment.digest(), block, &beacon))
+        .map(|a| {
+            a.attest(1, 1, 0, 0, commitment.digest(), block, &beacon)
+                .expect("the attester serves this slot")
+        })
         .collect();
 
     assert!(aggregate(1, 1, 0, block, &commitment, &beacon, &forged, 3).is_none());
@@ -75,7 +82,9 @@ fn two_independent_secrets_yield_independent_validators() {
     assert_ne!(a.attest_public_key(), b.attest_public_key());
     assert_ne!(a.root(), b.root());
 
-    let att_a = a.attest(1, 1, 0, 0, [0u8; 32], block, &beacon);
+    let att_a = a
+        .attest(1, 1, 0, 0, [0u8; 32], block, &beacon)
+        .expect("the attester serves this slot");
     assert!(att_a.signature_verifies(1, a.attest_public_key()));
     assert!(!att_a.signature_verifies(1, b.attest_public_key()));
 }
@@ -93,7 +102,10 @@ fn the_draw_and_finality_still_finalize_with_real_keys() {
 
     let atts: Vec<_> = members[..3]
         .iter()
-        .map(|a| a.attest(1, 1, 0, 0, commitment.digest(), block, &beacon))
+        .map(|a| {
+            a.attest(1, 1, 0, 0, commitment.digest(), block, &beacon)
+                .expect("the attester serves this slot")
+        })
         .collect();
     let cert = aggregate(1, 1, 0, block, &commitment, &beacon, &atts, 3)
         .expect("an honest quorum finalizes");

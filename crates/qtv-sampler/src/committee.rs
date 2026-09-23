@@ -1,6 +1,8 @@
 // Copyright 2026 Quantova Inc
 // SPDX-License-Identifier: Apache-2.0 OR MIT
 
+use std::collections::BTreeSet;
+
 use crate::beacon::Beacon;
 use crate::onetime::{Root, PREIMAGE_BYTES};
 use crate::params::{
@@ -93,7 +95,9 @@ pub struct CommitteeView {
 }
 
 impl CommitteeView {
-    pub fn new(registrations: Vec<Registration>) -> Self {
+    pub fn new(mut registrations: Vec<Registration>) -> Self {
+        let mut seen = BTreeSet::new();
+        registrations.retain(|r| seen.insert(r.id));
         CommitteeView {
             registrations,
             budget: COMMITTEE_BUDGET,
@@ -320,7 +324,9 @@ mod roster {
                 if v.is_prover() || v.weight() < self.floor {
                     continue;
                 }
-                let credential = v.reveal(slot);
+                let credential = v
+                    .reveal(slot)
+                    .expect("the position is within the committed slots");
                 let value = credential.value(beacon, DOMAIN_COMMITTEE, slot);
                 if is_selected(value, v.weight(), total, self.budget) {
                     members.push(Member {
@@ -379,7 +385,13 @@ mod tests {
         let beacon = Beacon::genesis();
         let published: Vec<PublishedReveal> = set
             .iter()
-            .map(|v| PublishedReveal::new(v.id, v.reveal(0)))
+            .map(|v| {
+                PublishedReveal::new(
+                    v.id,
+                    v.reveal(0)
+                        .expect("the position is within the committed slots"),
+                )
+            })
             .collect();
         let committee = view.form_committee(&beacon, 0, &published);
         let whale = committee
@@ -404,7 +416,13 @@ mod tests {
             let beacon = Beacon::genesis();
             let published: Vec<PublishedReveal> = set
                 .iter()
-                .map(|v| PublishedReveal::new(v.id, v.reveal(slot)))
+                .map(|v| {
+                    PublishedReveal::new(
+                        v.id,
+                        v.reveal(slot)
+                            .expect("the position is within the committed slots"),
+                    )
+                })
                 .collect();
             let drawn = reg.sample_committee(&beacon, slot);
             let assembled = view.form_committee(&beacon, slot, &published);
@@ -429,11 +447,22 @@ mod tests {
         let slot = 0;
         let honest: Vec<PublishedReveal> = set
             .iter()
-            .map(|v| PublishedReveal::new(v.id, v.reveal(slot)))
+            .map(|v| {
+                PublishedReveal::new(
+                    v.id,
+                    v.reveal(slot)
+                        .expect("the position is within the committed slots"),
+                )
+            })
             .collect();
         assert!(view.form_committee(&beacon, slot, &honest).contains(1));
 
-        let forged = vec![PublishedReveal::new(1, set[1].reveal(slot))];
+        let forged = vec![PublishedReveal::new(
+            1,
+            set[1]
+                .reveal(slot)
+                .expect("the position is within the committed slots"),
+        )];
         let committee = view.form_committee(&beacon, slot, &forged);
         assert!(
             !committee.contains(1),
@@ -451,8 +480,18 @@ mod tests {
         let beacon = Beacon::genesis();
         let slot = 0;
         let published = vec![
-            PublishedReveal::new(1, set[0].reveal(slot)),
-            PublishedReveal::new(3, set[2].reveal(slot)),
+            PublishedReveal::new(
+                1,
+                set[0]
+                    .reveal(slot)
+                    .expect("the position is within the committed slots"),
+            ),
+            PublishedReveal::new(
+                3,
+                set[2]
+                    .reveal(slot)
+                    .expect("the position is within the committed slots"),
+            ),
         ];
         let committee = view.form_committee(&beacon, slot, &published);
         assert!(committee.contains(1));
@@ -512,6 +551,7 @@ mod tests {
         let unbiased = committee.next_beacon(&beacon, slot);
         let fixed = proposer
             .reveal(next_slot)
+            .expect("the position is within the committed slots")
             .value(&unbiased, DOMAIN_LEADER, next_slot);
 
         let mut reveal_draws = BTreeSet::new();
@@ -521,18 +561,20 @@ mod tests {
             shake256(&candidate.to_le_bytes(), &mut digest);
 
             let reveal_next = committee.next_beacon(&beacon, slot);
-            reveal_draws.insert(proposer.reveal(next_slot).value(
-                &reveal_next,
-                DOMAIN_LEADER,
-                next_slot,
-            ));
+            reveal_draws.insert(
+                proposer
+                    .reveal(next_slot)
+                    .expect("the position is within the committed slots")
+                    .value(&reveal_next, DOMAIN_LEADER, next_slot),
+            );
 
             let digest_next = beacon.advance(&digest, slot);
-            digest_draws.insert(proposer.reveal(next_slot).value(
-                &digest_next,
-                DOMAIN_LEADER,
-                next_slot,
-            ));
+            digest_draws.insert(
+                proposer
+                    .reveal(next_slot)
+                    .expect("the position is within the committed slots")
+                    .value(&digest_next, DOMAIN_LEADER, next_slot),
+            );
         }
 
         assert_eq!(

@@ -118,7 +118,9 @@ mod tests {
         let (signer, sampler) = parts(1, 100);
         let beacon = Beacon::genesis();
         let block = Block::new(1, [5u8; 32], Parent::Genesis);
-        let membership = sampler.reveal(0);
+        let membership = sampler
+            .reveal(0)
+            .expect("the position is within the committed slots");
         let att = Attestation::create(&signer, 1, 1, 0, 0, [0u8; 32], block, membership);
 
         assert!(att.signature_verifies(1, signer.public_key()));
@@ -130,7 +132,9 @@ mod tests {
         let (signer, sampler) = parts(1, 100);
         let other = Validator::new(2);
         let block = Block::new(1, [5u8; 32], Parent::Genesis);
-        let membership = sampler.reveal(0);
+        let membership = sampler
+            .reveal(0)
+            .expect("the position is within the committed slots");
         let att = Attestation::create(&signer, 1, 1, 0, 0, [0u8; 32], block, membership);
         assert!(!att.signature_verifies(1, other.public_key()));
     }
@@ -139,7 +143,9 @@ mod tests {
     fn a_tampered_block_breaks_the_signature() {
         let (signer, sampler) = parts(1, 100);
         let block = Block::new(1, [5u8; 32], Parent::Genesis);
-        let membership = sampler.reveal(0);
+        let membership = sampler
+            .reveal(0)
+            .expect("the position is within the committed slots");
         let mut att = Attestation::create(&signer, 1, 1, 0, 0, [0u8; 32], block, membership);
         att.block = Block::new(1, [6u8; 32], Parent::Genesis);
         assert!(!att.signature_verifies(1, signer.public_key()));
@@ -151,7 +157,9 @@ mod tests {
         let impostor = SamplerValidator::new(9, 100);
         let beacon = Beacon::genesis();
         let block = Block::new(1, [5u8; 32], Parent::Genesis);
-        let membership = impostor.reveal(0);
+        let membership = impostor
+            .reveal(0)
+            .expect("the position is within the committed slots");
         let att = Attestation::create(&signer, 1, 1, 0, 0, [0u8; 32], block, membership);
         assert!(!att.is_entitled(&sampler.root(), &beacon, 100, 100, SATURATING_BUDGET));
     }
@@ -160,7 +168,9 @@ mod tests {
     fn an_attestation_is_bound_to_its_chain_and_will_not_verify_under_another() {
         let (signer, sampler) = parts(1, 100);
         let block = Block::new(1, [5u8; 32], Parent::Genesis);
-        let membership = sampler.reveal(0);
+        let membership = sampler
+            .reveal(0)
+            .expect("the position is within the committed slots");
         let chain_a = 7u64;
         let chain_b = 9u64;
         let att = Attestation::create(&signer, chain_a, 1, 0, 0, [0u8; 32], block, membership);

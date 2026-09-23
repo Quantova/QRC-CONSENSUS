@@ -7,6 +7,8 @@ pub const PREIMAGE_BYTES: usize = 32;
 
 pub const NODE_BYTES: usize = 32;
 
+pub const MAX_SLOTS: u64 = 1 << 16;
+
 const DOMAIN_PREIMAGE: &[u8] = b"QORUS/onetime/preimage";
 
 const DOMAIN_LEAF: &[u8] = b"QORUS/onetime/leaf";
@@ -100,7 +102,10 @@ pub fn node_hash(left: &[u8; NODE_BYTES], right: &[u8; NODE_BYTES]) -> [u8; NODE
 }
 
 fn padded_leaves(slots: u64) -> Option<usize> {
-    (slots as usize).max(1).checked_next_power_of_two()
+    if slots == 0 || slots > MAX_SLOTS {
+        return None;
+    }
+    usize::try_from(slots).ok()?.checked_next_power_of_two()
 }
 
 fn tree_depth(slots: u64) -> Option<usize> {
@@ -182,26 +187,24 @@ impl OneTimeTree {
         }
     }
 
-    pub fn preimage(&self, position: u64) -> [u8; PREIMAGE_BYTES] {
-        assert!(
-            position < self.slots,
-            "position past the committed slot count"
-        );
-        derive_preimage(&self.seed, position)
+    pub fn preimage(&self, position: u64) -> Option<[u8; PREIMAGE_BYTES]> {
+        if position >= self.slots {
+            return None;
+        }
+        Some(derive_preimage(&self.seed, position))
     }
 
-    pub fn path(&self, position: u64) -> MerklePath {
-        assert!(
-            position < self.slots,
-            "position past the committed slot count"
-        );
+    pub fn path(&self, position: u64) -> Option<MerklePath> {
+        if position >= self.slots {
+            return None;
+        }
         let mut siblings = Vec::with_capacity(self.layers.len() - 1);
         let mut idx = position as usize;
         for layer in &self.layers[..self.layers.len() - 1] {
             siblings.push(layer[idx ^ 1]);
             idx >>= 1;
         }
-        MerklePath { siblings }
+        Some(MerklePath { siblings })
     }
 }
 
@@ -220,8 +223,12 @@ mod tests {
         let t = tree(1, 16);
         let root = t.root();
         for position in 0..16 {
-            let preimage = t.preimage(position);
-            let path = t.path(position);
+            let preimage = t
+                .preimage(position)
+                .expect("the position is within the committed slots");
+            let path = t
+                .path(position)
+                .expect("the position is within the committed slots");
             assert!(root.verify_membership(HOLDER, position, &preimage, &path));
         }
     }
@@ -230,8 +237,12 @@ mod tests {
     fn a_preimage_at_another_position_is_rejected() {
         let t = tree(1, 16);
         let root = t.root();
-        let preimage = t.preimage(3);
-        let path = t.path(3);
+        let preimage = t
+            .preimage(3)
+            .expect("the position is within the committed slots");
+        let path = t
+            .path(3)
+            .expect("the position is within the committed slots");
         assert!(root.verify_membership(HOLDER, 3, &preimage, &path));
         for other in 0..16 {
             if other != 3 {
@@ -244,8 +255,12 @@ mod tests {
     fn a_preimage_from_another_tree_is_rejected() {
         let a = tree(1, 16);
         let b = tree(2, 16);
-        let preimage = a.preimage(5);
-        let path = a.path(5);
+        let preimage = a
+            .preimage(5)
+            .expect("the position is within the committed slots");
+        let path = a
+            .path(5)
+            .expect("the position is within the committed slots");
         assert!(a.root().verify_membership(HOLDER, 5, &preimage, &path));
         assert!(!b.root().verify_membership(HOLDER, 5, &preimage, &path));
     }
@@ -254,8 +269,12 @@ mod tests {
     fn a_position_past_the_slot_count_is_rejected() {
         let t = tree(1, 3);
         let root = t.root();
-        let preimage = t.preimage(0);
-        let path = t.path(0);
+        let preimage = t
+            .preimage(0)
+            .expect("the position is within the committed slots");
+        let path = t
+            .path(0)
+            .expect("the position is within the committed slots");
         assert!(root.verify_membership(HOLDER, 0, &preimage, &path));
         assert!(!root.verify_membership(HOLDER, 3, &preimage, &path));
     }
@@ -277,8 +296,12 @@ mod tests {
     fn a_single_slot_tree_has_the_leaf_as_its_root() {
         let t = tree(1, 1);
         let root = t.root();
-        let preimage = t.preimage(0);
-        let path = t.path(0);
+        let preimage = t
+            .preimage(0)
+            .expect("the position is within the committed slots");
+        let path = t
+            .path(0)
+            .expect("the position is within the committed slots");
         assert!(path.siblings.is_empty());
         assert_eq!(root.digest, bind_root(HOLDER, 1, &leaf_hash(0, &preimage)));
         assert!(root.verify_membership(HOLDER, 0, &preimage, &path));
@@ -292,8 +315,12 @@ mod tests {
     fn a_tree_built_for_one_holder_opens_for_no_other() {
         let mine = OneTimeTree::new([5u8; 32], 16, 11);
         let root = mine.root();
-        let preimage = mine.preimage(4);
-        let path = mine.path(4);
+        let preimage = mine
+            .preimage(4)
+            .expect("the position is within the committed slots");
+        let path = mine
+            .path(4)
+            .expect("the position is within the committed slots");
         assert!(root.verify_membership(11, 4, &preimage, &path));
         for other in [0u64, 10, 12, u64::MAX] {
             assert!(
@@ -319,8 +346,12 @@ mod tests {
     fn a_wrong_length_path_is_rejected() {
         let t = tree(1, 16);
         let root = t.root();
-        let preimage = t.preimage(2);
-        let mut path = t.path(2);
+        let preimage = t
+            .preimage(2)
+            .expect("the position is within the committed slots");
+        let mut path = t
+            .path(2)
+            .expect("the position is within the committed slots");
         path.siblings.pop();
         assert!(!root.verify_membership(HOLDER, 2, &preimage, &path));
     }

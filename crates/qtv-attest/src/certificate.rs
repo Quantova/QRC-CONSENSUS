@@ -93,8 +93,10 @@ mod tests {
         let commitment = CommitteeCommitment::from_attesters(0, &[&a, &b]);
         let envelope = Envelope::new(1, 0, block, &commitment);
         let atts = vec![
-            a.attest(1, 1, 0, 0, [0u8; 32], block, &beacon),
-            b.attest(1, 1, 0, 0, [0u8; 32], block, &beacon),
+            a.attest(1, 1, 0, 0, [0u8; 32], block, &beacon)
+                .expect("the attester serves this slot"),
+            b.attest(1, 1, 0, 0, [0u8; 32], block, &beacon)
+                .expect("the attester serves this slot"),
         ];
         let cert = Certificate::new(envelope, atts);
         assert_eq!(cert.attesters(), vec![1, 2]);

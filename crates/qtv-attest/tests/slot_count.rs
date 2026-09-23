@@ -20,7 +20,10 @@ fn a_certificate_verifies_at_a_slot_beyond_the_default() {
 
     let atts: Vec<_> = members
         .iter()
-        .map(|a| a.attest(1, 1, slot, 0, commitment.digest(), block, &beacon))
+        .map(|a| {
+            a.attest(1, 1, slot, 0, commitment.digest(), block, &beacon)
+                .expect("the attester serves this slot")
+        })
         .collect();
 
     assert_eq!(atts[0].membership.path.siblings.len(), 12);

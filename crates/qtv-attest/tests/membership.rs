@@ -20,7 +20,9 @@ fn an_off_committee_signer_is_rejected_even_with_a_valid_signature() {
     let commitment = CommitteeCommitment::from_attesters(0, &refs);
 
     let outsider = Attester::new(99, 100);
-    let outsider_att = outsider.attest(1, 1, 0, 0, commitment.digest(), block, &beacon);
+    let outsider_att = outsider
+        .attest(1, 1, 0, 0, commitment.digest(), block, &beacon)
+        .expect("the attester serves this slot");
     assert!(
         outsider_att.signature_verifies(1, outsider.attest_public_key()),
         "the outsider signature is valid on its own"
@@ -28,7 +30,10 @@ fn an_off_committee_signer_is_rejected_even_with_a_valid_signature() {
 
     let mut atts: Vec<_> = members[..3]
         .iter()
-        .map(|a| a.attest(1, 1, 0, 0, commitment.digest(), block, &beacon))
+        .map(|a| {
+            a.attest(1, 1, 0, 0, commitment.digest(), block, &beacon)
+                .expect("the attester serves this slot")
+        })
         .collect();
     atts.push(outsider_att.clone());
     let cert = aggregate(1, 1, 0, block, &commitment, &beacon, &atts, 3).expect("quorum");
@@ -38,8 +43,12 @@ fn an_off_committee_signer_is_rejected_even_with_a_valid_signature() {
     let tainted = Certificate::new(
         envelope,
         vec![
-            members[0].attest(1, 1, 0, 0, commitment.digest(), block, &beacon),
-            members[1].attest(1, 1, 0, 0, commitment.digest(), block, &beacon),
+            members[0]
+                .attest(1, 1, 0, 0, commitment.digest(), block, &beacon)
+                .expect("the attester serves this slot"),
+            members[1]
+                .attest(1, 1, 0, 0, commitment.digest(), block, &beacon)
+                .expect("the attester serves this slot"),
             outsider_att,
         ],
     );

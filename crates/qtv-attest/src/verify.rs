@@ -62,6 +62,9 @@ fn verify_body(
     if envelope.committee != committee_digest {
         return Verdict::Rejected(RejectReason::CommitmentMismatch);
     }
+    if envelope.slot != commitment.slot {
+        return Verdict::Rejected(RejectReason::CommitmentMismatch);
+    }
     let view = attestations.first().map(|att| att.view);
     let mut seen: Vec<u64> = Vec::new();
     for att in attestations {
@@ -105,7 +108,7 @@ fn verify_body(
         .fold(0u128, |acc, w| acc.saturating_add(w));
     let committee_stake = commitment.committee_stake();
     let weight_ok =
-        committee_stake == 0 || seen_stake.saturating_mul(3) >= committee_stake.saturating_mul(2);
+        committee_stake > 0 && seen_stake.saturating_mul(3) >= committee_stake.saturating_mul(2);
     if seen.len() as u64 >= effective_tau && weight_ok {
         Verdict::Verified
     } else {

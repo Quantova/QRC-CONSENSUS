@@ -73,7 +73,9 @@ fn credentials_and_values_are_byte_identical_to_the_pre_wiring_baseline() {
     let set = roster();
     let b = beacon();
 
-    let c1 = set[0].reveal(4);
+    let c1 = set[0]
+        .reveal(4)
+        .expect("the position is within the committed slots");
     assert_eq!(
         hex(&c1.to_bytes()),
         "040000000000000023fe3ff11ac0d84a61aeec6c11687df5d7815d2e25f3a74dc72802c3f4accefa44e482bed7634293ec6ec93c22b1676b5e2a8c77a179e82450d2315443f60d83a81b20049a8cdbf099a23fc94a4483079b4a46f8f8fd4d417dd4b4c6a7bd5d7199b58a7feae0bbdc1bea1ebfdc24ce946245db33977f8ed9ec397aca80da89cdec0ea5f80da137369d83830ba8a22eb3407d2dbf774cc9900025251722e5e58f6309204a266748da67bb2434bb5258ffd7e2131e35bce27a2ab40f4e90b6f088987423306b0afac5c4a0bb0c9d342235c9c76676c413eeb958599ad7dc280ae0",
@@ -82,7 +84,9 @@ fn credentials_and_values_are_byte_identical_to_the_pre_wiring_baseline() {
     assert_eq!(c1.value(&b, DOMAIN_COMMITTEE, 4), 8463245084084038997);
     assert_eq!(c1.value(&b, DOMAIN_LEADER, 4), 4132736013311636499);
 
-    let c4 = set[3].reveal(7);
+    let c4 = set[3]
+        .reveal(7)
+        .expect("the position is within the committed slots");
     assert_eq!(
         hex(&c4.to_bytes()),
         "0700000000000000b0704b63a0f49e4f071437cfa82dc87f5c943bb2d33fdbcbbc8633ccc4e24667bbd7e1086502d2ad6f4f2e1c9aeba7a2e710fb45d3acc5fcb0979ef4cf16f663c32ce5663e64fb5bbaa22c0ccb6b4fcc4871a7cac273f5439f0ba43eecb86ef16cd8dc8b9ec88c20ba64afdc28b5e8133f97a25742e407e75c73f5103b4fde8ccfcb43af3d0ed39a2ab82d5c5a9b7f7173f528f1f3a36822a482421c5c0b64666a0f3c414bc9302ddf9f83a1e0350b993292cf823829820fc8966de62e8953f9b205a8e5cd059e40cd99eef95fb4eb277435c228fdee97c929396001f3feaced",
@@ -104,7 +108,13 @@ fn committee_membership_and_leaders_are_byte_identical_to_the_pre_wiring_baselin
     for (slot, want_ids, want_leader) in expected {
         let published: Vec<PublishedReveal> = set
             .iter()
-            .map(|v| PublishedReveal::new(v.id, v.reveal(slot)))
+            .map(|v| {
+                PublishedReveal::new(
+                    v.id,
+                    v.reveal(slot)
+                        .expect("the position is within the committed slots"),
+                )
+            })
             .collect();
         let committee = view.form_committee(&b, slot, &published);
         let ids: Vec<String> = committee.ids().iter().map(|i| i.to_string()).collect();
@@ -132,8 +142,12 @@ fn the_sortition_credential_is_the_q_vrf_proof_over_the_committed_tree() {
     );
 
     for slot in 0..DEFAULT_SLOTS {
-        let cred = v.reveal(slot);
-        let (y, proof) = sk.eval_and_prove(slot);
+        let cred = v
+            .reveal(slot)
+            .expect("the position is within the committed slots");
+        let (y, proof) = sk
+            .eval_and_prove(slot)
+            .expect("the position is within the committed slots");
         assert_eq!(
             cred.preimage, proof.preimage,
             "the reveal preimage is not the q-vrf proof preimage at slot {slot}"

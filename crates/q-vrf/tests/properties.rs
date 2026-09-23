@@ -32,7 +32,9 @@ fn adversarial_preimages(count: u64) -> Vec<[u8; PREIMAGE_BYTES]> {
 fn exactly_one_output_verifies_per_key_and_position() {
     let (sk, pk) = keygen([11u8; 32], 128, HOLDER);
     for position in [0u64, 1, 7, 63, 127] {
-        let (y, proof) = sk.eval_and_prove(position);
+        let (y, proof) = sk
+            .eval_and_prove(position)
+            .expect("the position is within the committed slots");
         assert!(
             verify(&pk, HOLDER, position, &y, &proof),
             "honest output must verify"
@@ -55,7 +57,9 @@ fn exactly_one_output_verifies_per_key_and_position() {
 fn a_committed_key_cannot_be_reground_to_a_second_output() {
     let (sk, pk) = keygen([22u8; 32], 256, HOLDER);
     let position = 100u64;
-    let (honest_y, honest_proof) = sk.eval_and_prove(position);
+    let (honest_y, honest_proof) = sk
+        .eval_and_prove(position)
+        .expect("the position is within the committed slots");
     assert!(verify(&pk, HOLDER, position, &honest_y, &honest_proof));
 
     for alt in adversarial_preimages(20_000) {
@@ -79,9 +83,13 @@ fn a_preimage_from_another_position_or_key_cannot_be_reused() {
     let (sk, pk) = keygen([33u8; 32], 128, HOLDER);
     let (other_sk, _) = keygen([34u8; 32], 128, HOLDER);
     let position = 40u64;
-    let honest = sk.prove(position);
+    let honest = sk
+        .prove(position)
+        .expect("the position is within the committed slots");
 
-    let elsewhere = sk.prove(41);
+    let elsewhere = sk
+        .prove(41)
+        .expect("the position is within the committed slots");
     let mixed = Proof {
         preimage: elsewhere.preimage,
         path: honest.path.clone(),
@@ -89,7 +97,9 @@ fn a_preimage_from_another_position_or_key_cannot_be_reused() {
     let y = output_from_preimage(position, &mixed.preimage);
     assert!(!verify(&pk, HOLDER, position, &y, &mixed));
 
-    let foreign = other_sk.prove(position);
+    let foreign = other_sk
+        .prove(position)
+        .expect("the position is within the committed slots");
     let y2 = output_from_preimage(position, &foreign.preimage);
     assert!(!verify(&pk, HOLDER, position, &y2, &foreign));
 }
@@ -102,7 +112,10 @@ fn distinct_positions_give_distinct_outputs() {
     let mut seen = std::collections::HashSet::new();
     for position in 0..8192u64 {
         assert!(
-            seen.insert(sk.eval(position)),
+            seen.insert(
+                sk.eval(position)
+                    .expect("the position is within the committed slots")
+            ),
             "a repeat output appeared at {position}"
         );
     }
@@ -114,7 +127,9 @@ fn output_bits_are_statistically_balanced() {
     let mut ones = 0u64;
     let mut total_bits = 0u64;
     for position in 0..4096u64 {
-        let y = sk.eval(position);
+        let y = sk
+            .eval(position)
+            .expect("the position is within the committed slots");
         ones += count_ones(&y);
         total_bits += 8 * OUTPUT_LEN as u64;
     }
@@ -131,7 +146,10 @@ fn output_byte_mean_is_near_the_uniform_mean() {
     let mut sum = 0u64;
     let mut n = 0u64;
     for position in 0..4096u64 {
-        for b in sk.eval(position) {
+        for b in sk
+            .eval(position)
+            .expect("the position is within the committed slots")
+        {
             sum += b as u64;
             n += 1;
         }
@@ -148,9 +166,13 @@ fn neighbouring_outputs_are_decorrelated() {
     let (sk, _) = keygen([57u8; 32], 2048, HOLDER);
     let mut total = 0u64;
     let mut pairs = 0u64;
-    let mut prev = sk.eval(0);
+    let mut prev = sk
+        .eval(0)
+        .expect("the position is within the committed slots");
     for position in 1..2048u64 {
-        let cur = sk.eval(position);
+        let cur = sk
+            .eval(position)
+            .expect("the position is within the committed slots");
         total += hamming(&prev, &cur);
         pairs += 1;
         prev = cur;
@@ -166,8 +188,12 @@ fn neighbouring_outputs_are_decorrelated() {
 fn the_output_is_domain_separated_and_position_bound() {
     let (sk, pk) = keygen([58u8; 32], 64, HOLDER);
     let position = 9u64;
-    let proof = sk.prove(position);
-    let y = sk.eval(position);
+    let proof = sk
+        .prove(position)
+        .expect("the position is within the committed slots");
+    let y = sk
+        .eval(position)
+        .expect("the position is within the committed slots");
 
     assert_ne!(y.as_slice(), proof.preimage.as_slice());
     assert_ne!(y, leaf_hash(position, &proof.preimage));
@@ -181,7 +207,9 @@ fn the_output_is_domain_separated_and_position_bound() {
 fn an_honest_transcript_verifies() {
     let (sk, pk) = keygen([66u8; 32], 512, HOLDER);
     for position in [0u64, 1, 255, 511] {
-        let (y, proof) = sk.eval_and_prove(position);
+        let (y, proof) = sk
+            .eval_and_prove(position)
+            .expect("the position is within the committed slots");
         assert!(verify(&pk, HOLDER, position, &y, &proof));
     }
 }
@@ -190,7 +218,9 @@ fn an_honest_transcript_verifies() {
 fn a_tampered_authentication_path_is_rejected() {
     let (sk, pk) = keygen([67u8; 32], 512, HOLDER);
     let position = 300u64;
-    let (y, proof) = sk.eval_and_prove(position);
+    let (y, proof) = sk
+        .eval_and_prove(position)
+        .expect("the position is within the committed slots");
     assert!(verify(&pk, HOLDER, position, &y, &proof));
 
     for level in 0..proof.path.siblings.len() {
@@ -227,7 +257,9 @@ fn a_tampered_authentication_path_is_rejected() {
 fn a_tampered_preimage_is_rejected() {
     let (sk, pk) = keygen([68u8; 32], 512, HOLDER);
     let position = 123u64;
-    let (y, proof) = sk.eval_and_prove(position);
+    let (y, proof) = sk
+        .eval_and_prove(position)
+        .expect("the position is within the committed slots");
     for byte in 0..PREIMAGE_BYTES {
         let mut preimage = proof.preimage;
         preimage[byte] ^= 0x80;
@@ -245,7 +277,9 @@ fn a_tampered_preimage_is_rejected() {
 fn a_tampered_output_is_rejected() {
     let (sk, pk) = keygen([69u8; 32], 256, HOLDER);
     let position = 200u64;
-    let (y, proof) = sk.eval_and_prove(position);
+    let (y, proof) = sk
+        .eval_and_prove(position)
+        .expect("the position is within the committed slots");
     for byte in 0..OUTPUT_LEN {
         let mut forged: Output = y;
         forged[byte] ^= 0x01;
@@ -257,7 +291,9 @@ fn a_tampered_output_is_rejected() {
 fn a_proof_for_one_position_does_not_validate_another() {
     let (sk, pk) = keygen([70u8; 32], 256, HOLDER);
     let source = 30u64;
-    let (y_source, proof) = sk.eval_and_prove(source);
+    let (y_source, proof) = sk
+        .eval_and_prove(source)
+        .expect("the position is within the committed slots");
     for target in 0..256u64 {
         if target == source {
             continue;
@@ -271,7 +307,9 @@ fn a_proof_for_one_position_does_not_validate_another() {
 #[test]
 fn a_position_past_the_slot_count_is_rejected() {
     let (sk, pk) = keygen([71u8; 32], 100, HOLDER);
-    let (y, proof) = sk.eval_and_prove(0);
+    let (y, proof) = sk
+        .eval_and_prove(0)
+        .expect("the position is within the committed slots");
     assert!(verify(&pk, HOLDER, 0, &y, &proof));
     assert!(!verify(&pk, HOLDER, 100, &y, &proof));
     assert!(!verify(&pk, HOLDER, 1_000_000, &y, &proof));
@@ -282,7 +320,9 @@ fn a_proof_does_not_verify_under_a_foreign_key() {
     let (sk_a, pk_a) = keygen([72u8; 32], 256, HOLDER);
     let (_, pk_b) = keygen([73u8; 32], 256, HOLDER);
     let position = 55u64;
-    let (y, proof) = sk_a.eval_and_prove(position);
+    let (y, proof) = sk_a
+        .eval_and_prove(position)
+        .expect("the position is within the committed slots");
     assert!(verify(&pk_a, HOLDER, position, &y, &proof));
     assert!(!verify(&pk_b, HOLDER, position, &y, &proof));
 }
@@ -291,7 +331,9 @@ fn a_proof_does_not_verify_under_a_foreign_key() {
 fn forging_reduces_to_a_sha3_second_preimage_or_collision() {
     let (sk, pk) = keygen([88u8; 32], 128, HOLDER);
     let position = 64u64;
-    let honest = sk.prove(position);
+    let honest = sk
+        .prove(position)
+        .expect("the position is within the committed slots");
     let committed_leaf = leaf_hash(position, &honest.preimage);
 
     let mut node = committed_leaf;

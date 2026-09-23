@@ -160,22 +160,22 @@ impl SamplerValidator {
         }
     }
 
-    pub fn reveal(&self, slot: u64) -> Credential {
-        let proof = self.key.prove(slot);
-        Credential {
+    pub fn reveal(&self, slot: u64) -> Option<Credential> {
+        let proof = self.key.prove(slot)?;
+        Some(Credential {
             position: slot,
             preimage: proof.preimage,
             path: proof.path,
-        }
+        })
     }
 
-    pub fn reveal_out_of_position(&self, leaf_slot: u64, claim_slot: u64) -> Credential {
-        let proof = self.key.prove(leaf_slot);
-        Credential {
+    pub fn reveal_out_of_position(&self, leaf_slot: u64, claim_slot: u64) -> Option<Credential> {
+        let proof = self.key.prove(leaf_slot)?;
+        Some(Credential {
             position: claim_slot,
             preimage: proof.preimage,
             path: proof.path,
-        }
+        })
     }
 }
 
@@ -267,7 +267,12 @@ mod tests {
         let a = SamplerValidator::from_secret(3, &[3u8; 32], 2_000);
         let b = a.clone();
         assert_eq!(a.root(), b.root());
-        assert_eq!(a.reveal(4), b.reveal(4));
+        assert_eq!(
+            a.reveal(4)
+                .expect("the position is within the committed slots"),
+            b.reveal(4)
+                .expect("the position is within the committed slots")
+        );
     }
 
     #[test]
@@ -297,7 +302,9 @@ mod tests {
     fn a_reveal_authenticates_to_the_registered_root() {
         let v = SamplerValidator::from_secret(1, &[1u8; 32], 100);
         let reg = Registration::of(&v);
-        let cred = v.reveal(5);
+        let cred = v
+            .reveal(5)
+            .expect("the position is within the committed slots");
         assert!(reg
             .root
             .verify_membership(v.id, 5, &cred.preimage, &cred.path));
@@ -327,7 +334,9 @@ mod tests {
             let slot = crate::epoch::slot_in_epoch(height, epoch_len);
             let rotated = base.rotate_to(epoch);
             let reg = Registration::of(&rotated);
-            let cred = rotated.reveal(slot);
+            let cred = rotated
+                .reveal(slot)
+                .expect("the position is within the committed slots");
             assert!(
                 reg.root
                     .verify_membership(rotated.id, slot, &cred.preimage, &cred.path),

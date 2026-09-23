@@ -24,7 +24,9 @@ fn a_published_root_is_bound_to_the_id_that_committed_it() {
     assert_ne!(a.root(), c.root());
 
     let slot = 3;
-    let cred = a.reveal(slot);
+    let cred = a
+        .reveal(slot)
+        .expect("the position is within the committed slots");
     assert!(
         verify_membership(&a.root(), a.id, slot, &cred),
         "the holder opens its own credential"
@@ -40,7 +42,9 @@ fn registering_another_validators_root_admits_nothing() {
     let victim = SamplerValidator::from_secret(1, &[0xc1u8; 32], 100);
     let thief = SamplerValidator::from_secret(2, &[0xc2u8; 32], 100);
     let slot = 6;
-    let stolen = victim.reveal(slot);
+    let stolen = victim
+        .reveal(slot)
+        .expect("the position is within the committed slots");
     let victim_root = victim.root();
 
     assert!(
@@ -78,8 +82,12 @@ fn two_independent_secrets_are_independent() {
     );
 
     let slot = 3;
-    let ra = a.reveal(slot);
-    let rb = b.reveal(slot);
+    let ra = a
+        .reveal(slot)
+        .expect("the position is within the committed slots");
+    let rb = b
+        .reveal(slot)
+        .expect("the position is within the committed slots");
     assert!(verify_membership(&a.root(), a.id, slot, &ra));
     assert!(verify_membership(&b.root(), b.id, slot, &rb));
     assert!(!verify_membership(&b.root(), b.id, slot, &ra));
@@ -94,7 +102,9 @@ fn a_party_with_only_the_public_root_cannot_produce_a_valid_reveal() {
     let slot = 5;
 
     let impostor = SamplerValidator::from_secret(1, &[0xb2u8; 32], 100);
-    let forged = impostor.reveal(slot);
+    let forged = impostor
+        .reveal(slot)
+        .expect("the position is within the committed slots");
 
     assert!(!verify_membership(&victim_root, victim.id, slot, &forged));
     assert!(!verify_selection(
@@ -109,7 +119,9 @@ fn a_party_with_only_the_public_root_cannot_produce_a_valid_reveal() {
         &forged,
     ));
 
-    let honest = victim.reveal(slot);
+    let honest = victim
+        .reveal(slot)
+        .expect("the position is within the committed slots");
     assert!(verify_selection(
         &victim_root,
         victim.id,
@@ -131,8 +143,14 @@ fn the_committee_is_not_computable_in_advance_without_the_secrets() {
     let one = SamplerValidator::from_secret(1, &[0x10u8; 32], 100);
     let two = SamplerValidator::from_secret(1, &[0x20u8; 32], 100);
 
-    let out_one = one.reveal(slot).value(&beacon, DOMAIN_COMMITTEE, slot);
-    let out_two = two.reveal(slot).value(&beacon, DOMAIN_COMMITTEE, slot);
+    let out_one = one
+        .reveal(slot)
+        .expect("the position is within the committed slots")
+        .value(&beacon, DOMAIN_COMMITTEE, slot);
+    let out_two = two
+        .reveal(slot)
+        .expect("the position is within the committed slots")
+        .value(&beacon, DOMAIN_COMMITTEE, slot);
     assert_ne!(
         out_one, out_two,
         "the draw is fixed by the secret, so public fields cannot predict it"

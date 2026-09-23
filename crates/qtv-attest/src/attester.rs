@@ -109,7 +109,7 @@ impl Attester {
         self.sampler.root()
     }
 
-    pub fn reveal(&self, slot: u64) -> qtv_sampler::sortition::Credential {
+    pub fn reveal(&self, slot: u64) -> Option<qtv_sampler::sortition::Credential> {
         self.sampler.reveal(slot)
     }
 
@@ -122,10 +122,10 @@ impl Attester {
         committee: CommitteeDigest,
         block: Block,
         beacon: &Beacon,
-    ) -> Attestation {
+    ) -> Option<Attestation> {
         let _ = beacon;
-        let membership = self.sampler.reveal(slot);
-        Attestation::create(
+        let membership = self.sampler.reveal(slot)?;
+        Some(Attestation::create(
             &self.signer,
             chain_id,
             height,
@@ -134,7 +134,7 @@ impl Attester {
             committee,
             block,
             membership,
-        )
+        ))
     }
 }
 
@@ -177,7 +177,9 @@ mod tests {
         let a = Attester::new(1, 100);
         let beacon = Beacon::genesis();
         let block = Block::new(1, [7u8; 32], Parent::Genesis);
-        let att = a.attest(1, 1, 0, 0, [0u8; 32], block, &beacon);
+        let att = a
+            .attest(1, 1, 0, 0, [0u8; 32], block, &beacon)
+            .expect("the attester serves this slot");
         assert_eq!(att.from, a.id());
         assert!(att.signature_verifies(1, a.attest_public_key()));
         assert!(att.is_entitled(&a.root(), &beacon, a.weight(), a.weight(), 100));
@@ -202,7 +204,9 @@ mod tests {
         let beacon = Beacon::genesis();
         let block = Block::new(1, [7u8; 32], Parent::Genesis);
         let slot = 4000;
-        let att = a.attest(1, 1, slot, 0, [0u8; 32], block, &beacon);
+        let att = a
+            .attest(1, 1, slot, 0, [0u8; 32], block, &beacon)
+            .expect("the attester serves this slot");
         assert_eq!(att.membership.path.siblings.len(), 12);
         assert!(att.signature_verifies(1, a.attest_public_key()));
         assert!(att.is_entitled(&a.root(), &beacon, a.weight(), a.weight(), 100));
@@ -246,7 +250,9 @@ mod tests {
         let p = Attester::prover(9);
         let beacon = Beacon::genesis();
         let block = Block::new(1, [7u8; 32], Parent::Genesis);
-        let att = p.attest(1, 1, 0, 0, [0u8; 32], block, &beacon);
+        let att = p
+            .attest(1, 1, 0, 0, [0u8; 32], block, &beacon)
+            .expect("the attester serves this slot");
         assert_eq!(p.weight(), 0);
         assert!(att.signature_verifies(1, p.attest_public_key()));
         assert!(!att.is_entitled(&p.root(), &beacon, 0, 100, 100));

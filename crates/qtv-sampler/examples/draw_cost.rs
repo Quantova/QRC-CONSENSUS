@@ -23,7 +23,9 @@ fn draw_cost(slots: u64) -> (usize, f64, f64) {
     let root = v.root();
     let beacon = Beacon::genesis();
     let slot = slots / 2;
-    let cred: Credential = v.reveal(slot);
+    let cred: Credential = v
+        .reveal(slot)
+        .expect("the position is within the committed slots");
 
     let draw = ns_per_op(1_000_000, || {
         black_box(cred.value(black_box(&beacon), DOMAIN_COMMITTEE, slot));

@@ -23,6 +23,7 @@ fn committee(members: &[Attester]) -> CommitteeCommitment {
 fn old_style_draw(slot: u64) -> Credential {
     let depth = SamplerValidator::new(999, STAKE)
         .reveal(slot)
+        .expect("the position is within the committed slots")
         .path
         .siblings
         .len();
@@ -44,7 +45,10 @@ fn the_consensus_verification_rejects_an_old_mechanism_membership_draw() {
 
     let mut atts: Vec<_> = members[..3]
         .iter()
-        .map(|a| a.attest(1, 1, 0, 0, commitment.digest(), block, &beacon))
+        .map(|a| {
+            a.attest(1, 1, 0, 0, commitment.digest(), block, &beacon)
+                .expect("the attester serves this slot")
+        })
         .collect();
     let good = Certificate::new(Envelope::new(1, 0, block, &commitment), atts.clone());
     assert_eq!(good.verify(1, &commitment, &beacon, 3), Verdict::Verified);
@@ -66,7 +70,10 @@ fn aggregation_drops_an_old_mechanism_membership_draw() {
 
     let genuine: Vec<_> = members[..3]
         .iter()
-        .map(|a| a.attest(1, 1, 0, 0, commitment.digest(), block, &beacon))
+        .map(|a| {
+            a.attest(1, 1, 0, 0, commitment.digest(), block, &beacon)
+                .expect("the attester serves this slot")
+        })
         .collect();
     assert!(aggregate(1, 1, 0, block, &commitment, &beacon, &genuine, 3).is_some());
 
@@ -79,7 +86,9 @@ fn aggregation_drops_an_old_mechanism_membership_draw() {
 fn leader_eligibility_rejects_an_old_mechanism_draw() {
     let leader = SamplerValidator::new(1, STAKE);
     let root = leader.root();
-    let genuine = leader.reveal(0);
+    let genuine = leader
+        .reveal(0)
+        .expect("the position is within the committed slots");
     assert!(verify_leader(&root, leader.id, 0, &genuine));
     assert!(!verify_leader(&root, leader.id, 0, &old_style_draw(0)));
 }

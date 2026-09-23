@@ -15,8 +15,12 @@ fn the_draw_is_a_deterministic_hash_with_no_randomizer() {
     let v = SamplerValidator::new(1, 2_000);
     let beacon = Beacon::genesis();
 
-    let first = v.reveal(0);
-    let second = v.reveal(0);
+    let first = v
+        .reveal(0)
+        .expect("the position is within the committed slots");
+    let second = v
+        .reveal(0)
+        .expect("the position is within the committed slots");
     assert_eq!(first, second, "the reveal is fixed for a slot");
 
     let out_a = first.output(&beacon, DOMAIN_COMMITTEE, 0);
@@ -30,7 +34,9 @@ fn the_committed_leaf_is_the_only_valid_draw_for_a_slot() {
     let root = v.root();
     let slot = 4;
 
-    let honest = v.reveal(slot);
+    let honest = v
+        .reveal(slot)
+        .expect("the position is within the committed slots");
     assert!(
         verify_membership(&root, v.id, slot, &honest),
         "the committed leaf authenticates"
@@ -59,7 +65,9 @@ fn a_second_draw_revealed_for_one_slot_is_rejected() {
     let root = v.root();
     let slot = 2;
 
-    let honest = v.reveal(slot);
+    let honest = v
+        .reveal(slot)
+        .expect("the position is within the committed slots");
     assert!(verify_selection(
         &root,
         v.id,
@@ -72,8 +80,13 @@ fn a_second_draw_revealed_for_one_slot_is_rejected() {
         &honest,
     ));
 
-    let mut second = v.reveal(slot);
-    second.preimage = v.reveal(7).preimage;
+    let mut second = v
+        .reveal(slot)
+        .expect("the position is within the committed slots");
+    second.preimage = v
+        .reveal(7)
+        .expect("the position is within the committed slots")
+        .preimage;
     assert!(!verify_selection(
         &root,
         v.id,
@@ -93,7 +106,9 @@ fn a_preimage_used_out_of_its_position_is_rejected() {
     let beacon = Beacon::genesis();
     let root = v.root();
 
-    let out_of_place = v.reveal_out_of_position(3, 7);
+    let out_of_place = v
+        .reveal_out_of_position(3, 7)
+        .expect("the position is within the committed slots");
     assert!(!verify_selection(
         &root,
         v.id,
@@ -106,7 +121,9 @@ fn a_preimage_used_out_of_its_position_is_rejected() {
         &out_of_place,
     ));
 
-    let in_place = v.reveal(3);
+    let in_place = v
+        .reveal(3)
+        .expect("the position is within the committed slots");
     assert!(verify_selection(
         &root,
         v.id,
@@ -131,7 +148,9 @@ fn a_draw_against_a_root_not_in_the_registry_is_rejected() {
     let beacon = Beacon::genesis();
 
     let outsider = SamplerValidator::new(3, 100);
-    let cred = outsider.reveal(0);
+    let cred = outsider
+        .reveal(0)
+        .expect("the position is within the committed slots");
 
     assert!(
         reg.registration(3).is_none(),

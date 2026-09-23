@@ -27,7 +27,10 @@ fn measure(committee_size: usize) {
 
     let attestations: Vec<Attestation> = attesters
         .iter()
-        .map(|a| a.attest(1, 1, 0, 0, commitment.digest(), block, &beacon))
+        .map(|a| {
+            a.attest(1, 1, 0, 0, commitment.digest(), block, &beacon)
+                .expect("the attester serves this slot")
+        })
         .collect();
 
     let t0 = Instant::now();
