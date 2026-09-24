@@ -105,3 +105,43 @@ fn a_certificate_whose_height_is_not_its_blocks_height_is_refused() {
         Verdict::Rejected(RejectReason::HeightMismatch)
     );
 }
+
+#[test]
+fn a_commitment_that_makes_entitlement_vacuous_is_refused() {
+    let (members, beacon, block, commitment) = setup();
+    let atts = quorum_attestations(&members, &beacon, block, commitment.digest());
+
+    let mut thin = commitment.clone();
+    thin.total_weight = commitment.committee_weight() - 1;
+    let cert = Certificate::new(Envelope::new(1, 0, block, &thin), atts.clone());
+    assert_eq!(
+        cert.verify(1, &thin, &beacon, 3),
+        Verdict::Rejected(RejectReason::BadCommitment),
+        "a denominator under the committee's own weight is not a draw"
+    );
+
+    let mut starved = commitment.clone();
+    starved.budget = 0;
+    let cert = Certificate::new(Envelope::new(1, 0, block, &starved), atts.clone());
+    assert_eq!(
+        cert.verify(1, &starved, &beacon, 3),
+        Verdict::Rejected(RejectReason::BadCommitment),
+        "a zero budget draws nobody"
+    );
+
+    let mut greedy = commitment.clone();
+    greedy.budget = qtv_sampler::params::COMMITTEE_BUDGET + 1;
+    let cert = Certificate::new(Envelope::new(1, 0, block, &greedy), atts.clone());
+    assert_eq!(
+        cert.verify(1, &greedy, &beacon, 3),
+        Verdict::Rejected(RejectReason::BadCommitment),
+        "a budget past the protocol's saturates the threshold"
+    );
+
+    for bad in [&thin, &starved, &greedy] {
+        assert!(
+            qtv_attest::aggregate::aggregate(1, 1, 0, block, bad, &beacon, &atts, 3).is_none(),
+            "a certificate must not be built from a commitment verification refuses"
+        );
+    }
+}

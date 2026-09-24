@@ -108,6 +108,12 @@ fn aggregate_budgeted(
     tau: u64,
     cap: u64,
 ) -> (Option<Certificate>, u64) {
+    if commitment.total_weight < commitment.committee_weight()
+        || commitment.budget == 0
+        || commitment.budget > qtv_sampler::params::COMMITTEE_BUDGET
+    {
+        return (None, 0);
+    }
     let mut groups: Vec<(ValidatorId, Vec<&Attestation>)> = Vec::new();
     for att in attestations {
         if att.height != height || att.slot != slot || att.block != block {
