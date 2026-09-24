@@ -17,6 +17,8 @@ pub enum RejectReason {
     DuplicateAttester,
     NotAQuorum,
     MixedViews,
+    BadCommitment,
+    HeightMismatch,
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -65,6 +67,15 @@ fn verify_body(
     if envelope.slot != commitment.slot {
         return Verdict::Rejected(RejectReason::CommitmentMismatch);
     }
+    if commitment.total_weight < commitment.committee_weight()
+        || commitment.budget == 0
+        || commitment.budget > qtv_sampler::params::COMMITTEE_BUDGET
+    {
+        return Verdict::Rejected(RejectReason::BadCommitment);
+    }
+    if envelope.height != envelope.block.height {
+        return Verdict::Rejected(RejectReason::HeightMismatch);
+    }
     let view = attestations.first().map(|att| att.view);
     let mut seen: Vec<u64> = Vec::new();
     for att in attestations {
@@ -95,7 +106,7 @@ fn verify_body(
             return Verdict::Rejected(RejectReason::NotEntitled);
         }
         if seen.contains(&att.from) {
-            return Verdict::Rejected(RejectReason::DuplicateAttester);
+            continue;
         }
         seen.push(att.from);
     }

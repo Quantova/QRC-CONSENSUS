@@ -46,13 +46,22 @@ impl CommitteeCommitment {
         Self::from_member_keys(slot, members, budget)
     }
 
-    pub fn from_member_keys(slot: u64, mut members: Vec<MemberKey>, budget: u64) -> Self {
-        members.sort_by_key(|m| m.id);
-        members.dedup_by_key(|m| m.id);
-        let total_weight = members
+    pub fn from_member_keys(slot: u64, members: Vec<MemberKey>, budget: u64) -> Self {
+        let total = members
             .iter()
             .map(|m| m.weight)
             .fold(0u64, u64::saturating_add);
+        Self::from_member_keys_with_total(slot, members, budget, total)
+    }
+
+    pub fn from_member_keys_with_total(
+        slot: u64,
+        mut members: Vec<MemberKey>,
+        budget: u64,
+        total_weight: u64,
+    ) -> Self {
+        members.sort_by_key(|m| m.id);
+        members.dedup_by_key(|m| m.id);
         CommitteeCommitment {
             slot,
             total_weight,

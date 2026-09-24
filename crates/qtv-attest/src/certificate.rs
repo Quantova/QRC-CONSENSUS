@@ -68,8 +68,18 @@ impl Certificate {
         buf.extend_from_slice(&(self.attestations.len() as u64).to_le_bytes());
         for a in &self.attestations {
             buf.extend_from_slice(&a.from.to_le_bytes());
-            buf.extend_from_slice(&a.membership.to_bytes());
+            let membership = a.membership.to_bytes();
+            buf.extend_from_slice(&(membership.len() as u64).to_le_bytes());
+            buf.extend_from_slice(&membership);
+            buf.extend_from_slice(&(a.sig.len() as u64).to_le_bytes());
             buf.extend_from_slice(&a.sig);
+        }
+        buf.extend_from_slice(&(self.committee_reveals.len() as u64).to_le_bytes());
+        for reveal in &self.committee_reveals {
+            buf.extend_from_slice(&reveal.id.to_le_bytes());
+            let bytes = reveal.credential.to_bytes();
+            buf.extend_from_slice(&(bytes.len() as u64).to_le_bytes());
+            buf.extend_from_slice(&bytes);
         }
         let mut out = [0u8; 32];
         shake256(&buf, &mut out);

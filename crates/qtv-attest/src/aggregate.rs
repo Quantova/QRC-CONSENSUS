@@ -13,6 +13,8 @@ use crate::params::COMMITTEE_BUDGET;
 
 pub const MAX_ATTEST_VERIFICATIONS_PER_ROUND: u64 = 4 * COMMITTEE_BUDGET;
 
+pub const MAX_CANDIDATES_PER_MEMBER: usize = 4;
+
 pub fn aggregate(
     chain_id: u64,
     height: Height,
@@ -62,7 +64,8 @@ pub fn aggregate(
 }
 
 fn verification_cap(commitment: &CommitteeCommitment) -> u64 {
-    MAX_ATTEST_VERIFICATIONS_PER_ROUND.max(commitment.len() as u64)
+    let per_member = commitment.len().saturating_mul(MAX_CANDIDATES_PER_MEMBER) as u64;
+    per_member.max(commitment.len() as u64)
 }
 
 #[cfg(test)]
@@ -117,7 +120,13 @@ fn aggregate_budgeted(
             continue;
         }
         match groups.iter_mut().find(|(id, _)| *id == att.from) {
-            Some((_, bucket)) => bucket.push(*att),
+            Some((_, bucket)) => {
+                if bucket.len() < MAX_CANDIDATES_PER_MEMBER
+                    && !bucket.iter().any(|held| held.sig == att.sig)
+                {
+                    bucket.push(*att);
+                }
+            }
             None => groups.push((att.from, vec![*att])),
         }
     }
@@ -644,10 +653,13 @@ mod tests {
             cert.verify(1, &commitment, &beacon, TAU).is_verified(),
             "the certificate passes wire level verification"
         );
-        assert_eq!(
-            verifications,
-            forgeries + 3,
-            "the forgeries are the only extra work and none evicts the genuine signers"
+        assert!(
+            verifications <= (commitment.len() * MAX_CANDIDATES_PER_MEMBER) as u64,
+            "a flood aimed at one member costs at most that member's own bound, got {verifications}"
+        );
+        assert!(
+            verifications < forgeries,
+            "identical forgeries are collapsed rather than each paid for, got {verifications}"
         );
     }
 
