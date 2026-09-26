@@ -40,22 +40,22 @@ fn a_published_root_is_bound_to_the_id_that_committed_it() {
 #[test]
 fn registering_another_validators_root_admits_nothing() {
     let victim = SamplerValidator::from_secret(1, &[0xc1u8; 32], 100);
-    let thief = SamplerValidator::from_secret(2, &[0xc2u8; 32], 100);
+    let impostor = SamplerValidator::from_secret(2, &[0xc2u8; 32], 100);
     let slot = 6;
-    let stolen = victim
+    let copied = victim
         .reveal(slot)
         .expect("the position is within the committed slots");
     let victim_root = victim.root();
 
     assert!(
-        verify_membership(&victim_root, victim.id, slot, &stolen),
+        verify_membership(&victim_root, victim.id, slot, &copied),
         "the victim's own reveal is genuine"
     );
     assert!(
-        !verify_membership(&victim_root, thief.id, slot, &stolen),
+        !verify_membership(&victim_root, impostor.id, slot, &copied),
         "registering the victim's root and replaying its reveal admits nothing"
     );
-    let _ = thief.root();
+    let _ = impostor.root();
 }
 
 #[test]
