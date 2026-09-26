@@ -25,6 +25,7 @@ pub struct CommitteeCommitment {
     pub total_weight: u64,
     pub budget: u64,
     pub members: Vec<MemberKey>,
+    pub absent_stake: u128,
 }
 
 impl CommitteeCommitment {
@@ -67,11 +68,17 @@ impl CommitteeCommitment {
             total_weight,
             budget,
             members,
+            absent_stake: 0,
         }
     }
 
     pub fn with_total_weight(mut self, total_weight: u64) -> Self {
         self.total_weight = total_weight;
+        self
+    }
+
+    pub fn with_absent_stake(mut self, absent_stake: u128) -> Self {
+        self.absent_stake = absent_stake;
         self
     }
 
@@ -95,6 +102,10 @@ impl CommitteeCommitment {
             .iter()
             .map(|m| m.stake as u128)
             .fold(0u128, u128::saturating_add)
+    }
+
+    pub fn quorum_stake(&self) -> u128 {
+        self.committee_stake().saturating_add(self.absent_stake)
     }
 
     pub fn stake_of(&self, id: ValidatorId) -> u64 {
@@ -127,6 +138,9 @@ impl CommitteeCommitment {
             buf.extend_from_slice(&m.root.digest);
             buf.extend_from_slice(&m.root.slots.to_le_bytes());
             buf.extend_from_slice(&m.attest_pk);
+        }
+        if self.absent_stake > 0 {
+            buf.extend_from_slice(&self.absent_stake.to_le_bytes());
         }
         let mut out = [0u8; 32];
         shake256(&buf, &mut out);

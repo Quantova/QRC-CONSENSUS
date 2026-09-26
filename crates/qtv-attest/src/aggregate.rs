@@ -187,7 +187,7 @@ fn aggregate_budgeted(
         .iter()
         .map(|a| commitment.stake_of(a.from) as u128)
         .fold(0u128, |acc, w| acc.saturating_add(w));
-    let committee_stake = commitment.committee_stake();
+    let committee_stake = commitment.quorum_stake();
     let weight_ok = committee_stake > 0
         && admitted_stake.saturating_mul(3) >= committee_stake.saturating_mul(2);
     let cert = if admitted.len() as u64 >= effective_tau && weight_ok {
@@ -247,6 +247,47 @@ mod tests {
             aggregate(1, 1, 0, block, &commitment, &beacon, &with_stake, TAU).is_some(),
             "the same seat count but a stake supermajority finalizes"
         );
+    }
+
+    #[test]
+    fn leaving_certain_validators_out_of_the_committee_cannot_shrink_the_quorum() {
+        let a = Attester::new(1, 10);
+        let b = Attester::new(2, 10);
+        let c = Attester::new(3, 10);
+        let beacon = Beacon::genesis();
+        let block = Block::new(1, [9u8; 32], Parent::Genesis);
+        let chosen = CommitteeCommitment::from_attesters_with_budget(0, &[&a, &b, &c], 40);
+        let honest = chosen.clone().with_absent_stake(100);
+        assert_ne!(chosen.digest(), honest.digest());
+        let votes: Vec<_> = [&a, &b, &c]
+            .iter()
+            .map(|x| {
+                x.attest(1, 1, 0, 0, honest.digest(), block, &beacon)
+                    .expect("the attester serves this slot")
+            })
+            .collect();
+        assert!(aggregate(1, 1, 0, block, &honest, &beacon, &votes, TAU).is_none());
+        let cert = aggregate(
+            1,
+            1,
+            0,
+            block,
+            &honest.clone().with_absent_stake(0),
+            &beacon,
+            &votes,
+            TAU,
+        );
+        assert!(cert.is_none());
+        let own: Vec<_> = [&a, &b, &c]
+            .iter()
+            .map(|x| {
+                x.attest(1, 1, 0, 0, chosen.digest(), block, &beacon)
+                    .expect("the attester serves this slot")
+            })
+            .collect();
+        let forged = aggregate(1, 1, 0, block, &chosen, &beacon, &own, TAU)
+            .expect("the attackers' own committee aggregates");
+        assert!(!forged.verify(1, &honest, &beacon, TAU).is_verified());
     }
 
     #[test]

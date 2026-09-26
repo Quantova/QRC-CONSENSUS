@@ -76,6 +76,9 @@ fn verify_body(
     if envelope.height != envelope.block.height {
         return Verdict::Rejected(RejectReason::HeightMismatch);
     }
+    if attestations.len() > commitment.len() {
+        return Verdict::Rejected(RejectReason::NotAQuorum);
+    }
     let view = attestations.first().map(|att| att.view);
     let mut seen: Vec<u64> = Vec::new();
     for att in attestations {
@@ -88,6 +91,9 @@ fn verify_body(
         }
         if att.committee != committee_digest {
             return Verdict::Rejected(RejectReason::CommitmentMismatch);
+        }
+        if seen.contains(&att.from) {
+            continue;
         }
         let member = match commitment.member(att.from) {
             Some(m) => m,
@@ -105,9 +111,6 @@ fn verify_body(
         ) {
             return Verdict::Rejected(RejectReason::NotEntitled);
         }
-        if seen.contains(&att.from) {
-            continue;
-        }
         seen.push(att.from);
     }
     let effective_tau = tau.max(qtv_sampler::params::finality_threshold(
@@ -117,7 +120,7 @@ fn verify_body(
         .iter()
         .map(|id| commitment.stake_of(*id) as u128)
         .fold(0u128, |acc, w| acc.saturating_add(w));
-    let committee_stake = commitment.committee_stake();
+    let committee_stake = commitment.quorum_stake();
     let weight_ok =
         committee_stake > 0 && seen_stake.saturating_mul(3) >= committee_stake.saturating_mul(2);
     if seen.len() as u64 >= effective_tau && weight_ok {
