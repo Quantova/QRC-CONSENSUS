@@ -9,8 +9,6 @@ pub const SEED_BYTES: usize = 32;
 
 const REVEAL_BEACON_DOMAIN: &[u8] = b"QORUS/beacon/reveals";
 
-const REVEAL_TICKET_DOMAIN: &[u8] = b"QORUS/beacon/ticket";
-
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct Beacon {
     seed: [u8; SEED_BYTES],
@@ -43,36 +41,22 @@ impl Beacon {
     }
 
     pub fn advance_from_reveals(&self, slot: u64, reveals: &[[u8; PREIMAGE_BYTES]]) -> Beacon {
-        let chosen = reveals
-            .iter()
-            .min_by_key(|reveal| self.ticket(slot, reveal));
-        let mut input =
-            Vec::with_capacity(SEED_BYTES + REVEAL_BEACON_DOMAIN.len() + 9 + PREIMAGE_BYTES);
+        let mut folded: Vec<&[u8; PREIMAGE_BYTES]> = reveals.iter().collect();
+        folded.sort_unstable();
+        folded.dedup();
+        let mut input = Vec::with_capacity(
+            SEED_BYTES + REVEAL_BEACON_DOMAIN.len() + 16 + folded.len() * PREIMAGE_BYTES,
+        );
         input.extend_from_slice(&self.seed);
         input.extend_from_slice(REVEAL_BEACON_DOMAIN);
         input.extend_from_slice(&slot.to_le_bytes());
-        match chosen {
-            Some(reveal) => {
-                input.push(1);
-                input.extend_from_slice(reveal);
-            }
-            None => input.push(0),
+        input.extend_from_slice(&(folded.len() as u64).to_le_bytes());
+        for reveal in folded {
+            input.extend_from_slice(reveal);
         }
         let mut next = [0u8; SEED_BYTES];
         shake256(&input, &mut next);
         Beacon { seed: next }
-    }
-
-    fn ticket(&self, slot: u64, reveal: &[u8; PREIMAGE_BYTES]) -> [u8; SEED_BYTES] {
-        let mut input =
-            Vec::with_capacity(SEED_BYTES + REVEAL_TICKET_DOMAIN.len() + 8 + PREIMAGE_BYTES);
-        input.extend_from_slice(&self.seed);
-        input.extend_from_slice(REVEAL_TICKET_DOMAIN);
-        input.extend_from_slice(&slot.to_le_bytes());
-        input.extend_from_slice(reveal);
-        let mut ticket = [0u8; SEED_BYTES];
-        shake256(&input, &mut ticket);
-        ticket
     }
 
     pub fn sortition_input(&self, domain: &[u8], slot: u64) -> Vec<u8> {
@@ -113,7 +97,7 @@ mod tests {
     }
 
     #[test]
-    fn advance_from_reveals_follows_only_the_lowest_ticket() {
+    fn advance_from_reveals_folds_every_reveal() {
         let b = Beacon::genesis();
         let reveals = [
             [1u8; PREIMAGE_BYTES],
@@ -128,28 +112,14 @@ mod tests {
             b.advance_from_reveals(5, &reveals),
             b.advance_from_reveals(6, &reveals)
         );
-        let lowest = reveals
-            .iter()
-            .position(|r| reveals.iter().all(|o| b.ticket(5, r) <= b.ticket(5, o)))
-            .unwrap();
-        let without_lowest: Vec<_> = reveals
-            .iter()
-            .enumerate()
-            .filter(|(i, _)| *i != lowest)
-            .map(|(_, r)| *r)
-            .collect();
-        assert_ne!(
-            b.advance_from_reveals(5, &reveals),
-            b.advance_from_reveals(5, &without_lowest)
-        );
-        for skip in (0..reveals.len()).filter(|i| *i != lowest) {
+        for skip in 0..reveals.len() {
             let withheld: Vec<_> = reveals
                 .iter()
                 .enumerate()
                 .filter(|(i, _)| *i != skip)
                 .map(|(_, r)| *r)
                 .collect();
-            assert_eq!(
+            assert_ne!(
                 b.advance_from_reveals(5, &reveals),
                 b.advance_from_reveals(5, &withheld)
             );
@@ -159,6 +129,12 @@ mod tests {
         assert_eq!(
             b.advance_from_reveals(5, &reveals),
             b.advance_from_reveals(5, &reordered)
+        );
+        let mut stuffed = reveals.to_vec();
+        stuffed.push(reveals[0]);
+        assert_eq!(
+            b.advance_from_reveals(5, &reveals),
+            b.advance_from_reveals(5, &stuffed)
         );
         let other = Beacon::from_seed([9u8; SEED_BYTES]);
         assert_ne!(
