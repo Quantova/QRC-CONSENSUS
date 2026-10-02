@@ -131,23 +131,18 @@ impl CommitteeView {
 
     pub fn stake_cap(&self) -> u64 {
         *self.cap.get_or_init(|| {
-            let mut eligible: Vec<u64> = self
+            let total: u128 = self
                 .registrations
                 .iter()
                 .map(|r| r.weight)
                 .filter(|&w| w >= self.floor)
-                .collect();
-            if eligible.is_empty() {
+                .map(u128::from)
+                .sum();
+            if total == 0 {
                 return self.floor;
             }
-            eligible.sort_unstable();
-            let median = eligible[eligible.len() / 2];
-            let total: u128 = eligible.iter().map(|&w| u128::from(w)).sum();
             let share = u64::try_from(total / u128::from(STAKE_CAP_MULTIPLE)).unwrap_or(u64::MAX);
-            median
-                .saturating_mul(STAKE_CAP_MULTIPLE)
-                .max(share)
-                .max(self.floor)
+            share.max(self.floor)
         })
     }
 
