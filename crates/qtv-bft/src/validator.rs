@@ -3,7 +3,9 @@
 
 use core::fmt;
 
-use qtv_crypto::ml_dsa::{keygen_into, sign, PublicKey, SecretKey, Signature, SECRET_KEY_BYTES};
+use qtv_crypto::ml_dsa::{
+    keygen_into, sign, sign_os, PublicKey, SecretKey, Signature, SECRET_KEY_BYTES,
+};
 use qtv_crypto::sha3::shake256;
 
 pub type ValidatorId = u64;
@@ -138,6 +140,10 @@ impl Validator {
 
     pub fn sign(&self, message: &[u8], context: &[u8]) -> Signature {
         sign(self.sk.expose(), message, context, &[0u8; 32]).expect("context within bound")
+    }
+
+    pub fn sign_hedged(&self, message: &[u8], context: &[u8]) -> Signature {
+        sign_os(self.sk.expose(), message, context).expect("context within bound")
     }
 }
 

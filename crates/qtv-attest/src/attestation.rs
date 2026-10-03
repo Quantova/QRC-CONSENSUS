@@ -54,7 +54,7 @@ impl Attestation {
         membership: Credential,
     ) -> Self {
         let msg = attestation_message(chain_id, height, slot, view, &committee, &block);
-        let sig = signer.sign(&msg, ATTEST_CONTEXT);
+        let sig = signer.sign_hedged(&msg, ATTEST_CONTEXT);
         Attestation {
             from: signer.id,
             height,
