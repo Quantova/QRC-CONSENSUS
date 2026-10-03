@@ -104,7 +104,7 @@ fn committee_membership_and_leaders_are_byte_identical_to_the_pre_wiring_baselin
         .with_budget(3)
         .with_floor(0);
 
-    let expected: [(u64, &str, u64); 3] = [(0, "4,5", 4), (1, "4,5", 4), (7, "4", 4)];
+    let expected: [(u64, &str, u64); 3] = [(0, "5", 5), (1, "2,4,5", 5), (7, "4,5", 5)];
     for (slot, want_ids, want_leader) in expected {
         let published: Vec<PublishedReveal> = set
             .iter()

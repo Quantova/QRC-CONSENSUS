@@ -202,14 +202,21 @@ impl CommitteeView {
         published: &[PublishedReveal],
     ) -> Committee {
         let total = self.total_weight();
+        let by_id: std::collections::HashMap<ValidatorId, &Registration> = self
+            .registrations
+            .iter()
+            .filter(|r| r.weight >= self.floor)
+            .map(|r| (r.id, r))
+            .collect();
         let mut members: Vec<Member> = Vec::new();
+        let mut added: std::collections::HashSet<ValidatorId> = std::collections::HashSet::new();
         for reveal in published {
-            if members.iter().any(|m| m.id == reveal.id) {
+            if added.contains(&reveal.id) {
                 continue;
             }
-            let reg = match self.registration(reveal.id) {
-                Some(reg) if reg.weight >= self.floor => reg,
-                _ => continue,
+            let reg = match by_id.get(&reveal.id) {
+                Some(reg) => *reg,
+                None => continue,
             };
             if !verify_selection(
                 &reg.root,
@@ -224,6 +231,7 @@ impl CommitteeView {
             ) {
                 continue;
             }
+            added.insert(reveal.id);
             members.push(Member {
                 id: reveal.id,
                 weight: self.effective_weight(reg.weight),
