@@ -89,7 +89,7 @@ impl Attester {
     pub fn epoch_registration(&self, chain_id: u64, epoch: u64) -> (Root, Signature) {
         let root = self.sampler.rotate_to(epoch).root();
         let msg = epoch_registration_message(chain_id, self.id(), epoch, &root);
-        let sig = self.signer.sign_hedged(&msg, EPOCH_REG_CONTEXT);
+        let sig = self.signer.sign(&msg, EPOCH_REG_CONTEXT);
         (root, sig)
     }
 
