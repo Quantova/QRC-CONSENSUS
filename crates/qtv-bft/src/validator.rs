@@ -23,10 +23,11 @@ pub enum Fault {
 
 pub(crate) fn wipe(buf: &mut [u8]) {
     for slot in buf.iter_mut() {
-        *slot = 0;
+        unsafe {
+            core::ptr::write_volatile(slot, 0u8);
+        }
     }
     core::sync::atomic::compiler_fence(core::sync::atomic::Ordering::SeqCst);
-    let _ = core::hint::black_box(&*buf);
 }
 
 const SIGNING_KEY_DOMAIN: &[u8] = b"QORUS/validator-keying/v1/ml-dsa-65-signing";
@@ -69,10 +70,11 @@ impl Clone for SigningKey {
 impl Drop for SigningKey {
     fn drop(&mut self) {
         for slot in self.bytes.iter_mut() {
-            *slot = 0;
+            unsafe {
+                core::ptr::write_volatile(slot, 0u8);
+            }
         }
         core::sync::atomic::compiler_fence(core::sync::atomic::Ordering::SeqCst);
-        let _ = core::hint::black_box(&self.bytes);
     }
 }
 

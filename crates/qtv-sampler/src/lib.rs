@@ -16,8 +16,9 @@ pub mod validator;
 
 pub(crate) fn wipe(buf: &mut [u8]) {
     for slot in buf.iter_mut() {
-        *slot = 0;
+        unsafe {
+            core::ptr::write_volatile(slot, 0u8);
+        }
     }
     core::sync::atomic::compiler_fence(core::sync::atomic::Ordering::SeqCst);
-    let _ = core::hint::black_box(&*buf);
 }

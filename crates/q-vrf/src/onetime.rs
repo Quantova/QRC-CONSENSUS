@@ -65,10 +65,11 @@ pub struct MerklePath {
 
 fn wipe(bytes: &mut [u8]) {
     for slot in bytes.iter_mut() {
-        *slot = 0;
+        unsafe {
+            core::ptr::write_volatile(slot, 0u8);
+        }
     }
     core::sync::atomic::compiler_fence(core::sync::atomic::Ordering::SeqCst);
-    let _ = core::hint::black_box(bytes);
 }
 
 pub fn derive_preimage(seed: &[u8; 32], position: u64) -> [u8; PREIMAGE_BYTES] {
