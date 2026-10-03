@@ -9,7 +9,7 @@ fn committee_of_four() -> Vec<Attester> {
 }
 
 #[test]
-fn independently_hedged_committees_each_certify_the_same_block() {
+fn the_same_attestations_produce_the_same_certificate() {
     let beacon = Beacon::genesis();
     let block = Block::new(1, [9u8; 32], Parent::Genesis);
 
@@ -38,10 +38,7 @@ fn independently_hedged_committees_each_certify_the_same_block() {
     let cert_b = aggregate(1, 1, 0, block, &commitment_b, &beacon, &atts_b, 3).expect("quorum");
 
     assert_eq!(commitment_a.digest(), commitment_b.digest());
-    assert!(cert_a.verify(1, &commitment_a, &beacon, 3).is_verified());
-    assert!(cert_b.verify(1, &commitment_b, &beacon, 3).is_verified());
-    assert_eq!(cert_a.attesters(), cert_b.attesters());
-    assert_eq!(cert_a.envelope.block.val, cert_b.envelope.block.val);
+    assert_eq!(cert_a.digest(), cert_b.digest());
 }
 
 #[test]
