@@ -14,13 +14,13 @@ pub mod params;
 pub mod verify;
 
 pub use attestation::Attestation;
-pub use equivocation::{equivocators, EquivocationProof};
 pub use attester::{
     epoch_registration_message, epoch_registration_verifies, Attester, ValidatorId,
     EPOCH_REG_CONTEXT,
 };
 pub use certificate::{Certificate, Envelope};
 pub use committee::{CommitteeCommitment, CommitteeDigest, MemberKey};
+pub use equivocation::{equivocators, EquivocationProof};
 pub use verify::{RejectReason, Verdict};
 
 pub use qtv_bft::block::{Block, Height, Parent};

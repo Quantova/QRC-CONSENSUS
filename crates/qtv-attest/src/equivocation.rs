@@ -43,7 +43,11 @@ impl EquivocationProof {
     }
 }
 
-pub fn equivocators(chain_id: u64, attestations: &[Attestation], key_of: impl Fn(ValidatorId) -> Option<PublicKey>) -> Vec<ValidatorId> {
+pub fn equivocators(
+    chain_id: u64,
+    attestations: &[Attestation],
+    key_of: impl Fn(ValidatorId) -> Option<PublicKey>,
+) -> Vec<ValidatorId> {
     let mut flagged: Vec<ValidatorId> = Vec::new();
     for (i, a) in attestations.iter().enumerate() {
         for b in &attestations[i + 1..] {

@@ -136,7 +136,10 @@ impl Attester {
         let membership = self.sampler.reveal(slot)?;
         let digest = sha3_256(&block.to_bytes());
         {
-            let mut signed = self.signed.lock().expect("the signing record is not poisoned");
+            let mut signed = self
+                .signed
+                .lock()
+                .expect("the signing record is not poisoned");
             match signed.get(&(height, view)) {
                 Some(prev) if *prev != digest => return None,
                 Some(_) => {}
