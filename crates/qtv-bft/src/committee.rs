@@ -24,7 +24,7 @@ pub fn leader(committee: &[ValidatorId], height: Height, view: View) -> Option<V
     if committee.is_empty() {
         return None;
     }
-    let index = ((height + view) as usize) % committee.len();
+    let index = (height.wrapping_add(view) as usize) % committee.len();
     Some(committee[index])
 }
 
