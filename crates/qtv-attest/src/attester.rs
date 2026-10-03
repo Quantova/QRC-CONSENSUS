@@ -159,6 +159,31 @@ impl Attester {
             membership,
         ))
     }
+
+    #[cfg(any(test, feature = "test-fixtures"))]
+    pub fn attest_forced(
+        &self,
+        chain_id: u64,
+        height: Height,
+        slot: u64,
+        view: View,
+        committee: CommitteeDigest,
+        block: Block,
+        beacon: &Beacon,
+    ) -> Option<Attestation> {
+        let _ = beacon;
+        let membership = self.sampler.reveal(slot)?;
+        Some(Attestation::create(
+            &self.signer,
+            chain_id,
+            height,
+            slot,
+            view,
+            committee,
+            block,
+            membership,
+        ))
+    }
 }
 
 #[cfg(any(test, feature = "test-fixtures"))]
