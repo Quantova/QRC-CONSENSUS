@@ -41,18 +41,20 @@ impl Beacon {
     }
 
     pub fn advance_from_reveals(&self, slot: u64, reveals: &[[u8; PREIMAGE_BYTES]]) -> Beacon {
-        let mut folded: Vec<&[u8; PREIMAGE_BYTES]> = reveals.iter().collect();
-        folded.sort_unstable();
-        folded.dedup();
-        let mut input = Vec::with_capacity(
-            SEED_BYTES + REVEAL_BEACON_DOMAIN.len() + 16 + folded.len() * PREIMAGE_BYTES,
-        );
+        let lowest = reveals.iter().min();
+        let mut input =
+            Vec::with_capacity(SEED_BYTES + REVEAL_BEACON_DOMAIN.len() + 16 + PREIMAGE_BYTES);
         input.extend_from_slice(&self.seed);
         input.extend_from_slice(REVEAL_BEACON_DOMAIN);
         input.extend_from_slice(&slot.to_le_bytes());
-        input.extend_from_slice(&(folded.len() as u64).to_le_bytes());
-        for reveal in folded {
-            input.extend_from_slice(reveal);
+        match lowest {
+            Some(reveal) => {
+                input.extend_from_slice(&1u64.to_le_bytes());
+                input.extend_from_slice(reveal);
+            }
+            None => {
+                input.extend_from_slice(&0u64.to_le_bytes());
+            }
         }
         let mut next = [0u8; SEED_BYTES];
         shake256(&input, &mut next);
@@ -97,7 +99,7 @@ mod tests {
     }
 
     #[test]
-    fn advance_from_reveals_folds_every_reveal() {
+    fn advance_from_reveals_folds_only_the_lowest_reveal() {
         let b = Beacon::genesis();
         let reveals = [
             [1u8; PREIMAGE_BYTES],
@@ -112,18 +114,25 @@ mod tests {
             b.advance_from_reveals(5, &reveals),
             b.advance_from_reveals(6, &reveals)
         );
-        for skip in 0..reveals.len() {
+        for skip in 1..reveals.len() {
             let withheld: Vec<_> = reveals
                 .iter()
                 .enumerate()
                 .filter(|(i, _)| *i != skip)
                 .map(|(_, r)| *r)
                 .collect();
-            assert_ne!(
+            assert_eq!(
                 b.advance_from_reveals(5, &reveals),
-                b.advance_from_reveals(5, &withheld)
+                b.advance_from_reveals(5, &withheld),
+                "withholding a non-lowest reveal cannot move the seed"
             );
         }
+        let without_lowest: Vec<_> = reveals[1..].to_vec();
+        assert_ne!(
+            b.advance_from_reveals(5, &reveals),
+            b.advance_from_reveals(5, &without_lowest),
+            "withholding the lowest reveal costs the holder its own seat"
+        );
         let mut reordered = reveals;
         reordered.reverse();
         assert_eq!(
