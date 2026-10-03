@@ -237,6 +237,9 @@ impl CommitteeView {
                 weight: self.effective_weight(reg.weight),
                 credential: reveal.credential.clone(),
             });
+            if added.len() == by_id.len() {
+                break;
+            }
         }
         members.sort_by_key(|m| m.id);
         Committee { members }
