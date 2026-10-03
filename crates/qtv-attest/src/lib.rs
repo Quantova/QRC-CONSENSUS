@@ -9,10 +9,12 @@ pub mod attestation;
 pub mod attester;
 pub mod certificate;
 pub mod committee;
+pub mod equivocation;
 pub mod params;
 pub mod verify;
 
 pub use attestation::Attestation;
+pub use equivocation::{equivocators, EquivocationProof};
 pub use attester::{
     epoch_registration_message, epoch_registration_verifies, Attester, ValidatorId,
     EPOCH_REG_CONTEXT,

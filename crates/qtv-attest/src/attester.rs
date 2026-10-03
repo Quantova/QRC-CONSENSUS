@@ -1,10 +1,14 @@
 // Copyright 2026 Quantova Inc
 // SPDX-License-Identifier: Apache-2.0 OR MIT
 
+use std::collections::HashMap;
+use std::sync::Mutex;
+
 use qtv_bft::block::{Block, Height};
 use qtv_bft::committee::View;
 use qtv_bft::validator::Validator;
 use qtv_crypto::ml_dsa::{verify, PublicKey, Signature};
+use qtv_crypto::sha3::sha3_256;
 use qtv_sampler::beacon::Beacon;
 use qtv_sampler::onetime::Root;
 use qtv_sampler::validator::SamplerValidator;
@@ -46,6 +50,7 @@ pub fn epoch_registration_verifies(
 pub struct Attester {
     signer: Validator,
     sampler: SamplerValidator,
+    signed: Mutex<HashMap<(Height, View), [u8; 32]>>,
 }
 
 impl Attester {
@@ -53,6 +58,7 @@ impl Attester {
         Attester {
             signer: Validator::from_secret(id, secret),
             sampler: SamplerValidator::from_secret(id, secret, stake),
+            signed: Mutex::new(HashMap::new()),
         }
     }
 
@@ -65,6 +71,7 @@ impl Attester {
         Attester {
             signer: Validator::from_secret(id, secret),
             sampler: SamplerValidator::from_secret_with_slots(id, secret, stake, slots),
+            signed: Mutex::new(HashMap::new()),
         }
     }
 
@@ -72,6 +79,7 @@ impl Attester {
         Attester {
             signer: Validator::prover_from_secret(id, secret),
             sampler: SamplerValidator::prover_from_secret(id, secret),
+            signed: Mutex::new(HashMap::new()),
         }
     }
 
@@ -79,6 +87,7 @@ impl Attester {
         Attester {
             signer: self.signer.clone(),
             sampler: self.sampler.rotate_to(epoch),
+            signed: Mutex::new(HashMap::new()),
         }
     }
 
@@ -125,6 +134,17 @@ impl Attester {
     ) -> Option<Attestation> {
         let _ = beacon;
         let membership = self.sampler.reveal(slot)?;
+        let digest = sha3_256(&block.to_bytes());
+        {
+            let mut signed = self.signed.lock().expect("the signing record is not poisoned");
+            match signed.get(&(height, view)) {
+                Some(prev) if *prev != digest => return None,
+                Some(_) => {}
+                None => {
+                    signed.insert((height, view), digest);
+                }
+            }
+        }
         Some(Attestation::create(
             &self.signer,
             chain_id,
