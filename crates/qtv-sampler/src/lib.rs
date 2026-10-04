@@ -4,6 +4,9 @@
 #![allow(clippy::map_clone)]
 #![allow(clippy::unnecessary_map_or)]
 
+#[cfg(all(feature = "test-fixtures", not(any(test, debug_assertions))))]
+compile_error!("the test-fixtures feature exposes deterministic validator secrets and must never be enabled in a release build");
+
 pub mod beacon;
 pub mod committee;
 pub mod epoch;

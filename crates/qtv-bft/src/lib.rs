@@ -1,6 +1,9 @@
 // Copyright 2026 Quantova Inc
 // SPDX-License-Identifier: Apache-2.0 OR MIT
 
+#[cfg(all(feature = "test-fixtures", not(any(test, debug_assertions))))]
+compile_error!("the test-fixtures feature exposes deterministic validator secrets and must never be enabled in a release build");
+
 #[cfg(any(test, feature = "model"))]
 pub mod attest;
 pub mod block;
