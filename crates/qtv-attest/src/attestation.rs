@@ -7,7 +7,7 @@ use qtv_bft::validator::{Validator, ValidatorId};
 use qtv_crypto::ml_dsa::{verify, PublicKey, Signature};
 use qtv_sampler::beacon::Beacon;
 use qtv_sampler::onetime::Root;
-use qtv_sampler::sortition::{verify_selection, Credential};
+use qtv_sampler::sortition::{verify_bound_selection, verify_selection, Credential};
 
 use crate::committee::CommitteeDigest;
 use crate::params::{ATTEST_CONTEXT, DOMAIN_COMMITTEE};
@@ -88,6 +88,27 @@ impl Attestation {
         budget: u64,
     ) -> bool {
         verify_selection(
+            root,
+            self.from,
+            beacon,
+            DOMAIN_COMMITTEE,
+            self.slot,
+            weight,
+            total,
+            budget,
+            &self.membership,
+        )
+    }
+
+    pub fn is_entitled_bound(
+        &self,
+        root: &Root,
+        beacon: &Beacon,
+        weight: u64,
+        total: u64,
+        budget: u64,
+    ) -> bool {
+        verify_bound_selection(
             root,
             self.from,
             beacon,

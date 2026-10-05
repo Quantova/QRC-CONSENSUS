@@ -20,6 +20,41 @@ pub fn output_value(output: &[u8; OUTPUT_BYTES]) -> u64 {
 
 const INLINE_DOMAIN: usize = 32;
 
+const BOUND_DRAW_TAG: &[u8] = b"QORUS/sortition/bound/v1";
+
+pub fn bound_sortition_output(
+    holder: u64,
+    root: &Root,
+    preimage: &[u8; PREIMAGE_BYTES],
+    beacon: &Beacon,
+    domain: &[u8],
+    slot: u64,
+) -> [u8; OUTPUT_BYTES] {
+    let mut buf = Vec::with_capacity(
+        BOUND_DRAW_TAG.len()
+            + 8
+            + domain.len()
+            + 8
+            + root.digest.len()
+            + 8
+            + PREIMAGE_BYTES
+            + SEED_BYTES
+            + 8,
+    );
+    buf.extend_from_slice(BOUND_DRAW_TAG);
+    buf.extend_from_slice(&(domain.len() as u64).to_le_bytes());
+    buf.extend_from_slice(domain);
+    buf.extend_from_slice(&holder.to_le_bytes());
+    buf.extend_from_slice(&root.digest);
+    buf.extend_from_slice(&root.slots.to_le_bytes());
+    buf.extend_from_slice(preimage);
+    buf.extend_from_slice(beacon.seed());
+    buf.extend_from_slice(&slot.to_le_bytes());
+    let mut out = [0u8; OUTPUT_BYTES];
+    shake256(&buf, &mut out);
+    out
+}
+
 pub fn sortition_output(
     preimage: &[u8; PREIMAGE_BYTES],
     beacon: &Beacon,
@@ -170,6 +205,17 @@ impl Credential {
         output_value(&self.output(beacon, domain, slot))
     }
 
+    pub fn bound_output(
+        &self,
+        holder: u64,
+        root: &Root,
+        beacon: &Beacon,
+        domain: &[u8],
+        slot: u64,
+    ) -> [u8; OUTPUT_BYTES] {
+        bound_sortition_output(holder, root, &self.preimage, beacon, domain, slot)
+    }
+
     pub fn to_bytes(&self) -> Vec<u8> {
         let mut buf =
             Vec::with_capacity(8 + PREIMAGE_BYTES + self.path.siblings.len() * PREIMAGE_BYTES);
@@ -208,6 +254,25 @@ pub fn verify_selection(
         return false;
     }
     let value = credential.value(beacon, domain, slot);
+    is_selected(value, weight, total, budget)
+}
+
+#[allow(clippy::too_many_arguments)]
+pub fn verify_bound_selection(
+    root: &Root,
+    holder: u64,
+    beacon: &Beacon,
+    domain: &[u8],
+    slot: u64,
+    weight: u64,
+    total: u64,
+    budget: u64,
+    credential: &Credential,
+) -> bool {
+    if !verify_membership(root, holder, slot, credential) {
+        return false;
+    }
+    let value = output_value(&credential.bound_output(holder, root, beacon, domain, slot));
     is_selected(value, weight, total, budget)
 }
 

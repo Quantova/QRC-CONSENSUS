@@ -9,7 +9,8 @@ use crate::params::{
     COMMITTEE_BUDGET, DOMAIN_COMMITTEE, DOMAIN_LEADER, MIN_SELF_STAKE, STAKE_CAP_MULTIPLE,
 };
 use crate::sortition::{
-    leader_neg_log2, leader_prefers, verify_membership, verify_selection, Credential,
+    leader_neg_log2, leader_prefers, verify_bound_selection, verify_membership, verify_selection,
+    Credential,
 };
 use crate::validator::{Registration, ValidatorId};
 use std::sync::OnceLock;
@@ -92,6 +93,7 @@ pub struct CommitteeView {
     budget: u64,
     floor: u64,
     cap: OnceLock<u64>,
+    bound: bool,
 }
 
 impl CommitteeView {
@@ -103,6 +105,54 @@ impl CommitteeView {
             budget: COMMITTEE_BUDGET,
             floor: MIN_SELF_STAKE,
             cap: OnceLock::new(),
+            bound: false,
+        }
+    }
+
+    pub fn with_bound_draw(mut self, bound: bool) -> Self {
+        self.bound = bound;
+        self
+    }
+
+    pub fn bound_draw(&self) -> bool {
+        self.bound
+    }
+
+    #[allow(clippy::too_many_arguments)]
+    fn draws(
+        &self,
+        root: &Root,
+        holder: ValidatorId,
+        beacon: &Beacon,
+        slot: u64,
+        weight: u64,
+        total: u64,
+        credential: &Credential,
+    ) -> bool {
+        if self.bound {
+            verify_bound_selection(
+                root,
+                holder,
+                beacon,
+                DOMAIN_COMMITTEE,
+                slot,
+                weight,
+                total,
+                self.budget,
+                credential,
+            )
+        } else {
+            verify_selection(
+                root,
+                holder,
+                beacon,
+                DOMAIN_COMMITTEE,
+                slot,
+                weight,
+                total,
+                self.budget,
+                credential,
+            )
         }
     }
 
@@ -180,15 +230,13 @@ impl CommitteeView {
         credential: &Credential,
     ) -> bool {
         match self.registration(id) {
-            Some(reg) if reg.weight >= self.floor => verify_selection(
+            Some(reg) if reg.weight >= self.floor => self.draws(
                 &reg.root,
                 id,
                 beacon,
-                DOMAIN_COMMITTEE,
                 slot,
                 self.effective_weight(reg.weight),
                 self.total_weight(),
-                self.budget,
                 credential,
             ),
             _ => false,
@@ -218,15 +266,13 @@ impl CommitteeView {
                 Some(reg) => *reg,
                 None => continue,
             };
-            if !verify_selection(
+            if !self.draws(
                 &reg.root,
                 reveal.id,
                 beacon,
-                DOMAIN_COMMITTEE,
                 slot,
                 self.effective_weight(reg.weight),
                 total,
-                self.budget,
                 &reveal.credential,
             ) {
                 continue;
@@ -251,7 +297,27 @@ impl CommitteeView {
         beacon: &Beacon,
         slot: u64,
     ) -> Option<Leader> {
-        elect_leader(committee, beacon, slot)
+        if !self.bound {
+            return elect_leader(committee, beacon, slot);
+        }
+        let mut best: Option<(u128, u64, ValidatorId, Credential)> = None;
+        for m in &committee.members {
+            let reg = self.registration(m.id)?;
+            let output = m
+                .credential
+                .bound_output(m.id, &reg.root, beacon, DOMAIN_LEADER, slot);
+            let neg_log2 = leader_neg_log2(&output);
+            let take = match &best {
+                None => true,
+                Some((bnl, bw, bid, _)) => {
+                    leader_prefers(neg_log2, m.weight, m.id, *bnl, *bw, *bid)
+                }
+            };
+            if take {
+                best = Some((neg_log2, m.weight, m.id, m.credential.clone()));
+            }
+        }
+        best.map(|(_, _, id, credential)| Leader { id, credential })
     }
 }
 
