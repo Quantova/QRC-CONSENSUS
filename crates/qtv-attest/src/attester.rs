@@ -10,7 +10,8 @@ use qtv_sampler::onetime::Root;
 use qtv_sampler::validator::SamplerValidator;
 
 use crate::attestation::Attestation;
-use crate::committee::CommitteeDigest;
+use crate::certificate::Certificate;
+use crate::committee::{CommitteeCommitment, CommitteeDigest};
 
 pub use qtv_bft::validator::ValidatorId;
 
@@ -43,6 +44,86 @@ pub fn epoch_registration_verifies(
     verify(attest_pk, &msg, sig, EPOCH_REG_CONTEXT)
 }
 
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub struct VoteLock {
+    held: Option<(Height, View, Block)>,
+}
+
+pub struct Justification<'a> {
+    pub certificate: &'a Certificate,
+    pub commitment: &'a CommitteeCommitment,
+    pub beacon: &'a Beacon,
+    pub tau: u64,
+}
+
+impl VoteLock {
+    pub fn new() -> Self {
+        VoteLock::default()
+    }
+
+    pub fn held(&self) -> Option<(Height, View, Block)> {
+        self.held
+    }
+
+    pub fn permits(
+        &self,
+        height: Height,
+        view: View,
+        block: &Block,
+        justified_at: Option<View>,
+    ) -> bool {
+        match self.held {
+            None => true,
+            Some((h, _, _)) if h < height => true,
+            Some((h, _, _)) if h > height => false,
+            Some((_, locked_view, locked_block)) => {
+                if view < locked_view {
+                    return false;
+                }
+                if locked_block == *block {
+                    return true;
+                }
+                matches!(justified_at, Some(j) if j > locked_view && j <= view)
+            }
+        }
+    }
+
+    pub fn record(&mut self, height: Height, view: View, block: Block) {
+        let replace = match self.held {
+            None => true,
+            Some((h, v, _)) => (height, view) >= (h, v),
+        };
+        if replace {
+            self.held = Some((height, view, block));
+        }
+    }
+}
+
+pub fn justification_view(
+    chain_id: u64,
+    height: Height,
+    block: &Block,
+    justification: &Justification<'_>,
+) -> Option<View> {
+    let cert = justification.certificate;
+    if cert.envelope.height != height || cert.envelope.block != *block {
+        return None;
+    }
+    let view = cert.attestations.first()?.view;
+    if !cert
+        .verify(
+            chain_id,
+            justification.commitment,
+            justification.beacon,
+            justification.tau,
+        )
+        .is_verified()
+    {
+        return None;
+    }
+    Some(view)
+}
+
 pub struct Attester {
     signer: Validator,
     sampler: SamplerValidator,
@@ -61,11 +142,11 @@ impl Attester {
         secret: &[u8; 32],
         stake: u64,
         slots: u64,
-    ) -> Self {
-        Attester {
+    ) -> Option<Self> {
+        Some(Attester {
             signer: Validator::from_secret(id, secret),
-            sampler: SamplerValidator::from_secret_with_slots(id, secret, stake, slots),
-        }
+            sampler: SamplerValidator::from_secret_with_slots(id, secret, stake, slots)?,
+        })
     }
 
     pub fn prover_from_secret(id: ValidatorId, secret: &[u8; 32]) -> Self {
@@ -89,7 +170,7 @@ impl Attester {
     pub fn epoch_registration(&self, chain_id: u64, epoch: u64) -> (Root, Signature) {
         let root = self.sampler.rotate_to(epoch).root();
         let msg = epoch_registration_message(chain_id, self.id(), epoch, &root);
-        let sig = self.signer.sign(&msg, EPOCH_REG_CONTEXT);
+        let sig = self.signer.sign_hedged(&msg, EPOCH_REG_CONTEXT);
         (root, sig)
     }
 
@@ -113,6 +194,30 @@ impl Attester {
         self.sampler.reveal(slot)
     }
 
+    #[allow(clippy::too_many_arguments)]
+    pub fn attest_locked(
+        &self,
+        lock: &mut VoteLock,
+        chain_id: u64,
+        height: Height,
+        slot: u64,
+        view: View,
+        committee: CommitteeDigest,
+        block: Block,
+        beacon: &Beacon,
+        justification: Option<&Justification<'_>>,
+    ) -> Option<Attestation> {
+        let justified_at =
+            justification.and_then(|j| justification_view(chain_id, height, &block, j));
+        if !lock.permits(height, view, &block, justified_at) {
+            return None;
+        }
+        let att = self.attest(chain_id, height, slot, view, committee, block, beacon)?;
+        lock.record(height, view, block);
+        Some(att)
+    }
+
+    #[allow(clippy::too_many_arguments)]
     pub fn attest(
         &self,
         chain_id: u64,
@@ -160,6 +265,7 @@ impl Attester {
 
     pub fn with_slots(id: ValidatorId, stake: u64, slots: u64) -> Self {
         Self::from_secret_with_slots(id, &fixture_secret(id), stake, slots)
+            .expect("a valid slot count")
     }
 
     pub fn prover(id: ValidatorId) -> Self {

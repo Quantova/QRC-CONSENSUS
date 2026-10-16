@@ -30,7 +30,7 @@ fn adversarial_preimages(count: u64) -> Vec<[u8; PREIMAGE_BYTES]> {
 
 #[test]
 fn exactly_one_output_verifies_per_key_and_position() {
-    let (sk, pk) = keygen([11u8; 32], 128, HOLDER);
+    let (sk, pk) = keygen([11u8; 32], 128, HOLDER).expect("a valid slot count");
     for position in [0u64, 1, 7, 63, 127] {
         let (y, proof) = sk
             .eval_and_prove(position)
@@ -55,7 +55,7 @@ fn exactly_one_output_verifies_per_key_and_position() {
 
 #[test]
 fn a_committed_key_cannot_be_reground_to_a_second_output() {
-    let (sk, pk) = keygen([22u8; 32], 256, HOLDER);
+    let (sk, pk) = keygen([22u8; 32], 256, HOLDER).expect("a valid slot count");
     let position = 100u64;
     let (honest_y, honest_proof) = sk
         .eval_and_prove(position)
@@ -80,8 +80,8 @@ fn a_committed_key_cannot_be_reground_to_a_second_output() {
 
 #[test]
 fn a_preimage_from_another_position_or_key_cannot_be_reused() {
-    let (sk, pk) = keygen([33u8; 32], 128, HOLDER);
-    let (other_sk, _) = keygen([34u8; 32], 128, HOLDER);
+    let (sk, pk) = keygen([33u8; 32], 128, HOLDER).expect("a valid slot count");
+    let (other_sk, _) = keygen([34u8; 32], 128, HOLDER).expect("a valid slot count");
     let position = 40u64;
     let honest = sk
         .prove(position)
@@ -108,7 +108,7 @@ const OUTPUT_LEN: usize = 32;
 
 #[test]
 fn distinct_positions_give_distinct_outputs() {
-    let (sk, _) = keygen([44u8; 32], 8192, HOLDER);
+    let (sk, _) = keygen([44u8; 32], 8192, HOLDER).expect("a valid slot count");
     let mut seen = std::collections::HashSet::new();
     for position in 0..8192u64 {
         assert!(
@@ -123,7 +123,7 @@ fn distinct_positions_give_distinct_outputs() {
 
 #[test]
 fn output_bits_are_statistically_balanced() {
-    let (sk, _) = keygen([55u8; 32], 4096, HOLDER);
+    let (sk, _) = keygen([55u8; 32], 4096, HOLDER).expect("a valid slot count");
     let mut ones = 0u64;
     let mut total_bits = 0u64;
     for position in 0..4096u64 {
@@ -142,7 +142,7 @@ fn output_bits_are_statistically_balanced() {
 
 #[test]
 fn output_byte_mean_is_near_the_uniform_mean() {
-    let (sk, _) = keygen([56u8; 32], 4096, HOLDER);
+    let (sk, _) = keygen([56u8; 32], 4096, HOLDER).expect("a valid slot count");
     let mut sum = 0u64;
     let mut n = 0u64;
     for position in 0..4096u64 {
@@ -163,7 +163,7 @@ fn output_byte_mean_is_near_the_uniform_mean() {
 
 #[test]
 fn neighbouring_outputs_are_decorrelated() {
-    let (sk, _) = keygen([57u8; 32], 2048, HOLDER);
+    let (sk, _) = keygen([57u8; 32], 2048, HOLDER).expect("a valid slot count");
     let mut total = 0u64;
     let mut pairs = 0u64;
     let mut prev = sk
@@ -186,7 +186,7 @@ fn neighbouring_outputs_are_decorrelated() {
 
 #[test]
 fn the_output_is_domain_separated_and_position_bound() {
-    let (sk, pk) = keygen([58u8; 32], 64, HOLDER);
+    let (sk, pk) = keygen([58u8; 32], 64, HOLDER).expect("a valid slot count");
     let position = 9u64;
     let proof = sk
         .prove(position)
@@ -205,7 +205,7 @@ fn the_output_is_domain_separated_and_position_bound() {
 
 #[test]
 fn an_honest_transcript_verifies() {
-    let (sk, pk) = keygen([66u8; 32], 512, HOLDER);
+    let (sk, pk) = keygen([66u8; 32], 512, HOLDER).expect("a valid slot count");
     for position in [0u64, 1, 255, 511] {
         let (y, proof) = sk
             .eval_and_prove(position)
@@ -216,7 +216,7 @@ fn an_honest_transcript_verifies() {
 
 #[test]
 fn a_tampered_authentication_path_is_rejected() {
-    let (sk, pk) = keygen([67u8; 32], 512, HOLDER);
+    let (sk, pk) = keygen([67u8; 32], 512, HOLDER).expect("a valid slot count");
     let position = 300u64;
     let (y, proof) = sk
         .eval_and_prove(position)
@@ -255,7 +255,7 @@ fn a_tampered_authentication_path_is_rejected() {
 
 #[test]
 fn a_tampered_preimage_is_rejected() {
-    let (sk, pk) = keygen([68u8; 32], 512, HOLDER);
+    let (sk, pk) = keygen([68u8; 32], 512, HOLDER).expect("a valid slot count");
     let position = 123u64;
     let (y, proof) = sk
         .eval_and_prove(position)
@@ -275,7 +275,7 @@ fn a_tampered_preimage_is_rejected() {
 
 #[test]
 fn a_tampered_output_is_rejected() {
-    let (sk, pk) = keygen([69u8; 32], 256, HOLDER);
+    let (sk, pk) = keygen([69u8; 32], 256, HOLDER).expect("a valid slot count");
     let position = 200u64;
     let (y, proof) = sk
         .eval_and_prove(position)
@@ -289,7 +289,7 @@ fn a_tampered_output_is_rejected() {
 
 #[test]
 fn a_proof_for_one_position_does_not_validate_another() {
-    let (sk, pk) = keygen([70u8; 32], 256, HOLDER);
+    let (sk, pk) = keygen([70u8; 32], 256, HOLDER).expect("a valid slot count");
     let source = 30u64;
     let (y_source, proof) = sk
         .eval_and_prove(source)
@@ -306,7 +306,7 @@ fn a_proof_for_one_position_does_not_validate_another() {
 
 #[test]
 fn a_position_past_the_slot_count_is_rejected() {
-    let (sk, pk) = keygen([71u8; 32], 100, HOLDER);
+    let (sk, pk) = keygen([71u8; 32], 100, HOLDER).expect("a valid slot count");
     let (y, proof) = sk
         .eval_and_prove(0)
         .expect("the position is within the committed slots");
@@ -317,8 +317,8 @@ fn a_position_past_the_slot_count_is_rejected() {
 
 #[test]
 fn a_proof_does_not_verify_under_a_foreign_key() {
-    let (sk_a, pk_a) = keygen([72u8; 32], 256, HOLDER);
-    let (_, pk_b) = keygen([73u8; 32], 256, HOLDER);
+    let (sk_a, pk_a) = keygen([72u8; 32], 256, HOLDER).expect("a valid slot count");
+    let (_, pk_b) = keygen([73u8; 32], 256, HOLDER).expect("a valid slot count");
     let position = 55u64;
     let (y, proof) = sk_a
         .eval_and_prove(position)
@@ -329,7 +329,7 @@ fn a_proof_does_not_verify_under_a_foreign_key() {
 
 #[test]
 fn forging_reduces_to_a_sha3_second_preimage_or_collision() {
-    let (sk, pk) = keygen([88u8; 32], 128, HOLDER);
+    let (sk, pk) = keygen([88u8; 32], 128, HOLDER).expect("a valid slot count");
     let position = 64u64;
     let honest = sk
         .prove(position)

@@ -16,7 +16,7 @@ fn bench_position(slots: u64) {
     };
 
     let t0 = Instant::now();
-    let (sk, pk) = keygen(seed, slots, HOLDER);
+    let (sk, pk) = keygen(seed, slots, HOLDER).expect("a valid slot count");
     let keygen_ns = t0.elapsed().as_nanos();
 
     let (y0, proof0) = sk
@@ -79,7 +79,7 @@ fn main() {
     }
 
     let slots = 8_192u64;
-    let (sk, pk) = keygen([7u8; 32], slots, HOLDER);
+    let (sk, pk) = keygen([7u8; 32], slots, HOLDER).expect("a valid slot count");
     let transcripts: Vec<_> = (0..1_024u64)
         .map(|i| {
             let pos = i % slots;

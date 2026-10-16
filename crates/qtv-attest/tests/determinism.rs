@@ -38,7 +38,8 @@ fn the_same_attestations_produce_the_same_certificate() {
     let cert_b = aggregate(1, 1, 0, block, &commitment_b, &beacon, &atts_b, 3).expect("quorum");
 
     assert_eq!(commitment_a.digest(), commitment_b.digest());
-    assert_eq!(cert_a.digest(), cert_b.digest());
+    assert_eq!(cert_a.envelope, cert_b.envelope);
+    assert_eq!(cert_a.attesters(), cert_b.attesters());
 }
 
 #[test]

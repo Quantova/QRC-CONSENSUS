@@ -139,6 +139,13 @@ impl Validator {
     pub fn sign(&self, message: &[u8], context: &[u8]) -> Signature {
         sign(self.sk.expose(), message, context, &[0u8; 32]).expect("context within bound")
     }
+
+    pub fn sign_hedged(&self, message: &[u8], context: &[u8]) -> Signature {
+        match qtv_crypto::ml_dsa::sign_os(self.sk.expose(), message, context) {
+            Some(sig) => sig,
+            None => self.sign(message, context),
+        }
+    }
 }
 
 impl fmt::Debug for Validator {

@@ -144,10 +144,11 @@ impl Drop for OneTimeTree {
 }
 
 impl OneTimeTree {
-    pub fn new(seed: [u8; 32], slots: u64, holder: u64) -> Self {
-        assert!(slots >= 1, "a one time tree serves at least one slot");
-        let padded =
-            padded_leaves(slots).expect("a one time tree serves a representable slot count");
+    pub fn new(seed: [u8; 32], slots: u64, holder: u64) -> Option<Self> {
+        if slots == 0 {
+            return None;
+        }
+        let padded = padded_leaves(slots)?;
         let mut leaves = Vec::with_capacity(padded);
         for position in 0..padded as u64 {
             if position < slots {
@@ -165,12 +166,12 @@ impl OneTimeTree {
             }
             layers.push(next);
         }
-        OneTimeTree {
+        Some(OneTimeTree {
             seed,
             slots,
             holder,
             layers,
-        }
+        })
     }
 
     pub fn holder(&self) -> u64 {
@@ -216,7 +217,7 @@ mod tests {
     const HOLDER: u64 = 7;
 
     fn tree(seed_byte: u8, slots: u64) -> OneTimeTree {
-        OneTimeTree::new([seed_byte; 32], slots, HOLDER)
+        OneTimeTree::new([seed_byte; 32], slots, HOLDER).expect("a valid slot count")
     }
 
     #[test]
@@ -314,7 +315,7 @@ mod tests {
 
     #[test]
     fn a_tree_built_for_one_holder_opens_for_no_other() {
-        let mine = OneTimeTree::new([5u8; 32], 16, 11);
+        let mine = OneTimeTree::new([5u8; 32], 16, 11).expect("a valid slot count");
         let root = mine.root();
         let preimage = mine
             .preimage(4)
@@ -329,7 +330,7 @@ mod tests {
                 "a credential replayed under another id must not open"
             );
         }
-        let theirs = OneTimeTree::new([5u8; 32], 16, 12);
+        let theirs = OneTimeTree::new([5u8; 32], 16, 12).expect("a valid slot count");
         assert_ne!(
             mine.root().digest,
             theirs.root().digest,

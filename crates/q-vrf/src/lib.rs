@@ -108,10 +108,10 @@ impl Proof {
     }
 }
 
-pub fn keygen(seed: [u8; 32], epoch_slots: u64, holder: u64) -> (SecretKey, PublicKey) {
-    let tree = OneTimeTree::new(seed, epoch_slots, holder);
+pub fn keygen(seed: [u8; 32], epoch_slots: u64, holder: u64) -> Option<(SecretKey, PublicKey)> {
+    let tree = OneTimeTree::new(seed, epoch_slots, holder)?;
     let pk = PublicKey::from_root(tree.root());
-    (SecretKey { tree }, pk)
+    Some((SecretKey { tree }, pk))
 }
 
 pub fn output_from_preimage(position: u64, preimage: &[u8; PREIMAGE_BYTES]) -> Output {
@@ -141,7 +141,7 @@ mod tests {
 
     #[test]
     fn keygen_eval_prove_verify_round_trip() {
-        let (sk, pk) = keygen([3u8; 32], 64, HOLDER);
+        let (sk, pk) = keygen([3u8; 32], 64, HOLDER).expect("a valid slot count");
         for position in 0..64 {
             let (y, proof) = sk
                 .eval_and_prove(position)
@@ -157,8 +157,8 @@ mod tests {
 
     #[test]
     fn eval_is_deterministic_in_the_key() {
-        let (sk_a, _) = keygen([9u8; 32], 32, HOLDER);
-        let (sk_b, _) = keygen([9u8; 32], 32, HOLDER);
+        let (sk_a, _) = keygen([9u8; 32], 32, HOLDER).expect("a valid slot count");
+        let (sk_b, _) = keygen([9u8; 32], 32, HOLDER).expect("a valid slot count");
         for position in 0..32 {
             assert_eq!(
                 sk_a.eval(position)
@@ -171,10 +171,10 @@ mod tests {
 
     #[test]
     fn a_different_seed_gives_a_different_key_and_output() {
-        let (sk_a, pk_a) = keygen([1u8; 32], 32, HOLDER);
-        let (_, pk_b) = keygen([2u8; 32], 32, HOLDER);
+        let (sk_a, pk_a) = keygen([1u8; 32], 32, HOLDER).expect("a valid slot count");
+        let (_, pk_b) = keygen([2u8; 32], 32, HOLDER).expect("a valid slot count");
         assert_ne!(pk_a, pk_b);
-        let (sk_c, _) = keygen([2u8; 32], 32, HOLDER);
+        let (sk_c, _) = keygen([2u8; 32], 32, HOLDER).expect("a valid slot count");
         assert_ne!(
             sk_a.eval(5)
                 .expect("the position is within the committed slots"),
