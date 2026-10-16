@@ -3,6 +3,10 @@
 
 name: ci
 on: [push, pull_request]
+permissions:
+  contents: read
 jobs:
   ci:
-    uses: Quantova/Quantova-Ci/.github/workflows/rust-ci.yml@f2a7a9c5bee34b20876b110ba903d0008b9e90d1
+    uses: Quantova/Quantova-Ci/.github/workflows/rust-ci.yml@b353180bead0add4191e3bebb99d160ef9a89286
+    with:
+      release-features: ""
