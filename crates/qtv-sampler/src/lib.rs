@@ -10,7 +10,6 @@ compile_error!("the test-fixtures feature exposes deterministic validator secret
 pub mod beacon;
 pub mod committee;
 pub mod epoch;
-pub mod evidence;
 pub use q_vrf::onetime;
 pub mod params;
 pub mod sortition;

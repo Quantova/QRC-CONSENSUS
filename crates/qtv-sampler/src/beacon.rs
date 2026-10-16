@@ -13,6 +13,8 @@ const BOUND_BEACON_DOMAIN: &[u8] = b"QORUS/beacon/bound-reveals/v1";
 
 const BOUND_PICK_DOMAIN: &[u8] = b"QORUS/beacon/bound-pick/v1";
 
+const FULL_BEACON_DOMAIN: &[u8] = b"QORUS/beacon/full-committee/v1";
+
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct Beacon {
     seed: [u8; SEED_BYTES],
@@ -77,6 +79,16 @@ impl Beacon {
             }
             None => input.extend_from_slice(&0u64.to_le_bytes()),
         }
+        let mut next = [0u8; SEED_BYTES];
+        shake256(&input, &mut next);
+        Beacon { seed: next }
+    }
+
+    pub fn advance_fixed(&self, slot: u64) -> Beacon {
+        let mut input = Vec::with_capacity(SEED_BYTES + FULL_BEACON_DOMAIN.len() + 8);
+        input.extend_from_slice(&self.seed);
+        input.extend_from_slice(FULL_BEACON_DOMAIN);
+        input.extend_from_slice(&slot.to_le_bytes());
         let mut next = [0u8; SEED_BYTES];
         shake256(&input, &mut next);
         Beacon { seed: next }

@@ -62,6 +62,7 @@ impl Clone for SamplerValidator {
                 self.key.slots(),
                 self.id,
             )
+            .expect("a held tree has a valid slot count")
             .0,
         }
     }
@@ -80,6 +81,7 @@ impl Drop for SamplerValidator {
 impl SamplerValidator {
     pub fn from_secret(id: ValidatorId, secret: &[u8; 32], stake: u64) -> Self {
         Self::from_secret_with_slots(id, secret, stake, DEFAULT_SLOTS)
+            .expect("the default slot count is valid")
     }
 
     pub fn from_secret_with_slots(
@@ -87,17 +89,18 @@ impl SamplerValidator {
         secret: &[u8; 32],
         stake: u64,
         slots: u64,
-    ) -> Self {
+    ) -> Option<Self> {
         let seed = sortition_tree_seed(secret);
-        SamplerValidator {
+        let key = keygen(seed, slots, id)?.0;
+        Some(SamplerValidator {
             id,
             role: Role::Validator,
             fault: Fault::Honest,
             stake: Stake::native(stake),
             seed,
             epoch: 0,
-            key: keygen(seed, slots, id).0,
-        }
+            key,
+        })
     }
 
     pub fn epoch(&self) -> u64 {
@@ -117,6 +120,7 @@ impl SamplerValidator {
                 self.key.slots(),
                 self.id,
             )
+            .expect("a held tree has a valid slot count")
             .0,
         }
     }
@@ -201,6 +205,7 @@ impl SamplerValidator {
 
     pub fn with_slots(id: ValidatorId, stake: u64, slots: u64) -> Self {
         Self::from_secret_with_slots(id, &fixture_secret(id), stake, slots)
+            .expect("a valid slot count")
     }
 
     pub fn with_stake(id: ValidatorId, stake: Stake) -> Self {
@@ -327,7 +332,8 @@ mod tests {
         let epoch_len = 8u64;
         let slots = epoch_len;
         let old_ceiling = crate::validator::DEFAULT_SLOTS;
-        let base = SamplerValidator::from_secret_with_slots(1, &[3u8; 32], 100, slots);
+        let base = SamplerValidator::from_secret_with_slots(1, &[3u8; 32], 100, slots)
+            .expect("a valid slot count");
         let mut highest = 0u64;
         for height in 0..(old_ceiling + slots + 4) {
             let epoch = crate::epoch::epoch_of(height, epoch_len);

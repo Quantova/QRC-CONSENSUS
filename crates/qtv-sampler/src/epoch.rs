@@ -25,6 +25,18 @@ pub fn is_epoch_start(height: u64, heights_per_epoch: u64) -> bool {
     heights_per_epoch != 0 && height % heights_per_epoch == 0
 }
 
+pub fn registration_open(height: u64, heights_per_epoch: u64) -> bool {
+    let lead = (heights_per_epoch / 4).max(1);
+    heights_per_epoch > lead && slot_in_epoch(height, heights_per_epoch) < heights_per_epoch - lead
+}
+
+pub fn registration_target(height: u64, heights_per_epoch: u64) -> Option<u64> {
+    if !registration_open(height, heights_per_epoch) {
+        return None;
+    }
+    epoch_of(height, heights_per_epoch).checked_add(1)
+}
+
 pub fn epoch_tree_seed(base_seed: &[u8; 32], epoch: u64) -> [u8; 32] {
     if epoch == 0 {
         return *base_seed;

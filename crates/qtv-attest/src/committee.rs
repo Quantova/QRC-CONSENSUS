@@ -3,7 +3,9 @@
 
 use qtv_crypto::ml_dsa::PublicKey;
 use qtv_crypto::sha3::shake256;
+use qtv_sampler::committee::{Committee, CommitteeView};
 use qtv_sampler::onetime::Root;
+use qtv_sampler::sortition::DrawMode;
 
 use crate::attester::{Attester, ValidatorId};
 use crate::params::COMMITTEE_BUDGET;
@@ -26,6 +28,7 @@ pub struct CommitteeCommitment {
     pub budget: u64,
     pub members: Vec<MemberKey>,
     pub absent_stake: u128,
+    pub mode: DrawMode,
 }
 
 impl CommitteeCommitment {
@@ -69,7 +72,74 @@ impl CommitteeCommitment {
             budget,
             members,
             absent_stake: 0,
+            mode: DrawMode::Unbound,
         }
+    }
+
+    pub fn from_view(
+        slot: u64,
+        view: &CommitteeView,
+        committee: &Committee,
+        attest_key: impl Fn(ValidatorId) -> Option<PublicKey>,
+    ) -> Option<Self> {
+        let mode = view.mode();
+        let total = view.total_weight();
+        let key_of = |id: ValidatorId| -> Option<MemberKey> {
+            let reg = view.registration(id)?;
+            Some(MemberKey {
+                id,
+                weight: view.effective_weight(reg.weight),
+                stake: reg.weight,
+                root: reg.root,
+                attest_pk: attest_key(id)?,
+            })
+        };
+        let members: Vec<MemberKey> = if mode == DrawMode::Full {
+            view.eligible()
+                .map(|r| key_of(r.id))
+                .collect::<Option<Vec<_>>>()?
+        } else {
+            committee
+                .members
+                .iter()
+                .map(|m| key_of(m.id))
+                .collect::<Option<Vec<_>>>()?
+        };
+        let absent_stake = if mode == DrawMode::Full {
+            0
+        } else {
+            let budget = u128::from(view.budget());
+            let total_wide = u128::from(total);
+            let expected: u128 = view
+                .eligible()
+                .map(|r| {
+                    let weight = u128::from(view.effective_weight(r.weight));
+                    if weight == 0 || total_wide == 0 {
+                        0
+                    } else if budget.saturating_mul(weight) >= total_wide {
+                        u128::from(r.weight)
+                    } else {
+                        u128::from(r.weight).saturating_mul(budget.saturating_mul(weight))
+                            / total_wide
+                    }
+                })
+                .fold(0u128, u128::saturating_add);
+            let realized: u128 = members
+                .iter()
+                .map(|m| u128::from(m.stake))
+                .fold(0u128, u128::saturating_add);
+            expected.saturating_sub(realized)
+        };
+        Some(
+            Self::from_member_keys_with_total(slot, members, view.budget(), total)
+                .with_absent_stake(absent_stake)
+                .with_mode(mode),
+        )
+    }
+
+    pub fn with_mode(mut self, mode: DrawMode) -> Self {
+        self.mode = mode;
+        self
     }
 
     pub fn with_total_weight(mut self, total_weight: u64) -> Self {
@@ -117,7 +187,10 @@ impl CommitteeCommitment {
     }
 
     pub fn member(&self, id: ValidatorId) -> Option<&MemberKey> {
-        self.members.iter().find(|m| m.id == id)
+        self.members
+            .binary_search_by_key(&id, |m| m.id)
+            .ok()
+            .map(|i| &self.members[i])
     }
 
     pub fn contains(&self, id: ValidatorId) -> bool {
@@ -141,6 +214,10 @@ impl CommitteeCommitment {
         }
         if self.absent_stake > 0 {
             buf.extend_from_slice(&self.absent_stake.to_le_bytes());
+        }
+        if self.mode != DrawMode::Unbound {
+            buf.extend_from_slice(b"QORUS-ATTEST-DRAW");
+            buf.push(self.mode.tag());
         }
         let mut out = [0u8; 32];
         shake256(&buf, &mut out);

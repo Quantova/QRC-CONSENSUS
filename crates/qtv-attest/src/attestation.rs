@@ -7,7 +7,9 @@ use qtv_bft::validator::{Validator, ValidatorId};
 use qtv_crypto::ml_dsa::{verify, PublicKey, Signature};
 use qtv_sampler::beacon::Beacon;
 use qtv_sampler::onetime::Root;
-use qtv_sampler::sortition::{verify_bound_selection, verify_selection, Credential};
+use qtv_sampler::sortition::{
+    verify_bound_selection, verify_draw, verify_selection, Credential, DrawMode,
+};
 
 use crate::committee::CommitteeDigest;
 use crate::params::{ATTEST_CONTEXT, DOMAIN_COMMITTEE};
@@ -54,7 +56,7 @@ impl Attestation {
         membership: Credential,
     ) -> Self {
         let msg = attestation_message(chain_id, height, slot, view, &committee, &block);
-        let sig = signer.sign(&msg, ATTEST_CONTEXT);
+        let sig = signer.sign_hedged(&msg, ATTEST_CONTEXT);
         Attestation {
             from: signer.id,
             height,
@@ -88,6 +90,29 @@ impl Attestation {
         budget: u64,
     ) -> bool {
         verify_selection(
+            root,
+            self.from,
+            beacon,
+            DOMAIN_COMMITTEE,
+            self.slot,
+            weight,
+            total,
+            budget,
+            &self.membership,
+        )
+    }
+
+    pub fn is_entitled_in(
+        &self,
+        mode: DrawMode,
+        root: &Root,
+        beacon: &Beacon,
+        weight: u64,
+        total: u64,
+        budget: u64,
+    ) -> bool {
+        verify_draw(
+            mode,
             root,
             self.from,
             beacon,

@@ -4,6 +4,7 @@
 use qtv_bft::block::{Block, Height};
 
 use qtv_sampler::beacon::Beacon;
+use qtv_sampler::sortition::DrawMode;
 
 use crate::attestation::Attestation;
 use crate::attester::ValidatorId;
@@ -40,7 +41,7 @@ pub fn aggregate(
             break;
         }
         let distinct: std::collections::BTreeSet<_> = same.iter().map(|att| att.from).collect();
-        if (distinct.len() as u64) < tau {
+        if commitment.mode != DrawMode::Full && (distinct.len() as u64) < tau {
             continue;
         }
         let (certificate, used) = aggregate_budgeted(
@@ -165,7 +166,8 @@ fn aggregate_budgeted(
             if !att.signature_verifies(chain_id, &member.attest_pk) {
                 continue;
             }
-            if !att.is_entitled(
+            if !att.is_entitled_in(
+                commitment.mode,
                 &member.root,
                 beacon,
                 member.weight,
@@ -180,9 +182,13 @@ fn aggregate_budgeted(
         round += 1;
     }
 
-    let effective_tau = tau.max(qtv_sampler::params::finality_threshold(
-        commitment.len() as u64
-    ));
+    let effective_tau = if commitment.mode == DrawMode::Full {
+        1
+    } else {
+        tau.max(qtv_sampler::params::finality_threshold(
+            commitment.len() as u64
+        ))
+    };
     let admitted_stake: u128 = admitted
         .iter()
         .map(|a| commitment.stake_of(a.from) as u128)

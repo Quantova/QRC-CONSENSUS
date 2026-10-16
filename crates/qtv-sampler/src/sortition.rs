@@ -238,6 +238,48 @@ pub fn verify_membership(root: &Root, holder: u64, slot: u64, credential: &Crede
         )
 }
 
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Default)]
+pub enum DrawMode {
+    #[default]
+    Unbound,
+    Bound,
+    Full,
+}
+
+impl DrawMode {
+    pub fn tag(self) -> u8 {
+        match self {
+            DrawMode::Unbound => 0,
+            DrawMode::Bound => 1,
+            DrawMode::Full => 2,
+        }
+    }
+}
+
+#[allow(clippy::too_many_arguments)]
+pub fn verify_draw(
+    mode: DrawMode,
+    root: &Root,
+    holder: u64,
+    beacon: &Beacon,
+    domain: &[u8],
+    slot: u64,
+    weight: u64,
+    total: u64,
+    budget: u64,
+    credential: &Credential,
+) -> bool {
+    match mode {
+        DrawMode::Unbound => verify_selection(
+            root, holder, beacon, domain, slot, weight, total, budget, credential,
+        ),
+        DrawMode::Bound => verify_bound_selection(
+            root, holder, beacon, domain, slot, weight, total, budget, credential,
+        ),
+        DrawMode::Full => weight > 0 && verify_membership(root, holder, slot, credential),
+    }
+}
+
 #[allow(clippy::too_many_arguments)]
 pub fn verify_selection(
     root: &Root,

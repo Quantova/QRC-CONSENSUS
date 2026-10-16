@@ -1,7 +1,7 @@
 // Copyright 2026 Quantova Inc
 // SPDX-License-Identifier: Apache-2.0 OR MIT
 
-use std::collections::BTreeSet;
+use std::collections::{BTreeSet, HashMap, HashSet};
 
 use crate::beacon::Beacon;
 use crate::onetime::{Root, PREIMAGE_BYTES};
@@ -9,9 +9,10 @@ use crate::params::{
     COMMITTEE_BUDGET, DOMAIN_COMMITTEE, DOMAIN_LEADER, MIN_SELF_STAKE, STAKE_CAP_MULTIPLE,
 };
 use crate::sortition::{
-    leader_neg_log2, leader_prefers, verify_bound_selection, verify_membership, verify_selection,
-    Credential,
+    leader_neg_log2, leader_prefers, verify_draw, verify_membership, Credential,
 };
+
+pub use crate::sortition::DrawMode;
 use crate::validator::{Registration, ValidatorId};
 use std::sync::OnceLock;
 
@@ -23,6 +24,7 @@ pub struct Member {
 
 pub struct Committee {
     pub members: Vec<Member>,
+    pub mode: DrawMode,
 }
 
 impl Committee {
@@ -47,7 +49,18 @@ impl Committee {
     }
 
     pub fn next_beacon(&self, beacon: &Beacon, slot: u64) -> Beacon {
-        beacon.advance_from_reveals(slot, &self.reveals())
+        match self.mode {
+            DrawMode::Unbound => beacon.advance_from_reveals(slot, &self.reveals()),
+            DrawMode::Bound => {
+                let pairs: Vec<(ValidatorId, [u8; PREIMAGE_BYTES])> = self
+                    .members
+                    .iter()
+                    .map(|m| (m.id, m.credential.preimage))
+                    .collect();
+                beacon.advance_from_bound_reveals(slot, &pairs)
+            }
+            DrawMode::Full => beacon.advance_fixed(slot),
+        }
     }
 }
 
@@ -88,34 +101,59 @@ impl PublishedReveal {
     }
 }
 
+const ROTATION_DOMAIN: &[u8] = b"QORUS/leader/rotation/v1";
+
+#[derive(Clone)]
 pub struct CommitteeView {
     registrations: Vec<Registration>,
+    index: HashMap<ValidatorId, usize>,
     budget: u64,
     floor: u64,
     cap: OnceLock<u64>,
-    bound: bool,
+    total: OnceLock<u64>,
+    mode: DrawMode,
 }
 
 impl CommitteeView {
     pub fn new(mut registrations: Vec<Registration>) -> Self {
         let mut seen = BTreeSet::new();
         registrations.retain(|r| seen.insert(r.id));
+        let index = registrations
+            .iter()
+            .enumerate()
+            .map(|(i, r)| (r.id, i))
+            .collect();
         CommitteeView {
             registrations,
+            index,
             budget: COMMITTEE_BUDGET,
             floor: MIN_SELF_STAKE,
             cap: OnceLock::new(),
-            bound: false,
+            total: OnceLock::new(),
+            mode: DrawMode::Unbound,
         }
     }
 
-    pub fn with_bound_draw(mut self, bound: bool) -> Self {
-        self.bound = bound;
+    pub fn with_bound_draw(self, bound: bool) -> Self {
+        self.with_mode(if bound {
+            DrawMode::Bound
+        } else {
+            DrawMode::Unbound
+        })
+    }
+
+    pub fn with_mode(mut self, mode: DrawMode) -> Self {
+        self.mode = mode;
+        self.total = OnceLock::new();
         self
     }
 
+    pub fn mode(&self) -> DrawMode {
+        self.mode
+    }
+
     pub fn bound_draw(&self) -> bool {
-        self.bound
+        self.mode == DrawMode::Bound
     }
 
     #[allow(clippy::too_many_arguments)]
@@ -129,31 +167,18 @@ impl CommitteeView {
         total: u64,
         credential: &Credential,
     ) -> bool {
-        if self.bound {
-            verify_bound_selection(
-                root,
-                holder,
-                beacon,
-                DOMAIN_COMMITTEE,
-                slot,
-                weight,
-                total,
-                self.budget,
-                credential,
-            )
-        } else {
-            verify_selection(
-                root,
-                holder,
-                beacon,
-                DOMAIN_COMMITTEE,
-                slot,
-                weight,
-                total,
-                self.budget,
-                credential,
-            )
-        }
+        verify_draw(
+            self.mode,
+            root,
+            holder,
+            beacon,
+            DOMAIN_COMMITTEE,
+            slot,
+            weight,
+            total,
+            self.budget,
+            credential,
+        )
     }
 
     pub fn with_budget(mut self, budget: u64) -> Self {
@@ -164,6 +189,7 @@ impl CommitteeView {
     pub fn with_floor(mut self, floor: u64) -> Self {
         self.floor = floor;
         self.cap = OnceLock::new();
+        self.total = OnceLock::new();
         self
     }
 
@@ -176,7 +202,13 @@ impl CommitteeView {
     }
 
     pub fn registration(&self, id: ValidatorId) -> Option<&Registration> {
-        self.registrations.iter().find(|r| r.id == id)
+        self.index.get(&id).map(|&i| &self.registrations[i])
+    }
+
+    pub fn eligible(&self) -> impl Iterator<Item = &Registration> {
+        self.registrations
+            .iter()
+            .filter(move |r| r.weight >= self.floor)
     }
 
     pub fn stake_cap(&self) -> u64 {
@@ -200,25 +232,24 @@ impl CommitteeView {
         if weight < self.floor {
             return 0;
         }
+        if self.mode == DrawMode::Full {
+            return weight;
+        }
         weight.min(self.stake_cap())
     }
 
     pub fn total_weight(&self) -> u64 {
-        let cap = self.stake_cap();
-        self.registrations
-            .iter()
-            .map(|r| r.weight)
-            .filter(|&w| w >= self.floor)
-            .map(|w| w.min(cap))
-            .fold(0u64, u64::saturating_add)
+        *self.total.get_or_init(|| {
+            self.registrations
+                .iter()
+                .map(|r| self.effective_weight(r.weight))
+                .fold(0u64, u64::saturating_add)
+        })
     }
 
     pub fn weights(&self) -> Vec<u64> {
-        let cap = self.stake_cap();
-        self.registrations
-            .iter()
-            .filter(|r| r.weight >= self.floor)
-            .map(|r| r.weight.min(cap))
+        self.eligible()
+            .map(|r| self.effective_weight(r.weight))
             .collect()
     }
 
@@ -249,46 +280,72 @@ impl CommitteeView {
         slot: u64,
         published: &[PublishedReveal],
     ) -> Committee {
+        let empty = Committee {
+            members: Vec::new(),
+            mode: self.mode,
+        };
+        let eligible = self.eligible().count();
+        if published.len() > eligible {
+            return empty;
+        }
+        let mut ids: HashSet<ValidatorId> = HashSet::with_capacity(published.len());
+        if !published.iter().all(|r| ids.insert(r.id)) {
+            return empty;
+        }
         let total = self.total_weight();
-        let by_id: std::collections::HashMap<ValidatorId, &Registration> = self
-            .registrations
-            .iter()
-            .filter(|r| r.weight >= self.floor)
-            .map(|r| (r.id, r))
-            .collect();
         let mut members: Vec<Member> = Vec::new();
-        let mut added: std::collections::HashSet<ValidatorId> = std::collections::HashSet::new();
         for reveal in published {
-            if added.contains(&reveal.id) {
-                continue;
-            }
-            let reg = match by_id.get(&reveal.id) {
-                Some(reg) => *reg,
-                None => continue,
+            let reg = match self.registration(reveal.id) {
+                Some(reg) if reg.weight >= self.floor => reg,
+                _ => continue,
             };
+            let weight = self.effective_weight(reg.weight);
             if !self.draws(
                 &reg.root,
                 reveal.id,
                 beacon,
                 slot,
-                self.effective_weight(reg.weight),
+                weight,
                 total,
                 &reveal.credential,
             ) {
                 continue;
             }
-            added.insert(reveal.id);
             members.push(Member {
                 id: reveal.id,
-                weight: self.effective_weight(reg.weight),
+                weight,
                 credential: reveal.credential.clone(),
             });
-            if added.len() == by_id.len() {
-                break;
-            }
         }
         members.sort_by_key(|m| m.id);
-        Committee { members }
+        Committee {
+            members,
+            mode: self.mode,
+        }
+    }
+
+    pub fn rotation_leader(&self, epoch: u64, slot: u64) -> Option<ValidatorId> {
+        let mut eligible: Vec<&Registration> = self.eligible().collect();
+        eligible.sort_by_key(|r| r.id);
+        let total: u128 = eligible.iter().map(|r| u128::from(r.weight)).sum();
+        if total == 0 {
+            return None;
+        }
+        let mut input = Vec::with_capacity(ROTATION_DOMAIN.len() + 16);
+        input.extend_from_slice(ROTATION_DOMAIN);
+        input.extend_from_slice(&epoch.to_le_bytes());
+        input.extend_from_slice(&slot.to_le_bytes());
+        let mut out = [0u8; 16];
+        qtv_crypto::sha3::shake256(&input, &mut out);
+        let mut position = u128::from_le_bytes(out) % total;
+        for reg in eligible {
+            let weight = u128::from(reg.weight);
+            if position < weight {
+                return Some(reg.id);
+            }
+            position -= weight;
+        }
+        None
     }
 
     pub fn elect_leader(
@@ -297,27 +354,30 @@ impl CommitteeView {
         beacon: &Beacon,
         slot: u64,
     ) -> Option<Leader> {
-        if !self.bound {
-            return elect_leader(committee, beacon, slot);
-        }
-        let mut best: Option<(u128, u64, ValidatorId, Credential)> = None;
-        for m in &committee.members {
-            let reg = self.registration(m.id)?;
-            let output = m
-                .credential
-                .bound_output(m.id, &reg.root, beacon, DOMAIN_LEADER, slot);
-            let neg_log2 = leader_neg_log2(&output);
-            let take = match &best {
-                None => true,
-                Some((bnl, bw, bid, _)) => {
-                    leader_prefers(neg_log2, m.weight, m.id, *bnl, *bw, *bid)
+        match self.mode {
+            DrawMode::Unbound => elect_leader(committee, beacon, slot),
+            DrawMode::Full => None,
+            DrawMode::Bound => {
+                let mut best: Option<(u128, u64, ValidatorId, Credential)> = None;
+                for m in &committee.members {
+                    let reg = self.registration(m.id)?;
+                    let output =
+                        m.credential
+                            .bound_output(m.id, &reg.root, beacon, DOMAIN_LEADER, slot);
+                    let neg_log2 = leader_neg_log2(&output);
+                    let take = match &best {
+                        None => true,
+                        Some((bnl, bw, bid, _)) => {
+                            leader_prefers(neg_log2, m.weight, m.id, *bnl, *bw, *bid)
+                        }
+                    };
+                    if take {
+                        best = Some((neg_log2, m.weight, m.id, m.credential.clone()));
+                    }
                 }
-            };
-            if take {
-                best = Some((neg_log2, m.weight, m.id, m.credential.clone()));
+                best.map(|(_, _, id, credential)| Leader { id, credential })
             }
         }
-        best.map(|(_, _, id, credential)| Leader { id, credential })
     }
 }
 
@@ -326,7 +386,7 @@ pub use roster::Registry;
 
 #[cfg(any(test, feature = "test-fixtures"))]
 mod roster {
-    use super::{elect_leader, Committee, Leader, Member};
+    use super::{elect_leader, Committee, DrawMode, Leader, Member};
     use crate::beacon::Beacon;
     use crate::params::{COMMITTEE_BUDGET, DOMAIN_COMMITTEE, MIN_SELF_STAKE};
     use crate::sortition::is_selected;
@@ -409,7 +469,10 @@ mod roster {
                 }
             }
             members.sort_by_key(|m| m.id);
-            Committee { members }
+            Committee {
+                members,
+                mode: DrawMode::Unbound,
+            }
         }
 
         pub fn elect_leader(

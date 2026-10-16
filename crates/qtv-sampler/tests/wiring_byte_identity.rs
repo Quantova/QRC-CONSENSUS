@@ -133,7 +133,7 @@ fn the_sortition_credential_is_the_q_vrf_proof_over_the_committed_tree() {
     let v = SamplerValidator::from_secret(id, &secret, stake);
 
     let seed = sortition_tree_seed(&secret);
-    let (sk, pk) = keygen(seed, DEFAULT_SLOTS, id);
+    let (sk, pk) = keygen(seed, DEFAULT_SLOTS, id).expect("a valid slot count");
 
     assert_eq!(
         pk.root().digest,

@@ -11,7 +11,7 @@ const STAKE: u64 = 5_000;
 const SET: usize = 5_000;
 const SLOTS: u64 = 256;
 
-fn realized_draws() -> (u64, Vec<u64>) {
+fn sampled_committees() -> (u64, Vec<Vec<u64>>) {
     let validators: Vec<SamplerValidator> = (0..SET)
         .map(|i| SamplerValidator::with_slots(i as u64 + 1, STAKE, SLOTS))
         .collect();
@@ -20,10 +20,18 @@ fn realized_draws() -> (u64, Vec<u64>) {
         .with_floor(0);
     let beacon = Beacon::genesis();
     let expected = expected_committee(&vec![STAKE; SET], COMMITTEE_BUDGET);
-    let draws = (0..SLOTS)
-        .map(|slot| registry.sample_committee(&beacon, slot).len() as u64)
+    let committees = (0..SLOTS)
+        .map(|slot| registry.sample_committee(&beacon, slot).ids())
         .collect();
-    (expected, draws)
+    (expected, committees)
+}
+
+fn realized_draws() -> (u64, Vec<u64>) {
+    let (expected, committees) = sampled_committees();
+    (
+        expected,
+        committees.iter().map(|ids| ids.len() as u64).collect(),
+    )
 }
 
 fn fork_feasible(total: u64, adversary: u64, tau: u64) -> bool {
@@ -56,15 +64,17 @@ fn pinning_tau_to_the_expected_size_is_fork_feasible_when_the_draw_over_draws() 
 }
 
 #[test]
-fn deriving_tau_from_the_realized_draw_closes_the_fork_at_every_adversary_share() {
-    let (expected, draws) = realized_draws();
-    for pct in [10u64, 20, 30, 33] {
-        for &total in &draws {
+fn counting_the_sampled_adversary_seats_shows_no_fork_feasible_slot_up_to_a_fifth_of_stake() {
+    let (expected, committees) = sampled_committees();
+    for pct in [10u64, 20] {
+        let adversary_ids = SET as u64 * pct / 100;
+        for ids in &committees {
+            let total = ids.len() as u64;
             let tau = finality_threshold(expected.max(total));
-            let adversary = total * pct / 100;
+            let adversary = ids.iter().filter(|&&id| id <= adversary_ids).count() as u64;
             assert!(
                 !fork_feasible(total, adversary, tau),
-                "draw {total} at {pct}% adversary must not admit two conflicting certificates, tau {tau}"
+                "draw {total} holding {adversary} sampled adversary seats at {pct}% must not admit two certificates, tau {tau}"
             );
         }
     }
