@@ -32,6 +32,10 @@ pub fn epoch_registration_message(
     msg
 }
 
+pub fn attest_key_admissible(attest_pk: &PublicKey) -> bool {
+    !qtv_crypto::ml_dsa::public_key_is_degenerate(attest_pk)
+}
+
 pub fn epoch_registration_verifies(
     attest_pk: &PublicKey,
     chain_id: u64,
@@ -40,6 +44,9 @@ pub fn epoch_registration_verifies(
     root: &Root,
     sig: &Signature,
 ) -> bool {
+    if !attest_key_admissible(attest_pk) {
+        return false;
+    }
     let msg = epoch_registration_message(chain_id, id, epoch, root);
     verify(attest_pk, &msg, sig, EPOCH_REG_CONTEXT)
 }
@@ -125,14 +132,14 @@ pub fn justification_view(
 }
 
 pub struct Attester {
-    signer: Validator,
+    signer: std::sync::Arc<Validator>,
     sampler: SamplerValidator,
 }
 
 impl Attester {
     pub fn from_secret(id: ValidatorId, secret: &[u8; 32], stake: u64) -> Self {
         Attester {
-            signer: Validator::from_secret(id, secret),
+            signer: std::sync::Arc::new(Validator::from_secret(id, secret)),
             sampler: SamplerValidator::from_secret(id, secret, stake),
         }
     }
@@ -144,21 +151,21 @@ impl Attester {
         slots: u64,
     ) -> Option<Self> {
         Some(Attester {
-            signer: Validator::from_secret(id, secret),
+            signer: std::sync::Arc::new(Validator::from_secret(id, secret)),
             sampler: SamplerValidator::from_secret_with_slots(id, secret, stake, slots)?,
         })
     }
 
     pub fn prover_from_secret(id: ValidatorId, secret: &[u8; 32]) -> Self {
         Attester {
-            signer: Validator::prover_from_secret(id, secret),
+            signer: std::sync::Arc::new(Validator::prover_from_secret(id, secret)),
             sampler: SamplerValidator::prover_from_secret(id, secret),
         }
     }
 
     pub fn at_epoch(&self, epoch: u64) -> Self {
         Attester {
-            signer: self.signer.clone(),
+            signer: std::sync::Arc::clone(&self.signer),
             sampler: self.sampler.rotate_to(epoch),
         }
     }

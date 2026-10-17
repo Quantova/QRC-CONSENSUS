@@ -148,7 +148,7 @@ fn a_full_committee_weighs_split_stake_at_its_raw_share() {
 }
 
 #[test]
-fn conflicting_certificates_across_views_name_their_signers_and_a_lock_refuses_the_second() {
+fn conflicting_certificates_name_signers_only_within_one_view_and_a_lock_refuses_the_second() {
     let atts = attesters(4, 100);
     let refs: Vec<&Attester> = atts.iter().collect();
     let commitment = CommitteeCommitment::from_attesters(0, &refs);
@@ -163,8 +163,15 @@ fn conflicting_certificates_across_views_name_their_signers_and_a_lock_refuses_t
     let votes_y: Vec<_> = atts.iter().map(|a| vote(a, 1, y)).collect();
     let cert_x = aggregate(1, 1, 0, x, &commitment, &beacon, &votes_x, 3).expect("quorum");
     let cert_y = aggregate(1, 1, 0, y, &commitment, &beacon, &votes_y, 3).expect("quorum");
-    let offenders = ConflictingCertificates::new(&cert_x, &cert_y)
-        .expect("one height, two blocks")
+    assert!(
+        ConflictingCertificates::new(&cert_x, &cert_y).is_none(),
+        "a justified revote in a later view is not a conflict"
+    );
+    let votes_y_same_view: Vec<_> = atts.iter().map(|a| vote(a, 0, y)).collect();
+    let cert_y_same_view =
+        aggregate(1, 1, 0, y, &commitment, &beacon, &votes_y_same_view, 3).expect("quorum");
+    let offenders = ConflictingCertificates::new(&cert_x, &cert_y_same_view)
+        .expect("one height, one view, two blocks")
         .offenders(1, &commitment, &beacon, 3, &commitment, &beacon, 3);
     assert_eq!(offenders, vec![1, 2, 3, 4]);
     assert!(ConflictingCertificates::new(&cert_x, &cert_x).is_none());
@@ -223,6 +230,24 @@ fn a_later_view_revote_is_not_equivocation_but_a_same_view_double_vote_is() {
     assert!(proof.verifies(1, &pk));
     let padded: Vec<_> = std::iter::repeat_n(c, 5_000).chain([d]).collect();
     assert_eq!(equivocators(1, &padded, |_| Some(pk)), vec![5]);
+
+    let aux = |val: u8| {
+        Block::with_cost(
+            3,
+            [val; 32],
+            Parent::Genesis,
+            qtv_attest::params::AUXILIARY_SUBJECT_COST,
+        )
+    };
+    let prevote = vote(2, aux(7));
+    let commit = vote(2, x);
+    let auxiliary = vote(2, aux(8));
+    assert!(EquivocationProof::new(prevote.clone(), commit.clone()).is_none());
+    assert!(EquivocationProof::new(prevote.clone(), auxiliary.clone()).is_none());
+    assert!(
+        equivocators(1, &[prevote, commit, auxiliary], |_| Some(pk)).is_empty(),
+        "an honest prevote, view change or proposal subject beside its block vote is not a double vote"
+    );
 }
 
 #[test]

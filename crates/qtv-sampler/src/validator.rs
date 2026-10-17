@@ -48,33 +48,9 @@ pub struct SamplerValidator {
     key: SecretKey,
 }
 
-impl Clone for SamplerValidator {
-    fn clone(&self) -> Self {
-        SamplerValidator {
-            id: self.id,
-            role: self.role,
-            fault: self.fault,
-            stake: self.stake,
-            seed: self.seed,
-            epoch: self.epoch,
-            key: keygen(
-                crate::epoch::epoch_tree_seed(&self.seed, self.epoch),
-                self.key.slots(),
-                self.id,
-            )
-            .expect("a held tree has a valid slot count")
-            .0,
-        }
-    }
-}
-
 impl Drop for SamplerValidator {
     fn drop(&mut self) {
-        for slot in self.seed.iter_mut() {
-            *slot = 0;
-        }
-        core::sync::atomic::compiler_fence(core::sync::atomic::Ordering::SeqCst);
-        let _ = core::hint::black_box(&self.seed);
+        crate::wipe(&mut self.seed);
     }
 }
 
@@ -268,9 +244,9 @@ mod tests {
     }
 
     #[test]
-    fn a_clone_commits_the_same_root_and_reveals() {
+    fn a_rederived_holder_commits_the_same_root_and_reveals() {
         let a = SamplerValidator::from_secret(3, &[3u8; 32], 2_000);
-        let b = a.clone();
+        let b = SamplerValidator::from_secret(3, &[3u8; 32], 2_000);
         assert_eq!(a.root(), b.root());
         assert_eq!(
             a.reveal(4)

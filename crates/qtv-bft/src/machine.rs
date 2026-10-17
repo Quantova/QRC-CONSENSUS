@@ -13,7 +13,7 @@ use crate::params::MIN_HEIGHT;
 use crate::slashing::{slash_from_evidence, EquivocationDetector, Slash, SlashLedger};
 use crate::validator::{Fault, ValidatorId, ValidatorSet};
 
-#[derive(Clone, Debug)]
+#[derive(Debug)]
 pub struct Machine {
     set: ValidatorSet,
     committee_size: usize,

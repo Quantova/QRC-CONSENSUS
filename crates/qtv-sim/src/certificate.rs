@@ -5,30 +5,25 @@ use crate::committee::supermajority;
 use crate::round::{BlockId, Vote};
 use crate::validator::ValidatorId;
 
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[derive(Clone, Debug, PartialEq, Eq)]
 pub struct Certificate {
     pub height: u64,
     pub seed: u64,
     pub block: BlockId,
-    pub voters: u64,
+    pub voters: Vec<ValidatorId>,
     pub weight: u32,
-    pub valid: bool,
 }
 
-fn tally(committee: &[ValidatorId], votes: &[Vote], block: BlockId) -> (u64, u32) {
-    let mut mask: u64 = 0;
-    let mut weight: u32 = 0;
-    for &(voter, b) in votes {
-        if b != block || voter >= 64 || !committee.contains(&voter) {
-            continue;
-        }
-        let bit = 1u64 << voter;
-        if mask & bit == 0 {
-            mask |= bit;
-            weight += 1;
-        }
-    }
-    (mask, weight)
+fn tally(committee: &[ValidatorId], votes: &[Vote], block: BlockId) -> (Vec<ValidatorId>, u32) {
+    let mut voters: Vec<ValidatorId> = votes
+        .iter()
+        .filter(|&&(voter, b)| b == block && committee.contains(&voter))
+        .map(|&(voter, _)| voter)
+        .collect();
+    voters.sort_unstable();
+    voters.dedup();
+    let weight = voters.len() as u32;
+    (voters, weight)
 }
 
 pub fn aggregate(
@@ -51,7 +46,6 @@ pub fn aggregate(
                 block,
                 voters,
                 weight,
-                valid: true,
             });
         }
     }

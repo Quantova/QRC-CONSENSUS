@@ -82,7 +82,7 @@ impl RoundOutcome {
     }
 
     pub fn final_block(&self) -> Option<BlockId> {
-        self.certificate.map(|c| c.block)
+        self.certificate.as_ref().map(|c| c.block)
     }
 }
 

@@ -3,7 +3,7 @@
 
 use core::fmt;
 
-use qtv_crypto::ml_dsa::{keygen_into, sign, PublicKey, SecretKey, Signature, SECRET_KEY_BYTES};
+use qtv_crypto::ml_dsa::{keygen, sign, PublicKey, SecretKey, Signature};
 use qtv_crypto::sha3::shake256;
 
 pub type ValidatorId = u64;
@@ -49,11 +49,8 @@ struct SigningKey {
 
 impl SigningKey {
     fn derive(seed: &[u8; 32]) -> (PublicKey, SigningKey) {
-        let mut held = SigningKey {
-            bytes: [0u8; SECRET_KEY_BYTES],
-        };
-        let pk = keygen_into(seed, &mut held.bytes);
-        (pk, held)
+        let (pk, bytes) = keygen(seed);
+        (pk, SigningKey { bytes })
     }
 
     fn expose(&self) -> &SecretKey {
@@ -61,24 +58,6 @@ impl SigningKey {
     }
 }
 
-impl Clone for SigningKey {
-    fn clone(&self) -> SigningKey {
-        SigningKey { bytes: self.bytes }
-    }
-}
-
-impl Drop for SigningKey {
-    fn drop(&mut self) {
-        for slot in self.bytes.iter_mut() {
-            unsafe {
-                core::ptr::write_volatile(slot, 0u8);
-            }
-        }
-        core::sync::atomic::compiler_fence(core::sync::atomic::Ordering::SeqCst);
-    }
-}
-
-#[derive(Clone)]
 pub struct Validator {
     pub id: ValidatorId,
     pub role: Role,
@@ -183,7 +162,7 @@ impl Validator {
     }
 }
 
-#[derive(Clone, Debug)]
+#[derive(Debug)]
 pub struct ValidatorSet {
     participants: Vec<Validator>,
 }
@@ -255,9 +234,9 @@ mod tests {
     }
 
     #[test]
-    fn a_cloned_signer_still_signs_the_same() {
+    fn a_rederived_signer_still_signs_the_same() {
         let v = Validator::from_secret(1, &[9u8; 32]);
-        let c = v.clone();
+        let c = Validator::from_secret(1, &[9u8; 32]);
         assert_eq!(v.sign(b"m", b"ctx"), c.sign(b"m", b"ctx"));
     }
 

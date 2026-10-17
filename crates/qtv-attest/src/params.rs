@@ -7,3 +7,5 @@ pub use qtv_sampler::params::{
 pub use qtv_sampler::sortition::expected_committee;
 
 pub const ATTEST_CONTEXT: &[u8] = b"QORUS-ATTEST-CERT";
+
+pub const AUXILIARY_SUBJECT_COST: u64 = u64::MAX;

@@ -15,9 +15,9 @@ fn honest_supermajority_finalizes_each_round() {
     for outcome in sim.run(ROUNDS) {
         assert!(outcome.finalized());
         assert!(outcome.slashed.is_empty());
-        let cert = outcome.certificate.expect("certificate present");
-        assert!(cert.valid);
+        let cert = outcome.certificate.clone().expect("certificate present");
         assert!(cert.weight >= 3);
+        assert_eq!(cert.voters.len() as u32, cert.weight);
         assert_eq!(
             outcome.final_block(),
             Some(canonical_block(outcome.height, outcome.seed))

@@ -541,7 +541,7 @@ mod tests {
     #[test]
     fn a_published_reveal_committee_reproduces_the_sortition_committee() {
         let set = validators(&[100, 100, 100, 100, 100]);
-        let reg = Registry::new(set.iter().map(|v| v.clone()).collect())
+        let reg = Registry::new(validators(&[100, 100, 100, 100, 100]))
             .with_budget(3)
             .with_floor(0);
         let view = CommitteeView::new(set.iter().map(Registration::of).collect())
@@ -637,10 +637,11 @@ mod tests {
     #[test]
     fn the_elected_leader_matches_the_floating_reference_and_is_stable() {
         use crate::sortition::leader_score;
-        let set = validators(&[500, 2_000, 2_000, 7_500, 40_000, 2_000, 15_000]);
-        let reg = Registry::new(set.iter().map(|v| v.clone()).collect())
-            .with_budget(500)
-            .with_floor(0);
+        let reg = Registry::new(validators(&[
+            500, 2_000, 2_000, 7_500, 40_000, 2_000, 15_000,
+        ]))
+        .with_budget(500)
+        .with_floor(0);
         for slot in 0..64u64 {
             let beacon = Beacon::genesis();
             let committee = reg.sample_committee(&beacon, slot);
@@ -672,7 +673,7 @@ mod tests {
         use std::collections::BTreeSet;
 
         let set = validators(&[100, 100, 100, 100, 100]);
-        let reg = Registry::new(set.iter().map(|v| v.clone()).collect())
+        let reg = Registry::new(validators(&[100, 100, 100, 100, 100]))
             .with_budget(10)
             .with_floor(0);
         let beacon = Beacon::genesis();

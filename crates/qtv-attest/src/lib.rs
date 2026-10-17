@@ -15,8 +15,8 @@ pub mod verify;
 
 pub use attestation::Attestation;
 pub use attester::{
-    epoch_registration_message, epoch_registration_verifies, justification_view, Attester,
-    Justification, ValidatorId, VoteLock, EPOCH_REG_CONTEXT,
+    attest_key_admissible, epoch_registration_message, epoch_registration_verifies,
+    justification_view, Attester, Justification, ValidatorId, VoteLock, EPOCH_REG_CONTEXT,
 };
 pub use certificate::{Certificate, Envelope};
 pub use committee::{CommitteeCommitment, CommitteeDigest, MemberKey};

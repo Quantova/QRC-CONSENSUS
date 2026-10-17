@@ -15,6 +15,20 @@ use crate::committee::CommitteeCommitment;
 
 pub const MAX_EQUIVOCATION_CANDIDATES: usize = 4 * crate::params::COMMITTEE_BUDGET as usize;
 
+fn votes_on_a_block(att: &Attestation) -> bool {
+    att.block.cost != crate::params::AUXILIARY_SUBJECT_COST
+}
+
+fn certificate_view(cert: &Certificate) -> Option<View> {
+    let view = cert.attestations.first()?.view;
+    cert.attestations
+        .iter()
+        .all(|a| {
+            a.view == view && a.height == cert.envelope.height && a.block == cert.envelope.block
+        })
+        .then_some(view)
+}
+
 pub struct EquivocationProof {
     pub offender: ValidatorId,
     pub height: Height,
@@ -25,7 +39,13 @@ pub struct EquivocationProof {
 
 impl EquivocationProof {
     pub fn new(a: Attestation, b: Attestation) -> Option<EquivocationProof> {
-        if a.from != b.from || a.height != b.height || a.view != b.view || a.block == b.block {
+        if a.from != b.from
+            || a.height != b.height
+            || a.view != b.view
+            || a.block == b.block
+            || !votes_on_a_block(&a)
+            || !votes_on_a_block(&b)
+        {
             return None;
         }
         let (first, second) = if a.block.to_bytes() <= b.block.to_bytes() {
@@ -50,6 +70,8 @@ impl EquivocationProof {
             && self.first.view == self.view
             && self.second.view == self.view
             && self.first.block != self.second.block
+            && votes_on_a_block(&self.first)
+            && votes_on_a_block(&self.second)
             && self.first.signature_verifies(chain_id, attest_pk)
             && self.second.signature_verifies(chain_id, attest_pk)
     }
@@ -61,7 +83,7 @@ pub fn equivocators(
     key_of: impl Fn(ValidatorId) -> Option<PublicKey>,
 ) -> Vec<ValidatorId> {
     let mut groups: HashMap<(ValidatorId, Height, View), Vec<&Attestation>> = HashMap::new();
-    for att in attestations {
+    for att in attestations.iter().filter(|a| votes_on_a_block(a)) {
         let bucket = groups.entry((att.from, att.height, att.view)).or_default();
         if !bucket.iter().any(|held| held.block == att.block) {
             bucket.push(att);
@@ -110,8 +132,14 @@ impl<'a> ConflictingCertificates<'a> {
     pub fn new(first: &'a Certificate, second: &'a Certificate) -> Option<Self> {
         if first.envelope.height != second.envelope.height
             || first.envelope.block == second.envelope.block
+            || first.envelope.block.cost == crate::params::AUXILIARY_SUBJECT_COST
+            || second.envelope.block.cost == crate::params::AUXILIARY_SUBJECT_COST
         {
             return None;
+        }
+        match (certificate_view(first), certificate_view(second)) {
+            (Some(a), Some(b)) if a == b => {}
+            _ => return None,
         }
         Some(ConflictingCertificates { first, second })
     }

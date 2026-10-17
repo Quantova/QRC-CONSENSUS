@@ -128,9 +128,7 @@ fn aggregate_budgeted(
         }
         match groups.iter_mut().find(|(id, _)| *id == att.from) {
             Some((_, bucket)) => {
-                if bucket.len() < MAX_CANDIDATES_PER_MEMBER
-                    && !bucket.iter().any(|held| held.sig == att.sig)
-                {
+                if (bucket.len() as u64) < cap && !bucket.iter().any(|held| held.sig == att.sig) {
                     bucket.push(*att);
                 }
             }
