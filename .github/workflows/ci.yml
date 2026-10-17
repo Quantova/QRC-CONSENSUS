@@ -7,6 +7,6 @@ permissions:
   contents: read
 jobs:
   ci:
-    uses: Quantova/Quantova-Ci/.github/workflows/rust-ci.yml@b353180bead0add4191e3bebb99d160ef9a89286
+    uses: Quantova/Quantova-Ci/.github/workflows/rust-ci.yml@3eedb4e772007f2c5a301a2e2c9cc013481e369c
     with:
       release-features: ""
