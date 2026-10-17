@@ -123,15 +123,15 @@ fn verify_body(
         if att.committee != committee_digest {
             return Verdict::Rejected(RejectReason::CommitmentMismatch);
         }
-        if seen.contains(&att.from) {
-            continue;
-        }
         let member = match commitment.member(att.from) {
             Some(m) => m,
             None => return Verdict::Rejected(RejectReason::NotOnCommittee),
         };
         if !att.signature_verifies(chain_id, &member.attest_pk) {
             return Verdict::Rejected(RejectReason::BadSignature);
+        }
+        if seen.contains(&att.from) {
+            continue;
         }
         if !att.is_entitled_in(
             commitment.mode,
