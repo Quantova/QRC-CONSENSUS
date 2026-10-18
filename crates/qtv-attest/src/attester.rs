@@ -118,7 +118,7 @@ pub fn justification_view(
     }
     let view = cert.attestations.first()?.view;
     if !cert
-        .verify(
+        .verify_with_trusted_commitment(
             chain_id,
             justification.commitment,
             justification.beacon,

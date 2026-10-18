@@ -38,7 +38,7 @@ impl Verdict {
 }
 
 impl Certificate {
-    pub fn verify(
+    pub fn verify_with_trusted_commitment(
         &self,
         chain_id: u64,
         commitment: &CommitteeCommitment,
@@ -79,7 +79,7 @@ impl Certificate {
         else {
             return Verdict::Rejected(RejectReason::BadCommitment);
         };
-        self.verify(chain_id, &commitment, beacon, tau)
+        self.verify_with_trusted_commitment(chain_id, &commitment, beacon, tau)
     }
 }
 

@@ -6,7 +6,7 @@ use q_vrf::{keygen, verify};
 use qtv_sampler::beacon::Beacon;
 use qtv_sampler::committee::{CommitteeView, PublishedReveal};
 use qtv_sampler::params::{DOMAIN_COMMITTEE, DOMAIN_LEADER};
-use qtv_sampler::sortition::sortition_output;
+use qtv_sampler::sortition::{sortition_output, DrawMode};
 use qtv_sampler::validator::{sortition_tree_seed, Registration, SamplerValidator, DEFAULT_SLOTS};
 
 fn hex(bytes: &[u8]) -> String {
@@ -102,7 +102,8 @@ fn committee_membership_and_leaders_are_byte_identical_to_the_pre_wiring_baselin
     let b = beacon();
     let view = CommitteeView::new(set.iter().map(Registration::of).collect())
         .with_budget(3)
-        .with_floor(0);
+        .with_floor(0)
+        .with_mode(DrawMode::Unbound);
 
     let expected: [(u64, &str, u64); 3] = [(0, "5", 5), (1, "2,4,5", 5), (7, "4,5", 5)];
     for (slot, want_ids, want_leader) in expected {

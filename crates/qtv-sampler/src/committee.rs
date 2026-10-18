@@ -130,7 +130,7 @@ impl CommitteeView {
             floor: MIN_SELF_STAKE,
             cap: OnceLock::new(),
             total: OnceLock::new(),
-            mode: DrawMode::Unbound,
+            mode: DrawMode::Full,
         }
     }
 
@@ -516,7 +516,9 @@ mod tests {
     #[test]
     fn an_assembled_member_carries_its_capped_weight_into_the_leader_draw() {
         let set = validators(&[100, 100, 100, 100_000]);
-        let view = CommitteeView::new(set.iter().map(Registration::of).collect()).with_floor(0);
+        let view = CommitteeView::new(set.iter().map(Registration::of).collect())
+            .with_floor(0)
+            .with_mode(DrawMode::Unbound);
         let beacon = Beacon::genesis();
         let published: Vec<PublishedReveal> = set
             .iter()
@@ -545,6 +547,7 @@ mod tests {
             .with_budget(3)
             .with_floor(0);
         let view = CommitteeView::new(set.iter().map(Registration::of).collect())
+            .with_mode(DrawMode::Unbound)
             .with_budget(3)
             .with_floor(0);
         for slot in 0..16u64 {
@@ -576,6 +579,7 @@ mod tests {
     fn a_reveal_that_does_not_authenticate_is_not_admitted() {
         let set = validators(&[100, 100, 100]);
         let view = CommitteeView::new(set.iter().map(Registration::of).collect())
+            .with_mode(DrawMode::Unbound)
             .with_budget(10)
             .with_floor(0);
         let beacon = Beacon::genesis();
@@ -610,6 +614,7 @@ mod tests {
     fn a_validator_that_never_publishes_is_absent() {
         let set = validators(&[100, 100, 100]);
         let view = CommitteeView::new(set.iter().map(Registration::of).collect())
+            .with_mode(DrawMode::Unbound)
             .with_budget(10)
             .with_floor(0);
         let beacon = Beacon::genesis();
@@ -744,7 +749,7 @@ mod stake_cap_tests {
                 },
             })
             .collect();
-        CommitteeView::new(regs)
+        CommitteeView::new(regs).with_mode(DrawMode::Unbound)
     }
 
     #[test]

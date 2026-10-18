@@ -37,7 +37,7 @@ fn a_forged_signature_is_rejected() {
     atts[0].sig[0] ^= 255;
     let cert = Certificate::new(Envelope::new(1, 0, block, &commitment), atts);
     assert_eq!(
-        cert.verify(1, &commitment, &beacon, 3),
+        cert.verify_with_trusted_commitment(1, &commitment, &beacon, 3),
         Verdict::Rejected(RejectReason::BadSignature)
     );
 }
@@ -49,7 +49,7 @@ fn a_swapped_block_is_rejected_as_wrong_subject() {
     atts[0].block = Block::new(1, [10u8; 32], Parent::Genesis);
     let cert = Certificate::new(Envelope::new(1, 0, block, &commitment), atts);
     assert_eq!(
-        cert.verify(1, &commitment, &beacon, 3),
+        cert.verify_with_trusted_commitment(1, &commitment, &beacon, 3),
         Verdict::Rejected(RejectReason::WrongSubject)
     );
 }
@@ -61,7 +61,7 @@ fn a_mangled_membership_credential_is_rejected_as_not_entitled() {
     atts[0].membership.preimage[0] ^= 1;
     let cert = Certificate::new(Envelope::new(1, 0, block, &commitment), atts);
     assert_eq!(
-        cert.verify(1, &commitment, &beacon, 3),
+        cert.verify_with_trusted_commitment(1, &commitment, &beacon, 3),
         Verdict::Rejected(RejectReason::NotEntitled)
     );
 }
@@ -76,7 +76,7 @@ fn a_commitment_with_a_denominator_below_its_own_committee_is_refused() {
     let starved = CommitteeCommitment::from_attesters(0, &members.iter().collect::<Vec<_>>())
         .with_total_weight(1);
     assert_eq!(
-        cert.verify(1, &starved, &beacon, 3),
+        cert.verify_with_trusted_commitment(1, &starved, &beacon, 3),
         Verdict::Rejected(RejectReason::CommitmentMismatch),
         "a re-parameterised commitment does not match the digest the envelope names"
     );
@@ -90,7 +90,10 @@ fn a_repeated_attestation_does_not_invalidate_a_good_certificate() {
     atts.push(repeat);
     let envelope = Envelope::new(1, 0, block, &commitment);
     let cert = Certificate::new(envelope, atts);
-    assert_eq!(cert.verify(1, &commitment, &beacon, 3), Verdict::Verified);
+    assert_eq!(
+        cert.verify_with_trusted_commitment(1, &commitment, &beacon, 3),
+        Verdict::Verified
+    );
 }
 
 #[test]
@@ -101,7 +104,7 @@ fn a_certificate_whose_height_is_not_its_blocks_height_is_refused() {
     envelope.height = 9;
     let cert = Certificate::new(envelope, atts);
     assert_eq!(
-        cert.verify(1, &commitment, &beacon, 3),
+        cert.verify_with_trusted_commitment(1, &commitment, &beacon, 3),
         Verdict::Rejected(RejectReason::HeightMismatch)
     );
 }
@@ -115,7 +118,7 @@ fn a_commitment_that_makes_entitlement_vacuous_is_refused() {
     thin.total_weight = commitment.committee_weight() - 1;
     let cert = Certificate::new(Envelope::new(1, 0, block, &thin), atts.clone());
     assert_eq!(
-        cert.verify(1, &thin, &beacon, 3),
+        cert.verify_with_trusted_commitment(1, &thin, &beacon, 3),
         Verdict::Rejected(RejectReason::BadCommitment),
         "a denominator under the committee's own weight is not a draw"
     );
@@ -124,7 +127,7 @@ fn a_commitment_that_makes_entitlement_vacuous_is_refused() {
     starved.budget = 0;
     let cert = Certificate::new(Envelope::new(1, 0, block, &starved), atts.clone());
     assert_eq!(
-        cert.verify(1, &starved, &beacon, 3),
+        cert.verify_with_trusted_commitment(1, &starved, &beacon, 3),
         Verdict::Rejected(RejectReason::BadCommitment),
         "a zero budget draws nobody"
     );
@@ -133,7 +136,7 @@ fn a_commitment_that_makes_entitlement_vacuous_is_refused() {
     greedy.budget = qtv_sampler::params::COMMITTEE_BUDGET + 1;
     let cert = Certificate::new(Envelope::new(1, 0, block, &greedy), atts.clone());
     assert_eq!(
-        cert.verify(1, &greedy, &beacon, 3),
+        cert.verify_with_trusted_commitment(1, &greedy, &beacon, 3),
         Verdict::Rejected(RejectReason::BadCommitment),
         "a budget past the protocol's saturates the threshold"
     );

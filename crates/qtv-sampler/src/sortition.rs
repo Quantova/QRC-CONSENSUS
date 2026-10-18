@@ -240,9 +240,9 @@ pub fn verify_membership(root: &Root, holder: u64, slot: u64, credential: &Crede
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Default)]
 pub enum DrawMode {
-    #[default]
     Unbound,
     Bound,
+    #[default]
     Full,
 }
 

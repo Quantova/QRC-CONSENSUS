@@ -39,7 +39,7 @@ fn measure(committee_size: usize) {
     let aggregate_ms = t0.elapsed().as_secs_f64() * 1e3;
 
     let t1 = Instant::now();
-    let verdict = cert.verify(1, &commitment, &beacon, tau);
+    let verdict = cert.verify_with_trusted_commitment(1, &commitment, &beacon, tau);
     let verify_ms = t1.elapsed().as_secs_f64() * 1e3;
     assert!(
         verdict.is_verified(),

@@ -291,7 +291,9 @@ mod tests {
             .collect();
         let forged = aggregate(1, 1, 0, block, &chosen, &beacon, &own, TAU)
             .expect("the attackers' own committee aggregates");
-        assert!(!forged.verify(1, &honest, &beacon, TAU).is_verified());
+        assert!(!forged
+            .verify_with_trusted_commitment(1, &honest, &beacon, TAU)
+            .is_verified());
     }
 
     #[test]
@@ -314,6 +316,7 @@ mod tests {
             0,
             vec![key(&a, 10), key(&b, 10), key(&c, 10), key(&d, 12)],
             40,
+            DrawMode::Unbound,
         );
         let split = vec![
             a.attest(1, 1, 0, 0, commitment.digest(), block, &beacon)
@@ -337,7 +340,9 @@ mod tests {
         ];
         let cert = aggregate(1, 1, 0, block, &commitment, &beacon, &staked, TAU)
             .expect("a stake supermajority finalizes");
-        assert!(cert.verify(1, &commitment, &beacon, TAU).is_verified());
+        assert!(cert
+            .verify_with_trusted_commitment(1, &commitment, &beacon, TAU)
+            .is_verified());
     }
 
     #[test]
@@ -393,7 +398,9 @@ mod tests {
         let cert = aggregate(1, 1, 0, block, &commitment, &beacon, &one_view, TAU)
             .expect("three in view two is a quorum");
         assert!(cert.attestations.iter().all(|att| att.view == 2));
-        assert!(cert.verify(1, &commitment, &beacon, TAU).is_verified());
+        assert!(cert
+            .verify_with_trusted_commitment(1, &commitment, &beacon, TAU)
+            .is_verified());
 
         let mut stitched = cert.clone();
         let swap = stitched
@@ -405,7 +412,7 @@ mod tests {
             .attest(1, 1, 0, 0, digest, block, &beacon)
             .expect("the attester serves this slot");
         assert_eq!(
-            stitched.verify(1, &commitment, &beacon, TAU),
+            stitched.verify_with_trusted_commitment(1, &commitment, &beacon, TAU),
             crate::verify::Verdict::Rejected(crate::verify::RejectReason::MixedViews)
         );
     }
@@ -611,7 +618,8 @@ mod tests {
         let cert = cert.expect("an entitled supermajority aggregates");
         assert_eq!(cert.attesters(), vec![1, 2, 3]);
         assert!(
-            cert.verify(1, &commitment, &beacon, TAU).is_verified(),
+            cert.verify_with_trusted_commitment(1, &commitment, &beacon, TAU)
+                .is_verified(),
             "the aggregated certificate passes wire level verification"
         );
     }
@@ -701,7 +709,8 @@ mod tests {
             "member 1's genuine vote is not censored however many forgeries precede it"
         );
         assert!(
-            cert.verify(1, &commitment, &beacon, TAU).is_verified(),
+            cert.verify_with_trusted_commitment(1, &commitment, &beacon, TAU)
+                .is_verified(),
             "the certificate passes wire level verification"
         );
         assert!(
@@ -873,7 +882,7 @@ mod tests {
         ];
         let thin = Certificate::new(envelope, two_signers);
         assert!(
-            !thin.verify(1, &commitment, &beacon, 2).is_verified(),
+            !thin.verify_with_trusted_commitment(1, &commitment, &beacon, 2).is_verified(),
             "two of a realized committee of four cannot finalize even when the caller passes tau = 2"
         );
 
@@ -895,6 +904,8 @@ mod tests {
             TAU,
         )
         .expect("three signers meet the realized-draw floor");
-        assert!(full.verify(1, &commitment, &beacon, TAU).is_verified());
+        assert!(full
+            .verify_with_trusted_commitment(1, &commitment, &beacon, TAU)
+            .is_verified());
     }
 }

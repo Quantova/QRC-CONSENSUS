@@ -109,6 +109,9 @@ fn the_draw_and_finality_still_finalize_with_real_keys() {
         .collect();
     let cert = aggregate(1, 1, 0, block, &commitment, &beacon, &atts, 3)
         .expect("an honest quorum finalizes");
-    assert_eq!(cert.verify(1, &commitment, &beacon, 3), Verdict::Verified);
+    assert_eq!(
+        cert.verify_with_trusted_commitment(1, &commitment, &beacon, 3),
+        Verdict::Verified
+    );
     assert_eq!(cert.attesters(), vec![1, 2, 3]);
 }

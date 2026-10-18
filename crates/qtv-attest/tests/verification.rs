@@ -29,8 +29,13 @@ fn an_entitled_supermajority_certificate_verifies() {
 
     let cert = aggregate(1, 1, 0, block, &commitment, &beacon, &atts, 3).expect("quorum");
     assert_eq!(cert.attesters(), vec![1, 2, 3]);
-    assert!(cert.verify(1, &commitment, &beacon, 3).is_verified());
-    assert_eq!(cert.verify(1, &commitment, &beacon, 3), Verdict::Verified);
+    assert!(cert
+        .verify_with_trusted_commitment(1, &commitment, &beacon, 3)
+        .is_verified());
+    assert_eq!(
+        cert.verify_with_trusted_commitment(1, &commitment, &beacon, 3),
+        Verdict::Verified
+    );
 }
 
 #[test]
@@ -54,7 +59,7 @@ fn a_certificate_missing_the_supermajority_does_not_verify() {
     let envelope = Envelope::new(1, 0, block, &commitment);
     let cert = Certificate::new(envelope, atts);
     assert_eq!(
-        cert.verify(1, &commitment, &beacon, 3),
+        cert.verify_with_trusted_commitment(1, &commitment, &beacon, 3),
         Verdict::Rejected(RejectReason::NotAQuorum)
     );
 }
@@ -88,7 +93,7 @@ fn a_count_quorum_of_small_seats_cannot_finalize_without_the_stake_behind_it() {
     let envelope = Envelope::new(1, 0, block, &commitment);
     let cert = Certificate::new(envelope, atts);
     assert_eq!(
-        cert.verify(1, &commitment, &beacon, 3),
+        cert.verify_with_trusted_commitment(1, &commitment, &beacon, 3),
         Verdict::Rejected(RejectReason::NotAQuorum),
         "a seat majority without a stake supermajority is not finality"
     );

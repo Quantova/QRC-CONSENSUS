@@ -51,12 +51,15 @@ fn the_consensus_verification_rejects_an_old_mechanism_membership_draw() {
         })
         .collect();
     let good = Certificate::new(Envelope::new(1, 0, block, &commitment), atts.clone());
-    assert_eq!(good.verify(1, &commitment, &beacon, 3), Verdict::Verified);
+    assert_eq!(
+        good.verify_with_trusted_commitment(1, &commitment, &beacon, 3),
+        Verdict::Verified
+    );
 
     atts[0].membership = old_style_draw(0);
     let bad = Certificate::new(Envelope::new(1, 0, block, &commitment), atts);
     assert_eq!(
-        bad.verify(1, &commitment, &beacon, 3),
+        bad.verify_with_trusted_commitment(1, &commitment, &beacon, 3),
         Verdict::Rejected(RejectReason::NotEntitled)
     );
 }

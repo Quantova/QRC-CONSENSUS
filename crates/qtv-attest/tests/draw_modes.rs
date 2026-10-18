@@ -73,9 +73,10 @@ fn certify(mode: DrawMode, atts: &[Attester]) -> Run {
         .collect();
     let tau = qtv_sampler::params::finality_threshold(commitment.len() as u64);
     let cert = aggregate(1, 1, slot, block, &commitment, &beacon, &votes, tau);
-    let verified = cert
-        .as_ref()
-        .is_some_and(|c| c.verify(1, &commitment, &beacon, tau).is_verified());
+    let verified = cert.as_ref().is_some_and(|c| {
+        c.verify_with_trusted_commitment(1, &commitment, &beacon, tau)
+            .is_verified()
+    });
     let registered = cert.as_ref().is_some_and(|c| {
         c.verify_registered(1, &view, &beacon, tau, key_of(atts))
             .is_verified()

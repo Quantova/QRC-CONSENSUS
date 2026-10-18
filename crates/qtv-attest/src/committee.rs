@@ -47,15 +47,20 @@ impl CommitteeCommitment {
                 attest_pk: *a.attest_public_key(),
             })
             .collect();
-        Self::from_member_keys(slot, members, budget)
+        Self::from_member_keys(slot, members, budget, DrawMode::Unbound)
     }
 
-    pub fn from_member_keys(slot: u64, members: Vec<MemberKey>, budget: u64) -> Self {
+    pub fn from_member_keys(
+        slot: u64,
+        members: Vec<MemberKey>,
+        budget: u64,
+        mode: DrawMode,
+    ) -> Self {
         let total = members
             .iter()
             .map(|m| m.weight)
             .fold(0u64, u64::saturating_add);
-        Self::from_member_keys_with_total(slot, members, budget, total)
+        Self::from_member_keys_with_total(slot, members, budget, total, mode)
     }
 
     pub fn from_member_keys_with_total(
@@ -63,6 +68,7 @@ impl CommitteeCommitment {
         mut members: Vec<MemberKey>,
         budget: u64,
         total_weight: u64,
+        mode: DrawMode,
     ) -> Self {
         members.sort_by_key(|m| m.id);
         members.dedup_by_key(|m| m.id);
@@ -72,7 +78,7 @@ impl CommitteeCommitment {
             budget,
             members,
             absent_stake: 0,
-            mode: DrawMode::Unbound,
+            mode,
         }
     }
 
@@ -131,9 +137,8 @@ impl CommitteeCommitment {
             expected.saturating_sub(realized)
         };
         Some(
-            Self::from_member_keys_with_total(slot, members, view.budget(), total)
-                .with_absent_stake(absent_stake)
-                .with_mode(mode),
+            Self::from_member_keys_with_total(slot, members, view.budget(), total, mode)
+                .with_absent_stake(absent_stake),
         )
     }
 

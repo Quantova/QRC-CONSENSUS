@@ -29,6 +29,8 @@ fn a_certificate_verifies_at_a_slot_beyond_the_default() {
     assert_eq!(atts[0].membership.path.siblings.len(), 12);
 
     let cert = aggregate(1, 1, slot, block, &commitment, &beacon, &atts, 3).expect("quorum forms");
-    assert!(cert.verify(1, &commitment, &beacon, 3).is_verified());
+    assert!(cert
+        .verify_with_trusted_commitment(1, &commitment, &beacon, 3)
+        .is_verified());
     assert_eq!(cert.attesters(), vec![1, 2, 3, 4]);
 }

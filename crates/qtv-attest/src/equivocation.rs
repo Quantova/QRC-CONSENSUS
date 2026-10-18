@@ -1,7 +1,7 @@
 // Copyright 2026 Quantova Inc
 // SPDX-License-Identifier: Apache-2.0 OR MIT
 
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 
 use qtv_bft::block::Height;
 use qtv_bft::committee::View;
@@ -14,6 +14,8 @@ use crate::certificate::Certificate;
 use crate::committee::CommitteeCommitment;
 
 pub const MAX_EQUIVOCATION_CANDIDATES: usize = 4 * crate::params::COMMITTEE_BUDGET as usize;
+
+pub const MAX_FAILED_VERIFIES_PER_VALIDATOR: usize = 4;
 
 fn votes_on_a_block(att: &Attestation) -> bool {
     att.block.cost != crate::params::AUXILIARY_SUBJECT_COST
@@ -82,20 +84,22 @@ pub fn equivocators(
     attestations: &[Attestation],
     key_of: impl Fn(ValidatorId) -> Option<PublicKey>,
 ) -> Vec<ValidatorId> {
-    let mut groups: HashMap<(ValidatorId, Height, View), Vec<&Attestation>> = HashMap::new();
+    type Bucket<'a> = (HashSet<Vec<u8>>, Vec<&'a Attestation>);
+    let mut groups: HashMap<(ValidatorId, Height, View), Bucket> = HashMap::new();
     for att in attestations.iter().filter(|a| votes_on_a_block(a)) {
-        let bucket = groups.entry((att.from, att.height, att.view)).or_default();
-        if !bucket.iter().any(|held| held.block == att.block) {
+        let (blocks, bucket) = groups.entry((att.from, att.height, att.view)).or_default();
+        if blocks.insert(att.block.to_bytes()) {
             bucket.push(att);
         }
     }
     let mut keys: Vec<(ValidatorId, Height, View)> = groups
         .iter()
-        .filter(|(_, bucket)| bucket.len() >= 2)
+        .filter(|(_, (_, bucket))| bucket.len() >= 2)
         .map(|(key, _)| *key)
         .collect();
     keys.sort_unstable();
     let mut budget = MAX_EQUIVOCATION_CANDIDATES;
+    let mut failures: HashMap<ValidatorId, usize> = HashMap::new();
     let mut flagged: Vec<ValidatorId> = Vec::new();
     for key in keys {
         if budget == 0 {
@@ -104,15 +108,21 @@ pub fn equivocators(
         if flagged.contains(&key.0) {
             continue;
         }
+        if failures.get(&key.0).copied().unwrap_or(0) >= MAX_FAILED_VERIFIES_PER_VALIDATOR {
+            continue;
+        }
         let Some(pk) = key_of(key.0) else { continue };
         let mut valid = 0usize;
-        for att in &groups[&key] {
-            if budget == 0 || valid == 2 {
+        for att in &groups[&key].1 {
+            let failed = failures.entry(key.0).or_insert(0);
+            if budget == 0 || valid == 2 || *failed >= MAX_FAILED_VERIFIES_PER_VALIDATOR {
                 break;
             }
             budget -= 1;
             if att.signature_verifies(chain_id, &pk) {
                 valid += 1;
+            } else {
+                *failed += 1;
             }
         }
         if valid == 2 {
@@ -157,11 +167,16 @@ impl<'a> ConflictingCertificates<'a> {
     ) -> Vec<ValidatorId> {
         if !self
             .first
-            .verify(chain_id, first_commitment, first_beacon, first_tau)
+            .verify_with_trusted_commitment(chain_id, first_commitment, first_beacon, first_tau)
             .is_verified()
             || !self
                 .second
-                .verify(chain_id, second_commitment, second_beacon, second_tau)
+                .verify_with_trusted_commitment(
+                    chain_id,
+                    second_commitment,
+                    second_beacon,
+                    second_tau,
+                )
                 .is_verified()
         {
             return Vec::new();
