@@ -6,7 +6,8 @@ use std::collections::{BTreeSet, HashMap, HashSet};
 use crate::beacon::Beacon;
 use crate::onetime::{Root, PREIMAGE_BYTES};
 use crate::params::{
-    COMMITTEE_BUDGET, DOMAIN_COMMITTEE, DOMAIN_LEADER, MIN_SELF_STAKE, STAKE_CAP_MULTIPLE,
+    COMMITTEE_BUDGET, DOMAIN_COMMITTEE, DOMAIN_LEADER, MAX_ACTIVE_VALIDATORS, MIN_SELF_STAKE,
+    STAKE_CAP_MULTIPLE,
 };
 use crate::sortition::{
     leader_neg_log2, leader_prefers, verify_draw, verify_membership, Credential,
@@ -111,6 +112,7 @@ pub struct CommitteeView {
     floor: u64,
     cap: OnceLock<u64>,
     total: OnceLock<u64>,
+    active: OnceLock<Vec<usize>>,
     mode: DrawMode,
 }
 
@@ -130,6 +132,7 @@ impl CommitteeView {
             floor: MIN_SELF_STAKE,
             cap: OnceLock::new(),
             total: OnceLock::new(),
+            active: OnceLock::new(),
             mode: DrawMode::Full,
         }
     }
@@ -145,6 +148,7 @@ impl CommitteeView {
     pub fn with_mode(mut self, mode: DrawMode) -> Self {
         self.mode = mode;
         self.total = OnceLock::new();
+        self.active = OnceLock::new();
         self
     }
 
@@ -190,6 +194,7 @@ impl CommitteeView {
         self.floor = floor;
         self.cap = OnceLock::new();
         self.total = OnceLock::new();
+        self.active = OnceLock::new();
         self
     }
 
@@ -205,10 +210,31 @@ impl CommitteeView {
         self.index.get(&id).map(|&i| &self.registrations[i])
     }
 
+    fn active(&self) -> &[usize] {
+        self.active.get_or_init(|| {
+            let mut chosen: Vec<usize> = (0..self.registrations.len())
+                .filter(|&i| self.registrations[i].weight >= self.floor)
+                .collect();
+            if self.mode == DrawMode::Full && chosen.len() > MAX_ACTIVE_VALIDATORS {
+                chosen.sort_by(|&a, &b| {
+                    let (ra, rb) = (&self.registrations[a], &self.registrations[b]);
+                    rb.weight.cmp(&ra.weight).then(ra.id.cmp(&rb.id))
+                });
+                chosen.truncate(MAX_ACTIVE_VALIDATORS);
+                chosen.sort_unstable();
+            }
+            chosen
+        })
+    }
+
+    pub fn is_active(&self, id: ValidatorId) -> bool {
+        self.index
+            .get(&id)
+            .is_some_and(|i| self.active().binary_search(i).is_ok())
+    }
+
     pub fn eligible(&self) -> impl Iterator<Item = &Registration> {
-        self.registrations
-            .iter()
-            .filter(move |r| r.weight >= self.floor)
+        self.active().iter().map(move |&i| &self.registrations[i])
     }
 
     pub fn stake_cap(&self) -> u64 {
@@ -240,8 +266,7 @@ impl CommitteeView {
 
     pub fn total_weight(&self) -> u64 {
         *self.total.get_or_init(|| {
-            self.registrations
-                .iter()
+            self.eligible()
                 .map(|r| self.effective_weight(r.weight))
                 .fold(0u64, u64::saturating_add)
         })
@@ -261,7 +286,7 @@ impl CommitteeView {
         credential: &Credential,
     ) -> bool {
         match self.registration(id) {
-            Some(reg) if reg.weight >= self.floor => self.draws(
+            Some(reg) if reg.weight >= self.floor && self.is_active(id) => self.draws(
                 &reg.root,
                 id,
                 beacon,
@@ -285,7 +310,11 @@ impl CommitteeView {
             mode: self.mode,
         };
         let eligible = self.eligible().count();
-        if published.len() > eligible {
+        let relevant = published
+            .iter()
+            .filter(|r| self.mode != DrawMode::Full || self.is_active(r.id))
+            .count();
+        if relevant > eligible {
             return empty;
         }
         let mut ids: HashSet<ValidatorId> = HashSet::with_capacity(published.len());
@@ -296,7 +325,7 @@ impl CommitteeView {
         let mut members: Vec<Member> = Vec::new();
         for reveal in published {
             let reg = match self.registration(reveal.id) {
-                Some(reg) if reg.weight >= self.floor => reg,
+                Some(reg) if reg.weight >= self.floor && self.is_active(reveal.id) => reg,
                 _ => continue,
             };
             let weight = self.effective_weight(reg.weight);
