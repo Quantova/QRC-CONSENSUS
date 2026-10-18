@@ -8,7 +8,7 @@ use qtv_bft::committee::View;
 use qtv_crypto::ml_dsa::PublicKey;
 use qtv_sampler::beacon::Beacon;
 
-use crate::attestation::Attestation;
+use crate::attestation::{Attestation, ChainBinding};
 use crate::attester::ValidatorId;
 use crate::certificate::Certificate;
 use crate::committee::CommitteeCommitment;
@@ -64,7 +64,8 @@ impl EquivocationProof {
         })
     }
 
-    pub fn verifies(&self, chain_id: u64, attest_pk: &PublicKey) -> bool {
+    pub fn verifies(&self, chain_id: impl Into<ChainBinding>, attest_pk: &PublicKey) -> bool {
+        let chain_id: ChainBinding = chain_id.into();
         self.first.from == self.offender
             && self.second.from == self.offender
             && self.first.height == self.height
@@ -80,10 +81,11 @@ impl EquivocationProof {
 }
 
 pub fn equivocators(
-    chain_id: u64,
+    chain_id: impl Into<ChainBinding>,
     attestations: &[Attestation],
     key_of: impl Fn(ValidatorId) -> Option<PublicKey>,
 ) -> Vec<ValidatorId> {
+    let chain_id: ChainBinding = chain_id.into();
     type Bucket<'a> = (HashSet<Vec<u8>>, Vec<&'a Attestation>);
     let mut groups: HashMap<(ValidatorId, Height, View), Bucket> = HashMap::new();
     for att in attestations.iter().filter(|a| votes_on_a_block(a)) {
@@ -157,7 +159,7 @@ impl<'a> ConflictingCertificates<'a> {
     #[allow(clippy::too_many_arguments)]
     pub fn offenders(
         &self,
-        chain_id: u64,
+        chain_id: impl Into<ChainBinding>,
         first_commitment: &CommitteeCommitment,
         first_beacon: &Beacon,
         first_tau: u64,
@@ -165,6 +167,7 @@ impl<'a> ConflictingCertificates<'a> {
         second_beacon: &Beacon,
         second_tau: u64,
     ) -> Vec<ValidatorId> {
+        let chain_id: ChainBinding = chain_id.into();
         if !self
             .first
             .verify_with_trusted_commitment(chain_id, first_commitment, first_beacon, first_tau)

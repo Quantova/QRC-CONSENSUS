@@ -14,16 +14,40 @@ use qtv_sampler::sortition::{
 use crate::committee::CommitteeDigest;
 use crate::params::{ATTEST_CONTEXT, DOMAIN_COMMITTEE};
 
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct ChainBinding {
+    pub chain_id: u64,
+    pub genesis: [u8; 32],
+}
+
+impl ChainBinding {
+    pub fn new(chain_id: u64, genesis: [u8; 32]) -> Self {
+        ChainBinding { chain_id, genesis }
+    }
+}
+
+#[cfg(feature = "test-fixtures")]
+impl From<u64> for ChainBinding {
+    fn from(chain_id: u64) -> Self {
+        ChainBinding {
+            chain_id,
+            genesis: [0u8; 32],
+        }
+    }
+}
+
 pub fn attestation_message(
-    chain_id: u64,
+    chain_id: impl Into<ChainBinding>,
     height: Height,
     slot: u64,
     view: View,
     committee: &CommitteeDigest,
     block: &Block,
 ) -> Vec<u8> {
-    let mut msg = Vec::with_capacity(8 + 24 + 33);
-    msg.extend_from_slice(&chain_id.to_le_bytes());
+    let chain_id: ChainBinding = chain_id.into();
+    let mut msg = Vec::with_capacity(8 + 32 + 24 + 33);
+    msg.extend_from_slice(&chain_id.chain_id.to_le_bytes());
+    msg.extend_from_slice(&chain_id.genesis);
     msg.extend_from_slice(&height.to_le_bytes());
     msg.extend_from_slice(&slot.to_le_bytes());
     msg.extend_from_slice(&view.to_le_bytes());
@@ -47,7 +71,7 @@ pub struct Attestation {
 impl Attestation {
     pub fn create(
         signer: &Validator,
-        chain_id: u64,
+        chain_id: impl Into<ChainBinding>,
         height: Height,
         slot: u64,
         view: View,
@@ -55,6 +79,7 @@ impl Attestation {
         block: Block,
         membership: Credential,
     ) -> Self {
+        let chain_id: ChainBinding = chain_id.into();
         let msg = attestation_message(chain_id, height, slot, view, &committee, &block);
         let sig = signer.sign_hedged(&msg, ATTEST_CONTEXT);
         Attestation {
@@ -69,7 +94,12 @@ impl Attestation {
         }
     }
 
-    pub fn signature_verifies(&self, chain_id: u64, attest_pk: &PublicKey) -> bool {
+    pub fn signature_verifies(
+        &self,
+        chain_id: impl Into<ChainBinding>,
+        attest_pk: &PublicKey,
+    ) -> bool {
+        let chain_id: ChainBinding = chain_id.into();
         let msg = attestation_message(
             chain_id,
             self.height,

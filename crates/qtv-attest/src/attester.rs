@@ -9,7 +9,7 @@ use qtv_sampler::beacon::Beacon;
 use qtv_sampler::onetime::Root;
 use qtv_sampler::validator::SamplerValidator;
 
-use crate::attestation::Attestation;
+use crate::attestation::{Attestation, ChainBinding};
 use crate::certificate::Certificate;
 use crate::committee::{CommitteeCommitment, CommitteeDigest};
 
@@ -18,13 +18,15 @@ pub use qtv_bft::validator::ValidatorId;
 pub const EPOCH_REG_CONTEXT: &[u8] = b"QORUS-EPOCH-REGISTER";
 
 pub fn epoch_registration_message(
-    chain_id: u64,
+    chain_id: impl Into<ChainBinding>,
     id: ValidatorId,
     epoch: u64,
     root: &Root,
 ) -> Vec<u8> {
-    let mut msg = Vec::with_capacity(8 + 8 + 8 + 32 + 8);
-    msg.extend_from_slice(&chain_id.to_le_bytes());
+    let chain_id: ChainBinding = chain_id.into();
+    let mut msg = Vec::with_capacity(8 + 32 + 8 + 8 + 32 + 8);
+    msg.extend_from_slice(&chain_id.chain_id.to_le_bytes());
+    msg.extend_from_slice(&chain_id.genesis);
     msg.extend_from_slice(&id.to_le_bytes());
     msg.extend_from_slice(&epoch.to_le_bytes());
     msg.extend_from_slice(&root.digest);
@@ -38,12 +40,13 @@ pub fn attest_key_admissible(attest_pk: &PublicKey) -> bool {
 
 pub fn epoch_registration_verifies(
     attest_pk: &PublicKey,
-    chain_id: u64,
+    chain_id: impl Into<ChainBinding>,
     id: ValidatorId,
     epoch: u64,
     root: &Root,
     sig: &Signature,
 ) -> bool {
+    let chain_id: ChainBinding = chain_id.into();
     if !attest_key_admissible(attest_pk) {
         return false;
     }
@@ -107,11 +110,12 @@ impl VoteLock {
 }
 
 pub fn justification_view(
-    chain_id: u64,
+    chain_id: impl Into<ChainBinding>,
     height: Height,
     block: &Block,
     justification: &Justification<'_>,
 ) -> Option<View> {
+    let chain_id: ChainBinding = chain_id.into();
     let cert = justification.certificate;
     if cert.envelope.height != height || cert.envelope.block != *block {
         return None;
@@ -174,7 +178,12 @@ impl Attester {
         self.sampler.epoch()
     }
 
-    pub fn epoch_registration(&self, chain_id: u64, epoch: u64) -> (Root, Signature) {
+    pub fn epoch_registration(
+        &self,
+        chain_id: impl Into<ChainBinding>,
+        epoch: u64,
+    ) -> (Root, Signature) {
+        let chain_id: ChainBinding = chain_id.into();
         let root = self.sampler.rotate_to(epoch).root();
         let msg = epoch_registration_message(chain_id, self.id(), epoch, &root);
         let sig = self.signer.sign_hedged(&msg, EPOCH_REG_CONTEXT);
@@ -205,7 +214,7 @@ impl Attester {
     pub fn attest_locked(
         &self,
         lock: &mut VoteLock,
-        chain_id: u64,
+        chain_id: impl Into<ChainBinding>,
         height: Height,
         slot: u64,
         view: View,
@@ -214,6 +223,7 @@ impl Attester {
         beacon: &Beacon,
         justification: Option<&Justification<'_>>,
     ) -> Option<Attestation> {
+        let chain_id: ChainBinding = chain_id.into();
         let justified_at =
             justification.and_then(|j| justification_view(chain_id, height, &block, j));
         if !lock.permits(height, view, &block, justified_at) {
@@ -227,7 +237,7 @@ impl Attester {
     #[allow(clippy::too_many_arguments)]
     pub fn attest(
         &self,
-        chain_id: u64,
+        chain_id: impl Into<ChainBinding>,
         height: Height,
         slot: u64,
         view: View,
@@ -235,6 +245,7 @@ impl Attester {
         block: Block,
         beacon: &Beacon,
     ) -> Option<Attestation> {
+        let chain_id: ChainBinding = chain_id.into();
         let _ = beacon;
         let membership = self.sampler.reveal(slot)?;
         Some(Attestation::create(

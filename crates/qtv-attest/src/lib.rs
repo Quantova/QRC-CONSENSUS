@@ -13,7 +13,7 @@ pub mod equivocation;
 pub mod params;
 pub mod verify;
 
-pub use attestation::Attestation;
+pub use attestation::{Attestation, ChainBinding};
 pub use attester::{
     attest_key_admissible, epoch_registration_message, epoch_registration_verifies,
     justification_view, Attester, Justification, ValidatorId, VoteLock, EPOCH_REG_CONTEXT,

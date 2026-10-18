@@ -6,7 +6,7 @@ use qtv_bft::block::{Block, Height};
 use qtv_sampler::beacon::Beacon;
 use qtv_sampler::sortition::DrawMode;
 
-use crate::attestation::Attestation;
+use crate::attestation::{Attestation, ChainBinding};
 use crate::attester::ValidatorId;
 use crate::certificate::{Certificate, Envelope};
 use crate::committee::{CommitteeCommitment, CommitteeDigest};
@@ -17,7 +17,7 @@ pub const MAX_ATTEST_VERIFICATIONS_PER_ROUND: u64 = 4 * COMMITTEE_BUDGET;
 pub const MAX_CANDIDATES_PER_MEMBER: usize = 4;
 
 pub fn aggregate(
-    chain_id: u64,
+    chain_id: impl Into<ChainBinding>,
     height: Height,
     slot: u64,
     block: Block,
@@ -26,6 +26,7 @@ pub fn aggregate(
     attestations: &[Attestation],
     tau: u64,
 ) -> Option<Certificate> {
+    let chain_id: ChainBinding = chain_id.into();
     let mut by_view: std::collections::BTreeMap<u64, Vec<&Attestation>> =
         std::collections::BTreeMap::new();
     for att in attestations {
@@ -71,7 +72,7 @@ fn verification_cap(commitment: &CommitteeCommitment) -> u64 {
 
 #[cfg(test)]
 fn aggregate_metered(
-    chain_id: u64,
+    chain_id: impl Into<ChainBinding>,
     height: Height,
     slot: u64,
     block: Block,
@@ -80,6 +81,7 @@ fn aggregate_metered(
     attestations: &[Attestation],
     tau: u64,
 ) -> (Option<Certificate>, u64) {
+    let chain_id: ChainBinding = chain_id.into();
     let refs: Vec<&Attestation> = attestations.iter().collect();
     let committee_digest = commitment.digest();
     aggregate_budgeted(
@@ -98,7 +100,7 @@ fn aggregate_metered(
 
 #[allow(clippy::too_many_arguments)]
 fn aggregate_budgeted(
-    chain_id: u64,
+    chain_id: impl Into<ChainBinding>,
     height: Height,
     slot: u64,
     block: Block,
@@ -109,6 +111,7 @@ fn aggregate_budgeted(
     tau: u64,
     cap: u64,
 ) -> (Option<Certificate>, u64) {
+    let chain_id: ChainBinding = chain_id.into();
     if commitment.total_weight < commitment.committee_weight()
         || commitment.budget == 0
         || commitment.budget > qtv_sampler::params::COMMITTEE_BUDGET

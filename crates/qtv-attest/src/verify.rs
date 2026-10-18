@@ -4,7 +4,7 @@
 use qtv_sampler::beacon::Beacon;
 use qtv_sampler::sortition::DrawMode;
 
-use crate::attestation::Attestation;
+use crate::attestation::{Attestation, ChainBinding};
 use crate::attester::ValidatorId;
 use crate::certificate::{Certificate, Envelope};
 use crate::committee::CommitteeCommitment;
@@ -40,11 +40,12 @@ impl Verdict {
 impl Certificate {
     pub fn verify_with_trusted_commitment(
         &self,
-        chain_id: u64,
+        chain_id: impl Into<ChainBinding>,
         commitment: &CommitteeCommitment,
         beacon: &Beacon,
         tau: u64,
     ) -> Verdict {
+        let chain_id: ChainBinding = chain_id.into();
         verify_body(
             chain_id,
             &self.envelope,
@@ -59,12 +60,13 @@ impl Certificate {
 impl Certificate {
     pub fn verify_registered(
         &self,
-        chain_id: u64,
+        chain_id: impl Into<ChainBinding>,
         view: &CommitteeView,
         beacon: &Beacon,
         tau: u64,
         attest_key: impl Fn(ValidatorId) -> Option<PublicKey>,
     ) -> Verdict {
+        let chain_id: ChainBinding = chain_id.into();
         let reveals: Vec<PublishedReveal> = if self.committee_reveals.is_empty() {
             self.attestations
                 .iter()
@@ -84,13 +86,14 @@ impl Certificate {
 }
 
 fn verify_body(
-    chain_id: u64,
+    chain_id: impl Into<ChainBinding>,
     envelope: &Envelope,
     attestations: &[Attestation],
     commitment: &CommitteeCommitment,
     beacon: &Beacon,
     tau: u64,
 ) -> Verdict {
+    let chain_id: ChainBinding = chain_id.into();
     let committee_digest = commitment.digest();
     if envelope.committee != committee_digest {
         return Verdict::Rejected(RejectReason::CommitmentMismatch);
