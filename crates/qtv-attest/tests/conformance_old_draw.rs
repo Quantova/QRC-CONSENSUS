@@ -6,7 +6,7 @@ use qtv_attest::verify::RejectReason;
 use qtv_attest::{
     Attester, Beacon, Block, Certificate, CommitteeCommitment, Envelope, Parent, Verdict,
 };
-use qtv_sampler::committee::verify_leader;
+use qtv_sampler::sortition::verify_membership;
 use qtv_sampler::onetime::MerklePath;
 use qtv_sampler::sortition::Credential;
 use qtv_sampler::validator::SamplerValidator;
@@ -92,6 +92,6 @@ fn leader_eligibility_rejects_an_old_mechanism_draw() {
     let genuine = leader
         .reveal(0)
         .expect("the position is within the committed slots");
-    assert!(verify_leader(&root, leader.id, 0, &genuine));
-    assert!(!verify_leader(&root, leader.id, 0, &old_style_draw(0)));
+    assert!(verify_membership(&root, leader.id, 0, &genuine));
+    assert!(!verify_membership(&root, leader.id, 0, &old_style_draw(0)));
 }

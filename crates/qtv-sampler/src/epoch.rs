@@ -3,6 +3,7 @@
 
 use qtv_crypto::sha3::shake256;
 
+#[cfg(test)]
 use crate::validator::ValidatorId;
 
 const EPOCH_SEED_DOMAIN: &[u8] = b"QORUS/onetime/epoch-rotation/v1";
@@ -52,11 +53,13 @@ pub fn epoch_tree_seed(base_seed: &[u8; 32], epoch: u64) -> [u8; 32] {
     out
 }
 
+#[cfg(test)]
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct ChurnBound {
     pub max_entrants: u64,
 }
 
+#[cfg(test)]
 impl ChurnBound {
     pub fn new(max_entrants: u64) -> Self {
         ChurnBound { max_entrants }

@@ -39,6 +39,9 @@ pub fn aggregate(
     attestations: &[Attestation],
     set: &ValidatorSet,
 ) -> Option<Certificate> {
+    if block.height != height {
+        return None;
+    }
     let mut attesters: Vec<ValidatorId> = Vec::new();
     for att in attestations {
         if att.height != height || att.block != block {

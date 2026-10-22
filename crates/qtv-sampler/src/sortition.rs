@@ -184,6 +184,9 @@ pub fn leader_prefers(
     best_weight: u64,
     best_id: u64,
 ) -> bool {
+    if cand_weight == 0 || best_weight == 0 {
+        return cand_weight > 0 || (best_weight == 0 && cand_id < best_id);
+    }
     let lhs = cand_neg_log2 * best_weight as u128;
     let rhs = best_neg_log2 * cand_weight as u128;
     lhs < rhs || (lhs == rhs && cand_id < best_id)

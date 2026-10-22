@@ -300,7 +300,7 @@ impl Machine {
         if height < MIN_HEIGHT || height > self.max_height {
             return false;
         }
-        if !(MIN_HEIGHT..height).all(|g| self.decided(g)) {
+        if !(MIN_HEIGHT..height).all(|g| self.decided(g)) || self.decided(height) {
             return false;
         }
         let committee = self.committee_for(height);

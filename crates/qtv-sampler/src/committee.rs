@@ -70,8 +70,17 @@ pub struct Leader {
     pub credential: Credential,
 }
 
-pub fn verify_leader(root: &Root, holder: u64, slot: u64, credential: &Credential) -> bool {
+pub fn verify_leader(
+    committee: &Committee,
+    beacon: &Beacon,
+    slot: u64,
+    root: &Root,
+    holder: u64,
+    credential: &Credential,
+) -> bool {
     verify_membership(root, holder, slot, credential)
+        && elect_leader(committee, beacon, slot)
+            .is_some_and(|leader| leader.id == holder && leader.credential == *credential)
 }
 
 pub fn elect_leader(committee: &Committee, beacon: &Beacon, slot: u64) -> Option<Leader> {
@@ -119,7 +128,12 @@ pub struct CommitteeView {
 impl CommitteeView {
     pub fn new(mut registrations: Vec<Registration>) -> Self {
         let mut seen = BTreeSet::new();
-        registrations.retain(|r| seen.insert(r.id));
+        let doubled: BTreeSet<ValidatorId> = registrations
+            .iter()
+            .filter(|r| !seen.insert(r.id))
+            .map(|r| r.id)
+            .collect();
+        registrations.retain(|r| !doubled.contains(&r.id));
         let index = registrations
             .iter()
             .enumerate()
@@ -539,7 +553,14 @@ mod tests {
         let leader = reg.elect_leader(&committee, &beacon, 0).unwrap();
         assert!(committee.contains(leader.id));
         let root = reg.registration(leader.id).unwrap().root;
-        assert!(verify_leader(&root, leader.id, 0, &leader.credential));
+        assert!(verify_leader(
+            &committee,
+            &beacon,
+            0,
+            &root,
+            leader.id,
+            &leader.credential
+        ));
     }
 
     #[test]

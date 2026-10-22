@@ -52,15 +52,19 @@ impl CommitteeCommitment {
 
     pub fn from_member_keys(
         slot: u64,
-        members: Vec<MemberKey>,
+        mut members: Vec<MemberKey>,
         budget: u64,
         mode: DrawMode,
     ) -> Self {
+        members.sort_by_key(|m| m.id);
+        members.dedup_by_key(|m| m.id);
         let total = members
             .iter()
-            .map(|m| m.weight)
-            .fold(0u64, u64::saturating_add);
-        Self::from_member_keys_with_total(slot, members, budget, total, mode)
+            .try_fold(0u64, |sum, m| sum.checked_add(m.weight));
+        match total {
+            Some(total) => Self::from_member_keys_with_total(slot, members, budget, total, mode),
+            None => Self::from_member_keys_with_total(slot, Vec::new(), budget, 0, mode),
+        }
     }
 
     pub fn from_member_keys_with_total(
@@ -72,6 +76,11 @@ impl CommitteeCommitment {
     ) -> Self {
         members.sort_by_key(|m| m.id);
         members.dedup_by_key(|m| m.id);
+        let mut keys: Vec<&[u8]> = members.iter().map(|m| &m.attest_pk[..]).collect();
+        keys.sort_unstable();
+        if keys.windows(2).any(|pair| pair[0] == pair[1]) {
+            members.clear();
+        }
         CommitteeCommitment {
             slot,
             total_weight,
