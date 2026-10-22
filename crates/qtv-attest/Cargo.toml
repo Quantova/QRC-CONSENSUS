@@ -15,7 +15,7 @@ name = "qtv_attest"
 test-fixtures = ["qtv-sampler/test-fixtures", "qtv-bft/test-fixtures"]
 
 [dependencies]
-qtv-crypto = { git = "https://github.com/Quantova/Q-Crypto.git", rev = "4e37c52984740f345f96e2c8536803bce5f3b805" }
+qtv-crypto = { git = "https://github.com/Quantova/Q-Crypto.git", rev = "28c0fff8f620c1663663f4bd271b7bae3dbddc80" }
 qtv-bft = { path = "../qtv-bft" }
 qtv-sampler = { path = "../qtv-sampler" }
 
