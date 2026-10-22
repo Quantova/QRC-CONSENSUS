@@ -252,7 +252,7 @@ fn a_later_view_revote_is_not_equivocation_but_a_same_view_double_vote_is() {
 }
 
 #[test]
-fn a_full_committee_admits_no_conflicting_certificates_below_a_third_of_stake() {
+fn a_full_committee_admits_no_conflicting_certificates_up_to_a_third_of_stake() {
     let atts = attesters(30, 2_000);
     let view = CommitteeView::new(registrations(&atts)).with_mode(DrawMode::Full);
     let beacon = Beacon::genesis();
@@ -270,7 +270,8 @@ fn a_full_committee_admits_no_conflicting_certificates_below_a_third_of_stake() 
             })
             .collect()
     };
-    for adversary in 0..=10usize {
+    let quorum = 30 * 2 / 3 + 1;
+    for adversary in 0..=12usize {
         let (bad, honest) = atts.split_at(adversary);
         let mut forked = false;
         for split in 0..=honest.len() {
@@ -285,7 +286,7 @@ fn a_full_committee_admits_no_conflicting_certificates_below_a_third_of_stake() 
         }
         assert_eq!(
             forked,
-            adversary * 3 >= 30,
+            adversary >= 2 * quorum - 30,
             "{adversary} of 30 equal stakes"
         );
     }

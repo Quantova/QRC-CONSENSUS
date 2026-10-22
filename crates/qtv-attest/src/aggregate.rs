@@ -195,8 +195,8 @@ fn aggregate_budgeted(
         .map(|a| commitment.stake_of(a.from) as u128)
         .fold(0u128, |acc, w| acc.saturating_add(w));
     let committee_stake = commitment.quorum_stake();
-    let weight_ok = committee_stake > 0
-        && admitted_stake.saturating_mul(3) >= committee_stake.saturating_mul(2);
+    let weight_ok =
+        committee_stake > 0 && admitted_stake.saturating_mul(3) > committee_stake.saturating_mul(2);
     let cert = if admitted.len() as u64 >= effective_tau && weight_ok {
         let envelope = Envelope::new(height, slot, block, commitment);
         Some(Certificate::new(envelope, admitted))
