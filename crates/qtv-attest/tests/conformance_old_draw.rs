@@ -6,8 +6,8 @@ use qtv_attest::verify::RejectReason;
 use qtv_attest::{
     Attester, Beacon, Block, Certificate, CommitteeCommitment, Envelope, Parent, Verdict,
 };
-use qtv_sampler::sortition::verify_membership;
 use qtv_sampler::onetime::MerklePath;
+use qtv_sampler::sortition::verify_membership;
 use qtv_sampler::sortition::Credential;
 use qtv_sampler::validator::SamplerValidator;
 
