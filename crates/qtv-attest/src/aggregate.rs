@@ -27,6 +27,9 @@ pub fn aggregate(
     tau: u64,
 ) -> Option<Certificate> {
     let chain_id: ChainBinding = chain_id.into();
+    if !block.within_budget() {
+        return None;
+    }
     let mut by_view: std::collections::BTreeMap<u64, Vec<&Attestation>> =
         std::collections::BTreeMap::new();
     for att in attestations {
@@ -131,7 +134,9 @@ fn aggregate_budgeted(
         }
         match groups.iter_mut().find(|(id, _)| *id == att.from) {
             Some((_, bucket)) => {
-                if (bucket.len() as u64) < cap && !bucket.iter().any(|held| held.sig == att.sig) {
+                if (bucket.len() as u64) < MAX_CANDIDATES_PER_MEMBER as u64
+                    && !bucket.iter().any(|held| held.sig == att.sig)
+                {
                     bucket.push(*att);
                 }
             }
