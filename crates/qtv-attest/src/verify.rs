@@ -23,7 +23,6 @@ pub enum RejectReason {
     MixedViews,
     BadCommitment,
     HeightMismatch,
-    OutOfBudget,
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -110,9 +109,6 @@ fn verify_body(
     }
     if envelope.height != envelope.block.height {
         return Verdict::Rejected(RejectReason::HeightMismatch);
-    }
-    if !envelope.block.within_budget() {
-        return Verdict::Rejected(RejectReason::OutOfBudget);
     }
     if attestations.len() > commitment.len() {
         return Verdict::Rejected(RejectReason::NotAQuorum);
