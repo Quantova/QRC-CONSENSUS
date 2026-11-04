@@ -27,6 +27,9 @@ pub fn aggregate(
     tau: u64,
 ) -> Option<Certificate> {
     let chain_id: ChainBinding = chain_id.into();
+    if !block.is_admissible() {
+        return None;
+    }
     let mut by_view: std::collections::BTreeMap<u64, Vec<&Attestation>> =
         std::collections::BTreeMap::new();
     for att in attestations {
@@ -211,6 +214,7 @@ mod tests {
     use super::*;
     use crate::attester::Attester;
     use qtv_bft::block::Parent;
+    use qtv_bft::params::VALIDATOR_RESOURCE_BUDGET;
 
     const BUDGET: u64 = 4;
     const TAU: u64 = 3;
@@ -367,6 +371,86 @@ mod tests {
         ];
         let cert = aggregate(1, 1, 0, block, &commitment, &beacon, &atts, TAU).expect("quorum");
         assert_eq!(cert.attesters(), vec![1, 2, 3]);
+    }
+
+    #[test]
+    fn a_fake_out_of_budget_block_never_aggregates() {
+        let a = Attester::new(1, 100);
+        let b = Attester::new(2, 100);
+        let c = Attester::new(3, 100);
+        let d = Attester::new(4, 100);
+        let beacon = Beacon::genesis();
+        let fake = Block::with_cost(1, [9u8; 32], Parent::Genesis, VALIDATOR_RESOURCE_BUDGET + 1);
+        let commitment = committee(&[&a, &b, &c, &d]);
+        let atts = vec![
+            a.attest(1, 1, 0, 0, commitment.digest(), fake, &beacon)
+                .expect("the attester serves this slot"),
+            b.attest(1, 1, 0, 0, commitment.digest(), fake, &beacon)
+                .expect("the attester serves this slot"),
+            c.attest(1, 1, 0, 0, commitment.digest(), fake, &beacon)
+                .expect("the attester serves this slot"),
+        ];
+        assert!(
+            aggregate(1, 1, 0, fake, &commitment, &beacon, &atts, TAU).is_none(),
+            "an out of budget block forms no certificate however many sign it"
+        );
+    }
+
+    #[test]
+    fn a_fake_out_of_budget_certificate_is_rejected_on_verify() {
+        let a = Attester::new(1, 100);
+        let b = Attester::new(2, 100);
+        let c = Attester::new(3, 100);
+        let d = Attester::new(4, 100);
+        let beacon = Beacon::genesis();
+        let fake = Block::with_cost(1, [9u8; 32], Parent::Genesis, VALIDATOR_RESOURCE_BUDGET + 1);
+        let commitment = committee(&[&a, &b, &c, &d]);
+        let envelope = Envelope::new(1, 0, fake, &commitment);
+        let signers = vec![
+            a.attest(1, 1, 0, 0, commitment.digest(), fake, &beacon)
+                .expect("the attester serves this slot"),
+            b.attest(1, 1, 0, 0, commitment.digest(), fake, &beacon)
+                .expect("the attester serves this slot"),
+            c.attest(1, 1, 0, 0, commitment.digest(), fake, &beacon)
+                .expect("the attester serves this slot"),
+        ];
+        let forged = Certificate::new(envelope, signers);
+        assert_eq!(
+            forged.verify_with_trusted_commitment(1, &commitment, &beacon, TAU),
+            crate::verify::Verdict::Rejected(crate::verify::RejectReason::OutOfBudget),
+            "a certificate carrying an out of budget block is refused on the verify path"
+        );
+    }
+
+    #[test]
+    fn the_view_change_subject_still_aggregates_and_verifies() {
+        let a = Attester::new(1, 100);
+        let b = Attester::new(2, 100);
+        let c = Attester::new(3, 100);
+        let d = Attester::new(4, 100);
+        let beacon = Beacon::genesis();
+        let subject = Block::with_cost(
+            1,
+            [9u8; 32],
+            Parent::Genesis,
+            Block::VIEW_CHANGE_SUBJECT_COST,
+        );
+        let commitment = committee(&[&a, &b, &c, &d]);
+        let atts = vec![
+            a.attest(1, 1, 0, 0, commitment.digest(), subject, &beacon)
+                .expect("the attester serves this slot"),
+            b.attest(1, 1, 0, 0, commitment.digest(), subject, &beacon)
+                .expect("the attester serves this slot"),
+            c.attest(1, 1, 0, 0, commitment.digest(), subject, &beacon)
+                .expect("the attester serves this slot"),
+        ];
+        let cert = aggregate(1, 1, 0, subject, &commitment, &beacon, &atts, TAU)
+            .expect("the reserved view change subject still forms its certificate");
+        assert!(
+            cert.verify_with_trusted_commitment(1, &commitment, &beacon, TAU)
+                .is_verified(),
+            "the view change certificate still passes verification, so view change is not frozen"
+        );
     }
 
     #[test]

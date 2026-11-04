@@ -40,8 +40,18 @@ impl Block {
         }
     }
 
+    pub const VIEW_CHANGE_SUBJECT_COST: u64 = u64::MAX;
+
     pub fn within_budget(&self) -> bool {
         self.cost <= VALIDATOR_RESOURCE_BUDGET
+    }
+
+    pub fn is_view_change_subject(&self) -> bool {
+        self.cost == Block::VIEW_CHANGE_SUBJECT_COST
+    }
+
+    pub fn is_admissible(&self) -> bool {
+        self.within_budget() || self.is_view_change_subject()
     }
 
     pub fn to_bytes(&self) -> Vec<u8> {
@@ -77,6 +87,42 @@ mod tests {
     fn over_budget_block_is_rejected() {
         let b = Block::with_cost(1, [7u8; 32], Parent::Genesis, VALIDATOR_RESOURCE_BUDGET + 1);
         assert!(!b.within_budget());
+    }
+
+    #[test]
+    fn the_view_change_subject_is_admissible_but_not_a_real_block() {
+        let s = Block::with_cost(
+            1,
+            [7u8; 32],
+            Parent::Genesis,
+            Block::VIEW_CHANGE_SUBJECT_COST,
+        );
+        assert!(s.is_view_change_subject());
+        assert!(!s.within_budget());
+        assert!(s.is_admissible());
+    }
+
+    #[test]
+    fn a_real_block_is_admissible_and_is_not_a_subject() {
+        let b = Block::new(1, [7u8; 32], Parent::Genesis);
+        assert!(b.within_budget());
+        assert!(!b.is_view_change_subject());
+        assert!(b.is_admissible());
+    }
+
+    #[test]
+    fn a_fake_out_of_budget_tag_is_not_admissible() {
+        let fake = Block::with_cost(1, [7u8; 32], Parent::Genesis, VALIDATOR_RESOURCE_BUDGET + 1);
+        assert!(!fake.within_budget());
+        assert!(!fake.is_view_change_subject());
+        assert!(!fake.is_admissible());
+        let near = Block::with_cost(
+            1,
+            [7u8; 32],
+            Parent::Genesis,
+            Block::VIEW_CHANGE_SUBJECT_COST - 1,
+        );
+        assert!(!near.is_admissible());
     }
 
     #[test]
