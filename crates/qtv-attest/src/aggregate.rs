@@ -45,7 +45,12 @@ pub fn aggregate(
             break;
         }
         let distinct: std::collections::BTreeSet<_> = same.iter().map(|att| att.from).collect();
-        if commitment.mode != DrawMode::Full && (distinct.len() as u64) < tau {
+        let view_stake: u128 = distinct
+            .iter()
+            .map(|id| commitment.stake_of(*id) as u128)
+            .fold(0u128, u128::saturating_add);
+        let quorum_stake = commitment.quorum_stake();
+        if quorum_stake == 0 || view_stake.saturating_mul(3) <= quorum_stake.saturating_mul(2) {
             continue;
         }
         let (certificate, used) = aggregate_budgeted(
