@@ -229,6 +229,7 @@ impl CommitteeView {
             let mut chosen: Vec<usize> = (0..self.registrations.len())
                 .filter(|&i| self.registrations[i].weight >= self.floor)
                 .collect();
+            // capped committee by design, not a bug. the top MAX_ACTIVE_VALIDATORS by weight keep finality bounded as validators join
             if self.mode == DrawMode::Full && chosen.len() > MAX_ACTIVE_VALIDATORS {
                 chosen.sort_by(|&a, &b| {
                     let (ra, rb) = (&self.registrations[a], &self.registrations[b]);
